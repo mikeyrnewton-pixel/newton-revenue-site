@@ -72,7 +72,7 @@ export async function onRequestPost({ request, env }) {
   const record = {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    source: ["ai-profit-brief", "newton-reset", "autopilot-8"].includes(p.source) ? p.source : "newton-revenue-site",
+    source: ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(p.source) ? p.source : "newton-revenue-site",
     name: p.name.trim(),
     company: p.company.trim(),
     email,
