@@ -6,6 +6,13 @@
   const summary = document.getElementById("audit-summary");
   const actions = document.getElementById("audit-actions");
   if (!form || !panel || !score || !summary || !actions) return;
+  // Carry a strict, first-party social channel tag to the separate enquiry form.
+  // No cookies, analytics SDK or submitted checklist answers.
+  const source = new URLSearchParams(location.search).get("utm_source");
+  if (["facebook", "instagram", "youtube", "search", "partner"].includes(source)) {
+    const contact = document.querySelector('[data-preserve-source="enquiry-check"]');
+    if (contact) contact.href = "/?source=enquiry-check&utm_source=" + encodeURIComponent(source) + "#enquire";
+  }
   const recommendations = [
     ["log", "Create one enquiry log with a date, contact channel, reference and current status."],
     ["owner", "Assign one named person to every open enquiry and make ownership visible to the team."],
