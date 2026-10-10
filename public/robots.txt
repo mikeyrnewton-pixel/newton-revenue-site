@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /leads.html
+Disallow: /api/
+Sitemap: https://newton-revenue-site.pages.dev/sitemap.xml
