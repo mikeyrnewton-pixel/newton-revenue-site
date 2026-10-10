@@ -11,6 +11,7 @@ if (form) form.addEventListener("submit", async (event) => {
   const fields = new FormData(form);
   const payload = {
     submissionId: pendingSubmissionId,
+    source: ["ai-profit-brief", "newton-reset", "autopilot-8"].includes(new URLSearchParams(location.search).get("source")) ? new URLSearchParams(location.search).get("source") : "newton-revenue-site",
     name: String(fields.get("name") || ""),
     company: String(fields.get("company") || ""),
     email: String(fields.get("email") || ""),
