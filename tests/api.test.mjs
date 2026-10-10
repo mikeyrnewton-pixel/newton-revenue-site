@@ -73,3 +73,18 @@ test("unexpected methods fail closed", async () => {
   assert.equal((await otherEnquiry()).status, 405);
   assert.equal((await otherLeads()).status, 405);
 });
+
+
+test("approved brand attribution is retained and arbitrary source strings are ignored", async () => {
+  const first = new MemoryKV();
+  const a = await submit({ request: req({ ...valid(), source: "ai-profit-brief" }), env: { LEADS: first } });
+  assert.equal(a.status, 201);
+  const rowA = [...first.data.values()].find(item => item && typeof item === "object" && item.status === "new");
+  assert.equal(rowA.source, "ai-profit-brief");
+
+  const second = new MemoryKV();
+  const b = await submit({ request: req({ ...valid(), source: "inject-me" }), env: { LEADS: second } });
+  assert.equal(b.status, 201);
+  const rowB = [...second.data.values()].find(item => item && typeof item === "object" && item.status === "new");
+  assert.equal(rowB.source, "newton-revenue-site");
+});
