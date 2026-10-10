@@ -97,3 +97,17 @@ test("free enquiry check referrals receive an approved source tag", async () => 
   assert.equal(record.source, "enquiry-check");
   assert.equal(record.marketingConsent, false);
 });
+
+test("approved organic campaign channels are stored; attacker-provided labels cannot poison attribution", async () => {
+  const kv = new MemoryKV();
+  const good = await submit({ request: req({ ...valid(), source: "enquiry-check", channel: "facebook" }), env: { LEADS: kv } });
+  assert.equal(good.status, 201);
+  const record = [...kv.data.values()].find(x => x && x.status === "new");
+  assert.equal(record.source, "enquiry-check");
+  assert.equal(record.channel, "facebook");
+  const kv2 = new MemoryKV();
+  const bad = await submit({ request: req({ ...valid(), channel: "clickfarm-and-other-untrusted-value" }), env: { LEADS: kv2 } });
+  assert.equal(bad.status, 201);
+  const record2 = [...kv2.data.values()].find(x => x && x.status === "new");
+  assert.equal(record2.channel, "direct");
+});

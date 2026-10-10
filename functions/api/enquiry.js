@@ -73,6 +73,7 @@ export async function onRequestPost({ request, env }) {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     source: ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(p.source) ? p.source : "newton-revenue-site",
+    channel: ["facebook", "instagram", "youtube", "search", "partner"].includes(p.channel) ? p.channel : "direct",
     name: p.name.trim(),
     company: p.company.trim(),
     email,

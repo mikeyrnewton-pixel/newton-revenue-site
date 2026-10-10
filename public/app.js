@@ -12,6 +12,7 @@ if (form) form.addEventListener("submit", async (event) => {
   const payload = {
     submissionId: pendingSubmissionId,
     source: ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(new URLSearchParams(location.search).get("source")) ? new URLSearchParams(location.search).get("source") : "newton-revenue-site",
+    channel: ["facebook", "instagram", "youtube", "search", "partner"].includes(new URLSearchParams(location.search).get("utm_source")) ? new URLSearchParams(location.search).get("utm_source") : "direct",
     name: String(fields.get("name") || ""),
     company: String(fields.get("company") || ""),
     email: String(fields.get("email") || ""),
