@@ -88,3 +88,12 @@ test("approved brand attribution is retained and arbitrary source strings are ig
   const rowB = [...second.data.values()].find(item => item && typeof item === "object" && item.status === "new");
   assert.equal(rowB.source, "newton-revenue-site");
 });
+
+test("free enquiry check referrals receive an approved source tag", async () => {
+  const kv = new MemoryKV();
+  const response = await submit({ request: req({ ...valid(), source: "enquiry-check" }), env: { LEADS: kv } });
+  assert.equal(response.status, 201);
+  const record = [...kv.data.values()].find(value => value && value.status === "new");
+  assert.equal(record.source, "enquiry-check");
+  assert.equal(record.marketingConsent, false);
+});
