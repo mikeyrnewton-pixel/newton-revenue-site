@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Free staff training expiry register template | AI Profit Brief</title>
+<meta name="description" content="A practical free CSV training register template for UK facilities and service businesses, with an Excel expiry formula, review process, privacy cautions and limitations.">
+<link rel="canonical" href="https://newton-revenue-site.pages.dev/ai-profit-brief/training-expiry-register/">
+<meta property="og:type" content="article"><meta property="og:title" content="Your staff training dates are in five places. Build one expiry register.">
+<meta property="og:description" content="Free CSV template, Excel formula and weekly review process. No AI subscription needed.">
+<meta property="og:url" content="https://newton-revenue-site.pages.dev/ai-profit-brief/training-expiry-register/">
+<link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/hub.css">
+</head>
+<body class="hub brief">
+<header class="bar"><div class="container top"><a class="brand" href="/ai-profit-brief/"><span class="mark">N/</span> AI PROFIT BRIEF</a><nav class="navlinks" aria-label="Site navigation"><a href="/">Newton Revenue</a><a href="/ai-profit-brief/">All guides</a><a href="/enquiry-check/">Free enquiry check</a></nav></div></header>
+<main>
+<section class="container hero">
+<div class="eyebrow"><span class="dot"></span> PRACTICAL GUIDE · FACILITIES / OPERATIONS · 11 OCTOBER 2026</div>
+<h1>Your training certificates are in five places. Start with one register.</h1>
+<p class="intro">A missed refresher date can leave a manager scrambling. You do not need an AI agent to solve the first problem: one reliable list, one owner and a weekly review. Here is a free starter template and the limits you should know.</p>
+<div class="actions"><a class="btn primary" href="/ai-profit-brief/training-expiry-register/training-register-template.csv" download>Get the free CSV template →</a><a class="textlink" href="#walkthrough">Follow the setup</a></div>
+<div class="hero-kicker"><span class="pill">No signup</span><span class="pill">No employee data uploaded here</span><span class="pill">Human-owned</span></div>
+</section>
+<section class="light"><div class="container section" id="walkthrough">
+<div class="eyebrow">THE 30-MINUTE STARTER PROCESS</div><h2>One row per person, per training requirement.</h2>
+<p><strong>1. Decide what you actually need to track.</strong> Start with a training-needs review for each role and the relevant risk assessment. Do not assume every course has a legally mandated annual renewal. Record the source of any review/expiry date (training provider, certificate, company policy or specific regulation).</p>
+<p><strong>2. Download and open the <a href="/ai-profit-brief/training-expiry-register/training-register-template.csv">CSV template</a>.</strong> Import it into your existing spreadsheet application. The CSV contains headers only, not real staff records. Keep a stable internal employee reference instead of putting unnecessary personal information in a shared file.</p>
+<p><strong>3. Enter the evidence.</strong> For each requirement, record the employee reference, course or competency, completion date, review or expiry date, restricted evidence location, responsible owner and last verified date. Use real date cells, not text like “next summer”.</p>
+<p><strong>4. Add a visible status.</strong> In cell F2, enter the following Excel formula and copy it down. It treats an empty date as needing review; it does <em>not</em> invent an expiry date:</p>
+<pre style="white-space:pre-wrap;overflow-wrap:anywhere;background:#eef1f6;padding:1rem;border-radius:.75rem"><code>=IF(D2="","CHECK DATE",IF(D2&lt;TODAY(),"EXPIRED",IF(D2&lt;=TODAY()+7,"DUE 7 DAYS",IF(D2&lt;=TODAY()+30,"DUE 30 DAYS","CURRENT"))))</code></pre>
+<p>If your Excel uses semicolons instead of commas, adjust the separators. The formula assumes column D contains actual spreadsheet dates. Test with one past date, one seven days away and one date more than 30 days away before relying on it.</p>
+<p><strong>5. Assign one weekly reviewer.</strong> Filter “EXPIRED”, “DUE 7 DAYS” and “DUE 30 DAYS”; check the source documents, decide whether retraining or a competency review is appropriate, and log the next action. Urgent competence concerns require a person to assess work allocation immediately, not a spreadsheet reminder.</p>
+<p><strong>6. Review access and backups.</strong> Give edit access only to people who need it. Store certificate evidence in an approved restricted location, not an open shared folder. Define retention and deletion rules; check that you can restore the file.</p>
+</div></section>
+<section class="container section">
+<div class="eyebrow">BEFORE YOU AUTOMATE</div><h2>Where this simple version breaks.</h2>
+<div class="facts">
+<article><h3>No automatic alerts</h3><p>A CSV cannot send notifications. Spreadsheet formulas only help when somebody opens and reviews the register. Calendar reminders are a separate, human-approved step.</p></article>
+<article><h3>Dates are not competence</h3><p>A current certificate is not proof that someone can perform every task safely. Different roles, risks and qualifications need different reviews.</p></article>
+<article><h3>Privacy and control</h3><p>Training records may be personal data. Apply UK GDPR access, purpose, retention and accuracy controls. Do not add medical records or confidential assessments to this simple tracker.</p></article>
+</div>
+<h2>What does it cost?</h2><p>The template is free. If you already have spreadsheet software, there is no new software charge for this approach. You still need time to check source documents, correct records, maintain access permissions and review exceptions. A larger multi-site team may eventually need audit logs, role-based permissions, alerts and integration with HR systems. Those requirements should be scoped and priced rather than promised for free.</p>
+<h2>What about AI?</h2><p>AI might help <em>draft</em> a summary of missing fields or suggest questions for a reviewer, but it should not infer training validity from an ambiguous document or approve someone to work. Never upload employee certificates or health information to a third-party AI tool without appropriate data protection assessment and contractual controls.</p>
+<h2>Check the underlying guidance</h2><p>The UK <a href="https://www.hse.gov.uk/simple-health-safety/training/decide.htm">Health and Safety Executive</a> says training records help identify refresher needs. Its <a href="https://www.hse.gov.uk/workplacetransport/personnel/initialtraining.htm">workplace transport guidance</a> recommends a central register with training history and needs. For asbestos work, <a href="https://www.hse.gov.uk/asbestos/training.htm">HSE cautions</a> that a certificate's expiry is not automatically proof that full retraining is legally required. The <a href="https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/employment/employment-practices-and-data-protection-keeping-employment-records/collecting-and-keeping-employment-records/">Information Commissioner's Office</a> explains minimisation, security and retention for employment records. These sources are guidance, not a substitute for role-specific legal or safety advice.</p>
+<div class="inline-cta"><h2>Want it maintained rather than just tracked?</h2><p>Use the template yourself. If you'd prefer help mapping the workflow, setting up permission-aware reminders, or integrating with your existing system, Newton Revenue can assess a narrow, human-reviewed build and quote only after checking feasibility. No claimed client outcomes or automatic compliance guarantees.</p><a class="btn primary" href="/?source=ai-profit-brief#enquire">Describe your training admin bottleneck →</a></div>
+<p><small>Produced by Newton Revenue, operated by Newton Strategic Holdings Ltd (company 17330041). This is an editorial guide, not a sponsored placement. Updated 11 October 2026.</small></p>
+</section>
+</main><footer><div class="container foot"><div><strong>AI PROFIT BRIEF</strong><p>Practical guidance without invented savings.</p></div><div>Produced by Newton Revenue · Newton Strategic Holdings Ltd<br><a href="/privacy.html">Privacy</a> · <a href="mailto:newtonrevenue@gmail.com">Contact</a></div></div></footer>
+</body></html>
