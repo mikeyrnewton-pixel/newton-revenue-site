@@ -1,5 +1,6 @@
 // Cloudflare Pages Function: POST /api/enquiry
-// Stores only valid enquiries in a private KV namespace; no notification or CRM claim.
+// Stores valid enquiries privately; optional owner notices never include customer data.
+import { deliverOwnerNotice } from '../../lib/owner-notifications.js';
 const MAX_BYTES = 8192;
 const TTL_SECONDS = 30 * 24 * 60 * 60;
 
@@ -16,7 +17,7 @@ function reply(body, status = 200) {
 function validText(value, max) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
 }
-export async function onRequestPost({ request, env }) {
+export async function onRequestPost({ request, env, waitUntil }) {
   if (!env.LEADS || typeof env.LEADS.put !== "function") {
     return reply({ error: "Lead intake is not configured. Please email us instead." }, 503);
   }
@@ -81,6 +82,7 @@ export async function onRequestPost({ request, env }) {
     contactPermission: true,
     marketingConsent: false,
     status: "new",
+    notification: { version: 1, status: 'pending', attempts: 0 },
   };
   try {
     await env.LEADS.put("lead:" + record.id, JSON.stringify(record), {
@@ -96,8 +98,16 @@ export async function onRequestPost({ request, env }) {
   } catch {
     return reply({ error: "Could not save the enquiry. Please email us instead." }, 503);
   }
+  // Intake success does not depend on webhook availability. The saved lead is
+  // the durable retry record; the authenticated retry endpoint can replay it.
+  const notice = deliverOwnerNotice(record, env).catch(() => {
+    // The original pending lead remains available if the delivery-state write fails.
+  });
+  if (typeof waitUntil === 'function') waitUntil(notice);
+  else await notice;
   return reply({ ok: true, received: true, reference: record.id }, 201);
 }
 export async function onRequest() {
   return reply({ error: "Method not allowed." }, 405);
 }
+

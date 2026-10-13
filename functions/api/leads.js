@@ -32,6 +32,11 @@ export async function onRequestGet({ request, env }) {
     const records = (await Promise.all(
       page.keys.map(key => env.LEADS.get(key.name, "json"))
     )).filter(Boolean).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    await Promise.all(records.map(async record => {
+      if (record.notification?.version !== 1) return;
+      const notice = await env.LEADS.get('notice:' + record.id, 'json');
+      if (notice) record.notification = notice;
+    }));
     return reply({ records, hasMore: !page.list_complete, nextCursor: page.cursor || null });
   } catch {
     return reply({ error: "Could not retrieve leads." }, 503);
@@ -40,3 +45,4 @@ export async function onRequestGet({ request, env }) {
 export async function onRequest() {
   return reply({ error: "Method not allowed." }, 405);
 }
+

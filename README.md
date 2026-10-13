@@ -20,7 +20,7 @@ Source code for the Newton Revenue customer-facing website and Cloudflare Pages 
 2. Add a private Cloudflare secret `ADMIN_TOKEN` with a unique, long random value (32+ characters). **Never commit the value to GitHub, enter it in chat or screenshots, or expose it in site JavaScript.**
 3. Test an actual deployed synthetic form submission and independently retrieve it from `/leads.html`. Form errors must show the fallback email address. The administrator interface is a bearer-token utility, not a complete user-account system.
 4. Apply Cloudflare rate limiting/bot protection and verify the privacy notice and agreed 30-day lead retention before broad promotion.
-5. Arrange a dependable human lead-review and reply routine. **No automated email alert, CRM sync, automatic responses, live payment flow or booked appointment integration is implemented yet.**
+5. Arrange a dependable human lead-review and reply routine. An optional owner-only notice and authenticated retry endpoint are implemented in this branch but disabled until secure configuration and live testing are complete; see [OWNER_NOTICES.md](OWNER_NOTICES.md). CRM sync, customer auto-responses, live payments and appointment booking remain unimplemented.
 6. Preserve the existing `newton-revenue.pages.dev` site until the new project passes tests and a controlled cutover is approved.
 
 The introductory £495 pilot is a **proposed test price**, subject to specific scope and feasibility. Do not claim live installations, guaranteed returns or verified revenue without evidence.
@@ -36,3 +36,4 @@ npm test
 Mocks and local tests are not a substitute for live Cloudflare deployment testing.
 
 **Important: this repository is PUBLIC.** Keep it limited to website code, without customer records, proprietary business data, credentials or internal operating-system source.
+
