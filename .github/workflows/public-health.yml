@@ -1,0 +1,53 @@
+# Public-site safety/availability smoke check.
+# Read-only; no contact details, credentials, API writes or paid services.
+# A green run proves public routes and auth boundaries, NOT lead delivery.
+name: Public website health monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  public-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check public pages and private route protection
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://newton-revenue-site.pages.dev"
+          for path in "/" "/enquiry-check/" "/follow-up-tracker/"; do
+            code=$(curl -sSL -o /tmp/newton-page.html -w "%{http_code}" \
+              --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 25 \
+              "${base}${path}")
+            echo "GET ${path} -> ${code}"
+            if [[ "${code}" != "200" ]] || ! grep -Eqi '<html|<!doctype html' /tmp/newton-page.html; then
+              echo "::error::Required public page unavailable or invalid: ${path}"
+              exit 1
+            fi
+          done
+
+          # No authentication: private lead route must reject or report missing secure config.
+          leads_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --connect-timeout 10 --max-time 20 "${base}/api/leads")
+          echo "Unauthenticated GET /api/leads -> ${leads_code}"
+          if [[ "${leads_code}" != "401" && "${leads_code}" != "503" ]]; then
+            echo "::error::Unexpected private lead API status"
+            exit 1
+          fi
+
+          # No token or body: a public POST must never activate private retries.
+          retry_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --connect-timeout 10 --max-time 20 -X POST \
+            "${base}/api/retry-owner-notices")
+          echo "Unauthenticated POST /api/retry-owner-notices -> ${retry_code}"
+          if [[ "${retry_code}" != "401" && "${retry_code}" != "503" ]]; then
+            echo "::error::Owner retry endpoint did not reject unauthenticated access"
+            exit 1
+          fi
+          echo "Public route + basic security smoke checks passed."
