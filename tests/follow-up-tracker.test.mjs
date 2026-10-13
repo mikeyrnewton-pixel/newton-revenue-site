@@ -1,0 +1,11 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const page=readFileSync(new URL('../public/follow-up-tracker/index.html',import.meta.url),'utf8');
+const csv=readFileSync(new URL('../public/downloads/newton-revenue-enquiry-tracker.csv',import.meta.url),'utf8');
+test('tracker is accessible and search-canonical',()=>{assert.match(page,/lang="en-GB"/);assert.match(page,/name="viewport"/);assert.match(page,/https:\/\/newton-revenue-site\.pages\.dev\/follow-up-tracker\//);assert.equal((page.match(/<h1\b/g)||[]).length,1)});
+test('template has eight useful columns and absolutely no personal data',()=>{assert.equal(csv.trim().split(',').length,8);assert.equal(csv.trim().split('\n').length,1);assert.match(csv,/Next Action Owner/);assert.match(csv,/Due Date/)});
+test('download link targets real same-origin file',()=>{assert.match(page,/href="\/downloads\/newton-revenue-enquiry-tracker\.csv"/);assert.match(page, /download="Newton-Revenue-Enquiry-Tracker\.csv"/)});
+test('sample records are explicitly fictional and not downloaded',()=>{assert.match(page,/Fictional records only/);assert.match(page,/DEMO-001/);assert.doesNotMatch(csv,/DEMO-001|@/);assert.match(page,/privacy and retention policies/)});
+test('sales CTA uses existing business email and policy route',()=>{assert.match(page,/mailto:newtonrevenue@gmail\.com/);assert.match(page,/href="\/privacy\.html"/);assert.match(page,/href="\/enquiry-check\/"/)});
+test('template does not send form data to external services',()=>{assert.doesNotMatch(page,/<form\b|<script\b|google-analytics|facebook\.net|hotjar|postMessage/i);assert.match(page,/No customer data sent to us/)});
