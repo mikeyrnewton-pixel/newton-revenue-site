@@ -24,7 +24,7 @@ jobs:
         run: |
           set -euo pipefail
           base="https://newton-revenue-site.pages.dev"
-          for path in "/" "/enquiry-check/" "/follow-up-tracker/"; do
+          for path in "/" "/enquiry-check/" "/follow-up-tracker/" "/enquiry-diagnostic/"; do
             code=$(curl -sSL -o /tmp/newton-page.html -w "%{http_code}" \
               --retry 2 --retry-delay 2 --connect-timeout 10 --max-time 25 \
               "${base}${path}")
@@ -32,6 +32,13 @@ jobs:
             if [[ "${code}" != "200" ]] || ! grep -Eqi '<html|<!doctype html' /tmp/newton-page.html; then
               echo "::error::Required public page unavailable or invalid: ${path}"
               exit 1
+            fi
+            if [[ "${path}" == "/" ]]; then
+              if ! grep -Fq 'href="/enquiry-diagnostic/"' /tmp/newton-page.html ||
+                 ! grep -Fq 'href="mailto:newtonrevenue@gmail.com' /tmp/newton-page.html; then
+                echo "::error::Homepage paid diagnostic or human email contact route missing"
+                exit 1
+              fi
             fi
           done
 
