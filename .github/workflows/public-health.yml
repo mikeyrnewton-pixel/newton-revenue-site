@@ -1,6 +1,7 @@
 # Public-site safety/availability smoke check.
-# Read-only; no contact details, credentials, API writes or paid services.
-# A green run proves public routes and auth boundaries, NOT lead delivery.
+# Routine runs are read-only, without credentials, API writes or paid services.
+# The explicit one-time synthetic probe below has fictional contact details and is push-message gated.
+# A green routine run proves public routes and auth boundaries, NOT lead delivery.
 name: Public website health monitor
 
 on:
@@ -75,3 +76,33 @@ jobs:
             exit 1
           fi
           echo "Public route + basic security smoke checks passed."
+
+      - name: One-time synthetic lead-to-owner test
+        if: github.event_name == 'push' && github.event.head_commit.message == 'Run one synthetic lead notification acceptance probe'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Exactly one synthetic record, no real person or customer data.
+          # Do not retry a network-ambiguous POST: avoid duplicate submissions.
+          cat > /tmp/atlas-synthetic.json <<'JSON'
+          {"name":"ATLAS SYNTHETIC TEST","company":"FICTIONAL TEST ONLY","email":"atlas-qa@example.invalid","problem":"SYNTHETIC ACCEPTANCE TEST ONLY - no real customer, buyer, transaction, marketing consent or payment. For validating Cloudflare KV to owner notification only.","contactPermission":true,"website":"","source":"enquiry-check","channel":"direct"}
+          JSON
+          response_code=$(curl -sS -o /tmp/atlas-synthetic-response.json -w "%{http_code}" \
+            --connect-timeout 12 --max-time 35 \
+            -H "Content-Type: application/json" \
+            -H "Origin: https://newton-revenue-site.pages.dev" \
+            --data-binary @/tmp/atlas-synthetic.json \
+            "https://newton-revenue-site.pages.dev/api/enquiry")
+          echo "SYNTHETIC ONLY POST /api/enquiry -> \${response_code}"
+          if [[ "\${response_code}" != "201" ]]; then
+            echo "::error::Synthetic enquiry intake failed; no real lead or owner-notice delivery is proved"
+            exit 1
+          fi
+          python3 - <<'PY'
+          import json
+          data = json.load(open('/tmp/atlas-synthetic-response.json'))
+          assert data.get('ok') is True and data.get('received') is True
+          assert isinstance(data.get('reference'), str) and len(data['reference']) >= 32
+          print('SYNTHETIC ONLY receipt validated; reference held privately in runner, not printed')
+          PY
+          echo "Reminder: 201 confirms KV intake, NOT successful email ACK or owner receipt."
