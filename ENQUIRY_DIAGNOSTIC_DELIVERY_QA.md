@@ -93,6 +93,33 @@ The pack passes only when all tests pass.
 
 Any failed test keeps the pack at `HOLD`.
 
+## QA execution record
+
+Create a private copy for each delivery. Start every outcome at `NOT RUN`. Use only anonymous or private evidence references; never paste client data into this public repository.
+
+| Test | Outcome (`PASS` / `FAIL` / `NOT RUN`) | Evidence reference | Reviewer and UTC date |
+| --- | --- | --- | --- |
+| Scope | NOT RUN |  |  |
+| Privacy | NOT RUN |  |  |
+| Completeness | NOT RUN |  |  |
+| Ownership | NOT RUN |  |  |
+| Action control | NOT RUN |  |  |
+| Status integrity | NOT RUN |  |  |
+| Duplicate control | NOT RUN |  |  |
+| Reconciliation | NOT RUN |  |  |
+| Fix quality | NOT RUN |  |  |
+| Claims | NOT RUN |  |  |
+| Human review | NOT RUN |  |  |
+| Client acceptance | NOT RUN |  |  |
+
+Record one overall delivery gate:
+
+| Gate | Rule | Initial state |
+| --- | --- | --- |
+| Delivery release | `RELEASE` only when all 12 outcomes are `PASS`, every row has an evidence reference, and reviewer/date fields are complete | HOLD |
+
+A `FAIL` or `NOT RUN` outcome keeps the delivery at `HOLD`. Record the correction owner, due date and retest evidence beside the failed test before reassessment. Client acceptance must be written and stored privately; delivery completion never proves payment.
+
 ## Handover record
 
 Record privately:
