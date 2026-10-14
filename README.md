@@ -41,3 +41,5 @@ Mocks and local tests are not a substitute for live Cloudflare deployment testin
 ## Cloudflare production smoke check (October 2026)
 
 A successful Pages build alone does not prove runtime bindings or secrets are active. After configuration changes, independently verify the production Pages Function, private access control, and an authorised synthetic enquiry before treating lead capture or owner notices as operational. Keep all credentials out of public source, URLs, screenshots, and test logs. Do not mistake a synthetic test for a paying customer.
+
+Runtime diagnosis: send an empty `text/plain` POST to `/api/enquiry` only as a non-writing storage-binding probe; `415` indicates the request reached validation after the `LEADS` check. Once production secrets have been redeployed, unauthenticated `GET /api/leads` should return `401`, not `503`. Never place the admin token in an URL, browser screenshot, GitHub action, public response or repository file. A passing probe does not constitute a successful synthetic lead-to-owner notification test.
