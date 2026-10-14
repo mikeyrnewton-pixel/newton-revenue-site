@@ -37,3 +37,7 @@ Mocks and local tests are not a substitute for live Cloudflare deployment testin
 
 **Important: this repository is PUBLIC.** Keep it limited to website code, without customer records, proprietary business data, credentials or internal operating-system source.
 
+
+## Cloudflare production smoke check (October 2026)
+
+A successful Pages build alone does not prove runtime bindings or secrets are active. After configuration changes, independently verify the production Pages Function, private access control, and an authorised synthetic enquiry before treating lead capture or owner notices as operational. Keep all credentials out of public source, URLs, screenshots, and test logs. Do not mistake a synthetic test for a paying customer.
