@@ -120,6 +120,16 @@ Record one overall delivery gate:
 
 A `FAIL` or `NOT RUN` outcome keeps the delivery at `HOLD`. Record the correction owner, due date and retest evidence beside the failed test before reassessment. Client acceptance must be written and stored privately; delivery completion never proves payment.
 
+### Correction and retest log
+
+Use this private log for every `FAIL` result. Do not overwrite the original outcome. Close a failure only after the correction is independently retested and the evidence reference is complete.
+
+| Test | Failure / exception | Correction owner | Next action | Due (UTC) | Retest outcome (`PASS` / `FAIL` / `NOT RUN`) | Retest evidence reference | Closed by and UTC date |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+|  |  |  |  |  | NOT RUN |  |  |
+
+The delivery gate remains `HOLD` while any failure lacks an owner, next action, due date, passing retest evidence or closure record.
+
 ## Handover record
 
 Record privately:
