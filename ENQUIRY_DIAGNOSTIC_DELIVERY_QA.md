@@ -62,6 +62,80 @@ Out of scope unless separately agreed: CRM implementation, automated messaging, 
 | Duplicate of | Canonical Enquiry ID where applicable |
 | QA note | Correction or reviewer note |
 
+## Customer-ready findings page
+
+Create this as the first page of the private delivery pack. Keep the language factual and trace every conclusion to anonymous evidence references. Do not include personal data, unsupported uplift estimates or internal QA notes.
+
+### Delivery summary
+
+| Field | Required content |
+| --- | --- |
+| Client / project | Private client or project reference |
+| Agreed channel | Exactly one in-scope enquiry channel |
+| Review window | Start and end timestamps |
+| Source count | Total examples received before deduplication |
+| Unique in-scope | Canonical enquiry rows analysed |
+| Duplicates | Rows linked to a canonical Enquiry ID |
+| Exclusions | Count and documented reason |
+| Reconciliation | Source count = unique in-scope + duplicates + exclusions |
+| Overall gate | `HOLD` until all 12 QA tests pass; otherwise `RELEASE` |
+
+### Evidence-linked findings
+
+| Finding | Evidence references | Operational consequence | Confidence / limitation |
+| --- | --- | --- | --- |
+|  |  |  |  |
+|  |  |  |  |
+|  |  |  |  |
+
+Every evidence reference must resolve to an anonymous tracker row or private source index. A missing reference keeps the delivery gate at `HOLD`.
+
+### Ownership map
+
+| Stage | Accountable owner | Handoff trigger | Expected deadline | Exception path |
+| --- | --- | --- | --- | --- |
+| Receipt |  |  |  |  |
+| Qualification |  |  |  |  |
+| Response |  |  |  |  |
+| Resolution |  |  |  |  |
+
+### Three prioritised fixes
+
+| Priority | Fix | Evidence references | Impact | Effort | Owner | First implementation step |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 |  |  |  |  |  |  |
+| 2 |  |  |  |  |  |  |
+| 3 |  |  |  |  |  |  |
+
+Do not add a fourth fix. If fewer than three are evidence-supported, keep the gate at `HOLD` and record the gap rather than inventing one.
+
+### Synthetic completed snapshot
+
+This snapshot demonstrates the format only. It is fictional and excluded from every enquiry, buyer and revenue KPI.
+
+| Field | Synthetic value |
+| --- | --- |
+| Agreed channel | Website form |
+| Review window | 2026-10-14 09:15–09:24 BST |
+| Source count | 3 |
+| Unique in-scope | 2 |
+| Duplicates | 1 |
+| Exclusions | 0 |
+| Reconciliation | 3 = 2 + 1 + 0 |
+| Overall gate | HOLD — QA and client acceptance not complete |
+
+| Finding | Evidence references | Operational consequence | Confidence / limitation |
+| --- | --- | --- | --- |
+| One service-fit enquiry is waiting on a capacity decision | SYN-02 | Response cannot be finalised until Operations confirms capacity | High for the synthetic rows only |
+| A duplicate enquiry would inflate workload if treated as new demand | SYN-02, SYN-03 | Merge under the canonical row while retaining the audit trace | High for the synthetic rows only |
+| The pricing enquiry has an owner and dated next action | SYN-01 | Sales can progress it without a handoff clarification | High for the synthetic rows only |
+
+| Priority | Fix | Evidence references | Impact | Effort | Owner | First implementation step |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Add a same-day capacity decision checkpoint | SYN-02 | Prevents stalled service-fit responses | Low | Operations owner | Confirm the available delivery slot by the recorded deadline |
+| 2 | Deduplicate before workload and conversion reporting | SYN-02, SYN-03 | Prevents double-counting and duplicate handling | Low | Sales owner | Link the duplicate to its canonical Enquiry ID |
+| 3 | Preserve an owner and dated next action for every unresolved enquiry | SYN-01, SYN-02 | Makes follow-up responsibility visible | Low | Sales owner | Review the tracker at the start of each working day |
+
 ## Synthetic worked example
 
 | Enquiry ID | Received at | Channel | Intent/category | Status | Owner | Next action | Deadline | Exception | Evidence ref | Duplicate of |
