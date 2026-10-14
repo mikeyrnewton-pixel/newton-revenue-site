@@ -51,6 +51,20 @@ jobs:
             exit 1
           fi
 
+          # Non-writing invalid enquiry probes KV binding. The handler checks LEADS first:
+          # 415 means KV available and invalid Content-Type was safely rejected;
+          # 503 means storage is not available to the deployed function.
+          # No personal information is sent and no KV records are created.
+          intake_code=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --connect-timeout 10 --max-time 20 -X POST \
+            -H "Content-Type: text/plain" --data '' \
+            "${base}/api/enquiry")
+          echo "Invalid empty POST /api/enquiry (no data saved) -> ${intake_code}"
+          if [[ "${intake_code}" != "415" ]]; then
+            echo "::error::Lead intake storage may be unbound/unavailable; expected 415 for safe invalid content type"
+            exit 1
+          fi
+
           # No token or body: a public POST must never activate private retries.
           retry_code=$(curl -sS -o /dev/null -w "%{http_code}" \
             --connect-timeout 10 --max-time 20 -X POST \
