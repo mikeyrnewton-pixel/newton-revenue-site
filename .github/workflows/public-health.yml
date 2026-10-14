@@ -1,7 +1,6 @@
 # Public-site safety/availability smoke check.
-# Routine runs are read-only, without credentials, API writes or paid services.
-# The explicit one-time synthetic probe below has fictional contact details and is push-message gated.
-# A green routine run proves public routes and auth boundaries, NOT lead delivery.
+# Read-only production availability and API access-control monitor.
+# Owner email delivery is checked separately; no enquiry records are created here.
 name: Public website health monitor
 
 on:
@@ -43,11 +42,11 @@ jobs:
             fi
           done
 
-          # No authentication: private lead route must reject or report missing secure config.
+          # Production admin secret and LEADS must be configured: unauthenticated access must return 401.
           leads_code=$(curl -sS -o /dev/null -w "%{http_code}" \
             --connect-timeout 10 --max-time 20 "${base}/api/leads")
           echo "Unauthenticated GET /api/leads -> ${leads_code}"
-          if [[ "${leads_code}" != "401" && "${leads_code}" != "503" ]]; then
+          if [[ "${leads_code}" != "401" ]]; then
             echo "::error::Unexpected private lead API status"
             exit 1
           fi
@@ -66,43 +65,13 @@ jobs:
             exit 1
           fi
 
-          # No token or body: a public POST must never activate private retries.
+          # No token or body: authenticated owner retry route must refuse public access.
           retry_code=$(curl -sS -o /dev/null -w "%{http_code}" \
             --connect-timeout 10 --max-time 20 -X POST \
             "${base}/api/retry-owner-notices")
           echo "Unauthenticated POST /api/retry-owner-notices -> ${retry_code}"
-          if [[ "${retry_code}" != "401" && "${retry_code}" != "503" ]]; then
+          if [[ "${retry_code}" != "401" ]]; then
             echo "::error::Owner retry endpoint did not reject unauthenticated access"
             exit 1
           fi
           echo "Public route + basic security smoke checks passed."
-
-      - name: One-time synthetic lead-to-owner test
-        if: github.event_name == 'push' && github.event.head_commit.message == 'Run one synthetic lead notification acceptance probe'
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Exactly one synthetic record, no real person or customer data.
-          # Do not retry a network-ambiguous POST: avoid duplicate submissions.
-          cat > /tmp/atlas-synthetic.json <<'JSON'
-          {"name":"ATLAS SYNTHETIC TEST","company":"FICTIONAL TEST ONLY","email":"atlas-qa@example.invalid","problem":"SYNTHETIC ACCEPTANCE TEST ONLY - no real customer, buyer, transaction, marketing consent or payment. For validating Cloudflare KV to owner notification only.","contactPermission":true,"website":"","source":"enquiry-check","channel":"direct"}
-          JSON
-          response_code=$(curl -sS -o /tmp/atlas-synthetic-response.json -w "%{http_code}" \
-            --connect-timeout 12 --max-time 35 \
-            -H "Content-Type: application/json" \
-            -H "Origin: https://newton-revenue-site.pages.dev" \
-            --data-binary @/tmp/atlas-synthetic.json \
-            "https://newton-revenue-site.pages.dev/api/enquiry")
-          echo "SYNTHETIC ONLY POST /api/enquiry -> \${response_code}"
-          if [[ "\${response_code}" != "201" ]]; then
-            echo "::error::Synthetic enquiry intake failed; no real lead or owner-notice delivery is proved"
-            exit 1
-          fi
-          python3 - <<'PY'
-          import json
-          data = json.load(open('/tmp/atlas-synthetic-response.json'))
-          assert data.get('ok') is True and data.get('received') is True
-          assert isinstance(data.get('reference'), str) and len(data['reference']) >= 32
-          print('SYNTHETIC ONLY receipt validated; reference held privately in runner, not printed')
-          PY
-          echo "Reminder: 201 confirms KV intake, NOT successful email ACK or owner receipt."
