@@ -304,3 +304,63 @@ This example is fictional and excluded from all buyer, delivery and revenue KPIs
 | Cleared amount (GBP) | 0 |
 
 Never infer delivery, acceptance, invoicing or payment from this synthetic record.
+
+## Client intake and scope-lock record
+
+Complete this private record before accepting source data or starting the two-working-day clock. It converts a sales conversation into an executable delivery brief and prevents unpaid scope drift. Use only the minimum necessary information; keep personal data and credentials out of this public repository.
+
+| Field | Required decision or evidence |
+| --- | --- |
+| Private client/project reference | Non-identifying reference used across scope, QA, handover and payment records |
+| Agreed enquiry channel | Exactly one channel |
+| Review window | Exact start and end timestamps for the sample |
+| Maximum source items | No more than 20 unique in-scope examples |
+| Source format | Agreed export or private access method; no unapproved live-account access |
+| Included enquiry types | Controlled list agreed in writing |
+| Exclusions | Explicitly excluded channels, integrations, enrichment and implementation work |
+| Client decision owner | Role authorised to approve scope and corrections |
+| Delivery approver | Role authorised to accept the final pack |
+| Transfer and privacy approval | Reference to the completed private data-handling record |
+| Delivery capacity | Named Newton owner and confirmed two-working-day slot |
+| Price and VAT | Final GBP total plus written VAT treatment |
+| Payment terms | Agreed trigger, due date and verified payment route; no invoice or link issued without owner approval |
+| Client response deadline | Written date/time for acceptance or correction requests |
+| Change-control rule | Any new channel, extra examples or implementation work requires a separately approved scope |
+| Readiness state | `READY`, `HOLD` or `DECLINED` |
+| Scope approval evidence | Private email, portal or signed-record reference and UTC timestamp |
+
+Readiness is `READY` only when every required field is complete, the source fits the fixed offer and both client and Newton decision owners have approved the same scope version. Otherwise keep the state at `HOLD`; do not accept data, start analysis, promise delivery or infer a sale.
+
+Fail closed:
+
+- more than one channel, more than 20 unique examples or requested implementation work requires a separately priced scope;
+- missing VAT treatment, payment trigger, delivery capacity or approval evidence keeps the state at `HOLD`;
+- a verified payment route does not authorise issuing an invoice or payment link;
+- scope changes after approval create a new version; never overwrite the prior approved record;
+- silence, a meeting or a verbal expression of interest is not written scope approval.
+
+### Synthetic intake snapshot
+
+This example is fictional and excluded from all buyer, delivery and revenue KPIs.
+
+| Field | Synthetic value |
+| --- | --- |
+| Private client/project reference | SYN-DIAG-001 |
+| Agreed enquiry channel | Website form |
+| Review window | 2026-10-14T08:15:00Z to 2026-10-14T08:30:00Z |
+| Maximum source items | 3 synthetic examples |
+| Source format | Synthetic private CSV |
+| Included enquiry types | Pricing question; service fit |
+| Exclusions | CRM changes, automated messages, enrichment and live integrations |
+| Client decision owner | Synthetic client operations owner |
+| Delivery approver | Synthetic client operations owner |
+| Transfer and privacy approval | SYN-DATA-HANDLING-001 |
+| Delivery capacity | Synthetic Newton delivery owner; slot reserved |
+| Price and VAT | £195 proposed; VAT treatment not approved |
+| Payment terms | Not agreed; no payment route issued |
+| Client response deadline | Not agreed |
+| Change-control rule | New work requires a separately approved scope |
+| Readiness state | HOLD |
+| Scope approval evidence | None |
+
+The synthetic record stays at `HOLD` because VAT treatment, payment terms, response deadline and written approval are missing.
