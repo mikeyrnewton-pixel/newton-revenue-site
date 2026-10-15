@@ -250,15 +250,57 @@ This example is fictional and must not be used as evidence for a real delivery.
 | Deletion evidence | Not applicable until completed |
 | Exception owner and review date | None |
 
-## Handover record
+## Client handover and acceptance record
 
-Record privately:
+Create one private record for each delivery. Its purpose is to separate what was delivered, what the client accepted and what was actually paid. Start every outcome at `PENDING`; never pre-fill acceptance or payment.
 
-- scope version and approval timestamp;
-- delivery version and delivery timestamp;
-- reviewer and QA result;
-- client acceptance/corrections;
-- retention/deletion date for source material;
-- payment state separately as proposed, agreed, invoiced and actually cleared.
+| Field | Required record |
+| --- | --- |
+| Private client/project reference | Non-identifying reference used across scope, QA and payment records |
+| Agreed scope version | Version plus client approval timestamp |
+| Delivery version | Immutable delivery reference or private checksum |
+| Delivered at (UTC) | Timestamp and approved private delivery route |
+| Delivery contents | Findings page, ownership map, tracker, three fixes, evidence appendix and QA record |
+| QA gate | `RELEASE` only after 12/12 tests pass; otherwise `HOLD` |
+| Client response due | Written date/time agreed in the scope |
+| Client outcome | `PENDING`, `ACCEPTED`, `CORRECTIONS REQUESTED` or `REJECTED` |
+| Client evidence reference | Private email, portal or signed record reference |
+| Correction owner / due | Required when corrections are requested |
+| Final acceptance at (UTC) | Timestamp only when written acceptance exists |
+| Retention/deletion due | Exact UTC deadline from the data-handling record |
+| Payment state | `PROPOSED`, `AGREED`, `INVOICED` or `CLEARED` |
+| Invoice/payment reference | Private invoice ID or actual bank/merchant reference |
+| Cleared amount (GBP) | Zero unless settlement is independently evidenced |
 
-Never infer payment from delivery or acceptance.
+Fail closed:
+
+- delivery is not complete while the QA gate is `HOLD`;
+- silence is not acceptance—keep the client outcome at `PENDING`;
+- a correction request reopens the relevant QA tests and requires passing retest evidence;
+- `ACCEPTED`, `INVOICED` and `CLEARED` are separate states and must never be inferred from one another;
+- do not mark `CLEARED` from a promise, invoice, screenshot without settlement evidence or contingent fee;
+- retention and deletion controls continue after acceptance or payment.
+
+### Synthetic handover snapshot
+
+This example is fictional and excluded from all buyer, delivery and revenue KPIs.
+
+| Field | Synthetic value |
+| --- | --- |
+| Private client/project reference | SYN-DIAG-001 |
+| Agreed scope version | v1; synthetic approval 2026-10-14T08:00:00Z |
+| Delivery version | SYN-DELIVERY-001 |
+| Delivered at (UTC) | Not delivered |
+| Delivery contents | Draft synthetic pack only |
+| QA gate | HOLD — client acceptance test NOT RUN |
+| Client response due | Not agreed |
+| Client outcome | PENDING |
+| Client evidence reference | None |
+| Correction owner / due | Not applicable |
+| Final acceptance at (UTC) | Blank |
+| Retention/deletion due | 2026-10-21T17:00:00Z |
+| Payment state | PROPOSED |
+| Invoice/payment reference | None |
+| Cleared amount (GBP) | 0 |
+
+Never infer delivery, acceptance, invoicing or payment from this synthetic record.
