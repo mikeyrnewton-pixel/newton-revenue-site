@@ -586,3 +586,45 @@ This example is fictional and excluded from every enquiry, buyer, delivery and r
 | Release state | HOLD — remaining QA tests, client acceptance and manifest review are not complete |
 
 The synthetic reconciliation demonstrates the control but cannot release a real delivery or substantiate a commercial result.
+
+
+## One-page operator release checklist
+
+Use this private checklist as the front sheet for each delivery. It consolidates the detailed controls above; it does not replace them. Record only private or anonymous evidence references.
+
+| Gate | Required state | Outcome (`PASS` / `HOLD` / `NOT RUN`) | Evidence reference | Owner and UTC date |
+| --- | --- | --- | --- | --- |
+| 1. Scope and commercial readiness | Intake record is `READY`; one channel, no more than 20 unique examples, capacity, final GBP price, VAT treatment and payment terms are approved | NOT RUN |  |  |
+| 2. Private data readiness | Transfer route, controller decision, access list, retention deadline and anonymisation plan are approved | NOT RUN |  |  |
+| 3. Source reconciliation | Every source item is indexed once; canonical, duplicate and excluded totals reconcile; privacy checks pass | NOT RUN |  |  |
+| 4. Delivery control | Clock and working-day calendar are evidenced; margin state is `CONTINUE`; no overdue exception or unapproved cost exists | NOT RUN |  |  |
+| 5. Pack integrity | Findings, ownership map, tracker, three fixes, evidence appendix and QA record share the approved scope and pack version | NOT RUN |  |  |
+| 6. Objective QA | All 12 QA tests pass and every failed test has a closed correction/retest record | NOT RUN |  |  |
+| 7. Authorised handover | Manifest is `RELEASE`; intended recipient, private route and independent reviewer are recorded | NOT RUN |  |  |
+| 8. Post-handover commercial state | Client outcome, invoice state and cleared payment are recorded separately without inference | NOT RUN |  |  |
+
+Release decision:
+
+- set **delivery release** to `RELEASE` only when gates 1–7 are `PASS`, their evidence references resolve to the same scope and pack version, and no open exception exists;
+- gate 8 does not block an authorised delivery, but it must remain factual: delivery, acceptance, invoicing and cleared payment are distinct;
+- `NOT RUN`, missing evidence, version mismatch, overdue exception or unsupported `N/A` keeps delivery at `HOLD`;
+- an `N/A` decision is permitted only with a written scope reason, owner and independent reviewer/date;
+- never use a synthetic checklist as evidence of a buyer, completed delivery, invoice, payment or revenue.
+
+### Synthetic operator snapshot
+
+This fictional example demonstrates the fail-closed state and is excluded from every commercial KPI.
+
+| Gate | Synthetic outcome | Reason |
+| --- | --- | --- |
+| 1. Scope and commercial readiness | HOLD | VAT, payment terms and written approval are incomplete |
+| 2. Private data readiness | HOLD | Synthetic plan only; no real transfer authority |
+| 3. Source reconciliation | PASS — synthetic only | Three fictional source items reconcile |
+| 4. Delivery control | NOT RUN | Clock is not eligible to start |
+| 5. Pack integrity | HOLD | Checksums and approved pack version are absent |
+| 6. Objective QA | NOT RUN | 12-test record has not been executed |
+| 7. Authorised handover | HOLD | No recipient, route or independent release |
+| 8. Post-handover commercial state | NOT RUN | No delivery, acceptance, invoice or cleared payment |
+| Delivery release | HOLD | Gates 1–7 are not all PASS |
+
+The operator checklist is a control summary only. The detailed private records remain the source of truth.
