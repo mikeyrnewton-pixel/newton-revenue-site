@@ -521,3 +521,68 @@ This example is fictional and excluded from every buyer, delivery and revenue KP
 
 The synthetic record remains on hold because price/VAT, effort and human review are incomplete. It is not evidence that the service is profitable.
 
+
+## Private evidence index and source reconciliation record
+
+Create this private index immediately after anonymisation. It makes every finding traceable without putting raw enquiry content into the delivery pack, and gives the completeness, duplicate-control and reconciliation tests one auditable source of truth.
+
+| Field | Required record |
+| --- | --- |
+| Private client/project reference | Same non-identifying reference used across intake, tracker, QA and manifest |
+| Source item reference | Immutable private source reference; never a name, email address, phone number or message excerpt |
+| Anonymous evidence ID | Unique ID used by the tracker and findings, such as `EV-001` |
+| Canonical enquiry ID | One `E-###` row, or blank only for an evidenced exclusion |
+| Received at (UTC) | Source timestamp or `UNKNOWN` with an exception owner and review date |
+| Scope decision | `IN SCOPE`, `DUPLICATE` or `EXCLUDED` |
+| Duplicate of | Canonical enquiry ID; required only for `DUPLICATE` |
+| Exclusion reason | Controlled reason and decision owner; required only for `EXCLUDED` |
+| Integrity reference | Private checksum, export row ID or immutable system reference |
+| Anonymisation check | `PASS`, `FAIL` or `NOT RUN`, plus reviewer and UTC date |
+| Tracker cross-reference | Exact tracker row/version using the evidence |
+| Finding cross-reference | Finding/fix IDs using the evidence, or `NONE` |
+| Retention/deletion link | Private data-handling record and due date |
+| Exception | Specific gap, accountable owner, next action and review deadline |
+
+Record one reconciliation decision:
+
+| Control | Pass condition | Initial state |
+| --- | --- | --- |
+| Source coverage | Every received source item appears exactly once in the evidence index | HOLD |
+| Anonymous-ID uniqueness | Every evidence ID is unique and resolves to one source item | HOLD |
+| Classification total | Source count = in-scope canonical items + duplicates + exclusions | HOLD |
+| Duplicate integrity | Every duplicate resolves to one in-scope canonical enquiry | HOLD |
+| Tracker traceability | Every non-excluded item resolves to the reviewed tracker version | HOLD |
+| Finding traceability | Every reported finding and fix resolves only to indexed evidence | HOLD |
+| Privacy review | Every indexed item has a passing anonymisation check | HOLD |
+
+Fail closed:
+
+- never copy raw messages, direct identifiers, credentials or attachment contents into this index;
+- do not omit rejected, duplicate or out-of-scope source items—retain a minimal private audit reference and classification;
+- a source item cannot be both canonical and duplicate, and a duplicate cannot point to another duplicate;
+- a finding supported by an absent, excluded, failed-anonymisation or superseded item keeps the QA gate at `HOLD`;
+- changed source data or tracker rows require a new index version, reconciliation and manifest checksum;
+- the evidence index proves traceability only; it does not prove buyer consent, client acceptance, invoicing, payment or business outcome.
+
+### Synthetic evidence-index snapshot
+
+This example is fictional and excluded from every enquiry, buyer, delivery and revenue KPI.
+
+| Source item reference | Anonymous evidence ID | Canonical enquiry ID | Scope decision | Duplicate of | Integrity reference | Anonymisation check | Tracker cross-reference | Finding cross-reference |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| SYN-SRC-01 | EV-001 | E-001 | IN SCOPE |  | SYN-HASH-01 | PASS — synthetic reviewer, 2026-10-14T08:35:00Z | SYN-TRACKER-v0.1 row E-001 | F-03 |
+| SYN-SRC-02 | EV-002 | E-002 | IN SCOPE |  | SYN-HASH-02 | PASS — synthetic reviewer, 2026-10-14T08:36:00Z | SYN-TRACKER-v0.1 row E-002 | F-01, F-02 |
+| SYN-SRC-03 | EV-003 | E-003 | DUPLICATE | E-002 | SYN-HASH-03 | PASS — synthetic reviewer, 2026-10-14T08:37:00Z | SYN-TRACKER-v0.1 row E-003 | F-02 |
+
+| Control | Synthetic outcome |
+| --- | --- |
+| Source coverage | PASS — 3 of 3 synthetic source items indexed |
+| Anonymous-ID uniqueness | PASS — EV-001 to EV-003 unique |
+| Classification total | PASS — 3 = 2 canonical + 1 duplicate + 0 exclusions |
+| Duplicate integrity | PASS — E-003 resolves to canonical E-002 |
+| Tracker traceability | PASS for synthetic tracker v0.1 only |
+| Finding traceability | PASS for synthetic findings F-01 to F-03 only |
+| Privacy review | PASS for synthetic rows only |
+| Release state | HOLD — remaining QA tests, client acceptance and manifest review are not complete |
+
+The synthetic reconciliation demonstrates the control but cannot release a real delivery or substantiate a commercial result.
