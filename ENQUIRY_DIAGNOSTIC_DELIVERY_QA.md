@@ -364,3 +364,51 @@ This example is fictional and excluded from all buyer, delivery and revenue KPIs
 | Scope approval evidence | None |
 
 The synthetic record stays at `HOLD` because VAT treatment, payment terms, response deadline and written approval are missing.
+
+
+## Two-working-day delivery clock and exception control
+
+Create this private record once the intake state is `READY`. The clock starts only when written scope approval, a confirmed delivery slot and the complete approved source set are all evidenced. Record timestamps in UTC and retain the original baseline when anything changes.
+
+| Field | Required record |
+| --- | --- |
+| Private client/project reference | Same non-identifying reference used across intake, QA and handover |
+| Clock start eligibility | `READY` intake reference, complete-source receipt reference and confirmed Newton owner |
+| Clock started at (UTC) | Actual start timestamp; blank until all eligibility evidence exists |
+| Working-day calendar | Agreed working days, timezone and excluded dates |
+| Day 1 control checkpoint | Due timestamp, completion timestamp, owner and evidence for anonymisation, reconciliation and initial ownership map |
+| Day 2 QA checkpoint | Due timestamp, completion timestamp, owner and evidence for findings, tracker, three fixes and 12-test QA |
+| Client response dependency | Client-owned decision or missing source, requested by timestamp and response deadline |
+| Clock state | `NOT STARTED`, `RUNNING`, `PAUSED — CLIENT DEPENDENCY`, `HOLD — NEWTON EXCEPTION`, `COMPLETE` |
+| Exception | Specific event, accountable owner, impact, opened timestamp, next action and review deadline |
+| Revised target | Written timestamp plus client approval reference; blank unless an approved change exists |
+| Release state | `HOLD` until QA release and private handover evidence are complete |
+
+Fail closed:
+
+- do not backdate the clock or start it from a sales call, payment promise, partial data receipt or synthetic example;
+- a client dependency pauses the clock only when the request, owner and deadline are evidenced; otherwise retain the original target and record a risk;
+- a Newton capacity, quality or privacy exception never silently pauses the clock—set `HOLD — NEWTON EXCEPTION` and escalate to the named owner;
+- scope additions create a versioned change decision and separate price/capacity review; never overwrite the original target;
+- missed checkpoints require an exception, recovery action and owner-approved client communication draft before work continues;
+- `COMPLETE` means the 12-test QA gate passed and handover evidence exists; it does not prove client acceptance, invoicing or cleared payment.
+
+### Synthetic clock snapshot
+
+This example is fictional and excluded from all client, delivery and revenue KPIs.
+
+| Field | Synthetic value |
+| --- | --- |
+| Private client/project reference | SYN-DIAG-001 |
+| Clock start eligibility | HOLD — VAT, payment terms and written scope approval incomplete |
+| Clock started at (UTC) | Blank |
+| Working-day calendar | Europe/London; Monday–Friday excluding agreed holidays |
+| Day 1 control checkpoint | Not scheduled |
+| Day 2 QA checkpoint | Not scheduled |
+| Client response dependency | None recorded |
+| Clock state | NOT STARTED |
+| Exception | Readiness conditions incomplete; synthetic Newton owner to review before any start |
+| Revised target | Blank |
+| Release state | HOLD |
+
+The synthetic clock remains `NOT STARTED`; no delivery timing, acceptance or revenue may be inferred.
