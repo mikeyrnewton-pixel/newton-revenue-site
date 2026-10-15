@@ -153,7 +153,7 @@ The pack passes only when all tests pass.
 | Test | Pass condition |
 | --- | --- |
 | Scope | Exactly one agreed channel and no more than 20 unique in-scope examples |
-| Privacy | No direct personal identifiers or unnecessary free text in the delivery pack |
+| Privacy | No direct personal identifiers or unnecessary free text in the delivery pack; the private data-handling record is complete and the deletion state is evidenced |
 | Completeness | Every source example has an anonymous ID and evidence reference |
 | Ownership | Every row has one owner or is explicitly reported as `UNASSIGNED` |
 | Action control | Every unresolved row has a next action and deadline, or a complete exception |
@@ -203,6 +203,52 @@ Use this private log for every `FAIL` result. Do not overwrite the original outc
 |  |  |  |  |  | NOT RUN |  |  |
 
 The delivery gate remains `HOLD` while any failure lacks an owner, next action, due date, passing retest evidence or closure record.
+
+## Private data-handling and deletion record
+
+Create this record privately before opening any source material. Use roles rather than unnecessary names, do not paste credentials or personal data into it, and retain only the minimum evidence needed to prove control.
+
+| Field | Required evidence |
+| --- | --- |
+| Client/project reference | Private non-identifying reference |
+| Approved transfer method | Client-approved private route; never public repository or ordinary chat |
+| Data controller / decision owner | Named client role responsible for lawful sharing and retention |
+| Delivery access list | Minimum roles with access; additions require written approval |
+| Source received (UTC) | Timestamp and source-item count before deduplication |
+| Integrity reference | Private manifest, checksum or immutable source index |
+| Anonymisation completed (UTC) | Reviewer, timestamp and anonymous-ID range |
+| Raw-source working location | Approved private location only |
+| Retention basis and deadline | Written purpose plus exact UTC deletion/review deadline |
+| Deletion outcome | `NOT DUE`, `DELETED`, `CLIENT RETAINED` or `HOLD — EXCEPTION` |
+| Deletion evidence | Private audit/event reference; never the raw data itself |
+| Exception owner and review date | Required for any retention, access or deletion exception |
+
+Fail closed:
+
+- do not start analysis until transfer method, decision owner, access list and retention deadline are recorded;
+- do not release the delivery while anonymisation or access evidence is incomplete;
+- do not mark `DELETED` from intention alone—record a completed private deletion event or keep the state at `NOT DUE`;
+- any overdue deletion, unexplained access or retention exception sets the delivery gate to `HOLD`;
+- client acceptance and payment do not authorise indefinite retention.
+
+### Synthetic data-handling snapshot
+
+This example is fictional and must not be used as evidence for a real delivery.
+
+| Field | Synthetic value |
+| --- | --- |
+| Client/project reference | SYN-DIAG-001 |
+| Approved transfer method | Private client-provided folder |
+| Data controller / decision owner | Client operations owner |
+| Delivery access list | Delivery reviewer only |
+| Source received (UTC) | 2026-10-14T08:15:00Z; 3 source items |
+| Integrity reference | SYN-MANIFEST-001 |
+| Anonymisation completed (UTC) | QA reviewer; 2026-10-14T08:30:00Z; E-001–E-003 |
+| Raw-source working location | Synthetic private workspace |
+| Retention basis and deadline | Delivery QA; delete/review by 2026-10-21T17:00:00Z |
+| Deletion outcome | NOT DUE |
+| Deletion evidence | Not applicable until completed |
+| Exception owner and review date | None |
 
 ## Handover record
 
