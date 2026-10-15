@@ -305,6 +305,62 @@ This example is fictional and excluded from all buyer, delivery and revenue KPIs
 
 Never infer delivery, acceptance, invoicing or payment from this synthetic record.
 
+## Delivery pack manifest and version control
+
+Create this private manifest before handover. It proves that the reviewed pack and the delivered pack are the same version, and prevents a draft, omitted attachment or corrected-but-unreviewed file from being treated as the client deliverable.
+
+| Field | Required record |
+| --- | --- |
+| Private client/project reference | Same non-identifying reference used across intake, QA and handover |
+| Scope version | Exact approved scope version and approval evidence reference |
+| Pack version | Immutable delivery version; increment for every correction |
+| Manifest created at (UTC) | Timestamp and responsible delivery owner |
+| Findings page | Private file reference, version and checksum |
+| Ownership map | Private file reference, version and checksum |
+| Enquiry tracker | Private file reference, version and checksum |
+| Three-fix action plan | Private file reference, version and checksum |
+| Evidence appendix | Private index reference and checksum; no raw personal data |
+| QA record | Private 12-test record reference and reviewer/date |
+| Data-handling record | Private transfer, access, retention and deletion reference |
+| Handover record | Approved route, intended recipient role and release decision |
+| Superseded versions | Prior pack versions and withdrawal status |
+| Manifest reviewer | Independent reviewer role, UTC date and outcome |
+| Release state | `HOLD` or `RELEASE` |
+
+Fail closed:
+
+- keep the manifest at `HOLD` until every required component has an immutable reference, version and checksum;
+- the pack version, scope version and 12-test QA record must refer to the same delivery state;
+- a missing, changed or additional component invalidates the release and requires a new manifest review;
+- corrections create a new pack version; never overwrite or silently replace the version already delivered;
+- mark superseded versions withdrawn and retain only the minimum private audit evidence required by the retention decision;
+- do not release when the intended recipient, approved private route or independent reviewer is missing;
+- manifest `RELEASE` proves only pack integrity and authorised handover readiness; it does not prove client acceptance, invoicing, cleared payment or commercial outcome.
+
+### Synthetic manifest snapshot
+
+This example is fictional and excluded from every client, delivery and revenue KPI.
+
+| Field | Synthetic value |
+| --- | --- |
+| Private client/project reference | SYN-DIAG-001 |
+| Scope version | v1 synthetic; approval incomplete |
+| Pack version | v0.1 draft |
+| Manifest created at (UTC) | Not created |
+| Findings page | SYN-FINDINGS-001; checksum not recorded |
+| Ownership map | SYN-MAP-001; checksum not recorded |
+| Enquiry tracker | SYN-TRACKER-001; checksum not recorded |
+| Three-fix action plan | Included in synthetic findings; checksum not recorded |
+| Evidence appendix | SYN-EVIDENCE-001; checksum not recorded |
+| QA record | 12 tests NOT RUN |
+| Data-handling record | SYN-DATA-HANDLING-001 |
+| Handover record | Not approved |
+| Superseded versions | None |
+| Manifest reviewer | Not reviewed |
+| Release state | HOLD |
+
+The synthetic manifest stays at `HOLD`: approval, checksums, QA release, handover route and independent review are incomplete. It is not evidence that a real pack was delivered.
+
 ## Client intake and scope-lock record
 
 Complete this private record before accepting source data or starting the two-working-day clock. It converts a sales conversation into an executable delivery brief and prevents unpaid scope drift. Use only the minimum necessary information; keep personal data and credentials out of this public repository.
