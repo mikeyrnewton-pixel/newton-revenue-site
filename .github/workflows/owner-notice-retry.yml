@@ -1,0 +1,103 @@
+name: Owner notice retry (approval-gated)
+
+# This file is a PROPOSAL until merged and the repository secret is
+# independently and securely configured. It never stores or logs customer data.
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: newton-owner-notice-retry
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ATLAS_NOTICE_ADMIN_TOKEN: ${{ secrets.ATLAS_NOTICE_ADMIN_TOKEN }}
+    steps:
+      - name: Require configured credential without revealing it
+        id: credentials
+        shell: bash
+        run: |
+          if [[ -z "$ATLAS_NOTICE_ADMIN_TOKEN" ]]; then
+            echo 'ready=no' >> "$GITHUB_OUTPUT"
+            echo '::notice::Automatic retries not activated: approved secret is absent. No requests sent.'
+          else
+            echo 'ready=yes' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Recover persisted pending owner notices
+        if: steps.credentials.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          // No credentials, customer details, request URLs with tokens or raw
+          // response bodies are printed. Existing server deduplicates notice IDs.
+          const base = 'https://newton-revenue-site.pages.dev/api/retry-owner-notices';
+          const token = process.env.ATLAS_NOTICE_ADMIN_TOKEN;
+          if (!token || token.length < 24) {
+            throw new Error('Owner retry credential invalid; no requests sent');
+          }
+          const maxPages = 10; // Up to 50 leads; fail visibly rather than silently miss more.
+          const deadline = Date.now() + 240000;
+          let cursor = '';
+          let finished = false;
+          let pages = 0;
+          let pending = 0;
+          let delivered = 0;
+          for (let page = 0; page < maxPages; page++) {
+            if (Date.now() > deadline - 25000) {
+              throw new Error('Recovery run timed out before scanning the complete list');
+            }
+            const target = new URL(base);
+            if (cursor) target.searchParams.set('cursor', cursor);
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 100000);
+            let response;
+            try {
+              response = await fetch(target, {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token },
+                redirect: 'error',
+                signal: controller.signal,
+              });
+            } finally { clearTimeout(timer); }
+            if (!response.ok) {
+              throw new Error('Owner retry endpoint failed with HTTP ' + response.status);
+            }
+            const data = await response.json();
+            if (data?.ok !== true || !data?.counts || typeof data?.hasMore !== 'boolean') {
+              throw new Error('Owner retry response contract invalid');
+            }
+            for (const k of ['pending', 'delivered', 'skipped', 'deferred', 'expired']) {
+              if (!Number.isSafeInteger(data.counts[k]) || data.counts[k] < 0) {
+                throw new Error('Owner retry counters invalid');
+              }
+            }
+            pages++;
+            pending += data.counts.pending;
+            delivered += data.counts.delivered;
+            if (!data.hasMore) { finished = true; break; }
+            if (typeof data.nextCursor !== 'string' || !data.nextCursor ||
+                data.nextCursor === cursor) {
+              throw new Error('Owner retry pagination stalled');
+            }
+            cursor = data.nextCursor;
+          }
+          if (!finished) {
+            throw new Error('Owner retry scan exceeded page limit; investigate backlog');
+          }
+          console.log('Owner notice scan finished: pages=' + pages +
+            ' retried-delivered=' + delivered + ' still-pending=' + pending);
+          // Pending notices remain safely persisted for the next scheduled run.
+          // Reporting nonzero pending as an error gives an operational alert.
+          if (pending > 0) {
+            throw new Error('One or more owner notices remain pending for future retry');
+          }
+          NODE
