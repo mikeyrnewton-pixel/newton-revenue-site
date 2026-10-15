@@ -10,7 +10,15 @@ export async function onRequestPost({ request, env }) {
       typeof env.ADMIN_TOKEN !== 'string' || env.ADMIN_TOKEN.length < 24) {
     return reply({ error: 'Owner retry service is not configured.' }, 503);
   }
-  if (request.headers.get('Authorization') !== 'Bearer ' + env.ADMIN_TOKEN) {
+  // The optional scheduled job uses a distinct, retry-only credential. Preserve
+  // the existing owner ADMIN_TOKEN for deliberate manual operations.
+  const authorisation = request.headers.get('Authorization');
+  const ownerAuthorised = authorisation === 'Bearer ' + env.ADMIN_TOKEN;
+  const retryJobAuthorised = typeof env.RETRY_JOB_TOKEN === 'string' &&
+    env.RETRY_JOB_TOKEN.length >= 32 &&
+    env.RETRY_JOB_TOKEN !== env.ADMIN_TOKEN &&
+    authorisation === 'Bearer ' + env.RETRY_JOB_TOKEN;
+  if (!ownerAuthorised && !retryJobAuthorised) {
     return reply({ error: 'Unauthorised.' }, 401);
   }
   if (!noticeConfigured(env)) return reply({ error: 'Owner notice receiver is not configured.' }, 503);
