@@ -412,3 +412,56 @@ This example is fictional and excluded from all client, delivery and revenue KPI
 | Release state | HOLD |
 
 The synthetic clock remains `NOT STARTED`; no delivery timing, acceptance or revenue may be inferred.
+
+## Delivery effort and margin-control record
+
+Create this private record for every accepted scope before work starts. It protects the fixed £195 offer from hidden effort, unapproved cost and unpaid scope expansion. Record actual time from evidence; do not estimate retrospectively to make the delivery appear profitable.
+
+| Field | Required record |
+| --- | --- |
+| Private client/project reference | Same non-identifying reference used across intake, QA and handover |
+| Final price and VAT treatment | Written GBP total, VAT basis and approval reference |
+| Approved effort ceiling | Maximum delivery hours approved by the Newton owner before start |
+| Approved external-cost ceiling | £0 unless a specific cost and owner approval are recorded |
+| Planned hours by phase | Intake/anonymisation, analysis, findings, QA and handover |
+| Actual hours by phase | Start/stop evidence or contemporaneous time record |
+| External costs incurred | Supplier, purpose, GBP amount and approval evidence; otherwise £0 |
+| Gross cash contribution | Cleared client cash minus evidenced external costs; never use contracted or invoiced value |
+| Effective cleared hourly value | Gross cash contribution divided by actual delivery hours; blank until cash clears |
+| Variance | Actual hours and costs versus approved ceilings |
+| Scope-change evidence | Versioned client request, price/capacity decision and written approval |
+| Stop-loss state | `CONTINUE`, `HOLD — SCOPE CHANGE`, `HOLD — COST` or `COMPLETE` |
+| Review owner and UTC date | Human reviewer and decision timestamp |
+
+Fail closed:
+
+- do not start while the effort ceiling, £0 default cost ceiling, final price or VAT treatment is missing;
+- do not absorb a new channel, more than 20 unique examples, implementation work or extra review cycle into the fixed fee—set `HOLD — SCOPE CHANGE`;
+- no expense, paid tool or subcontractor cost is authorised by this record; separate owner approval is required before commitment;
+- if actual effort or cost reaches 80% of its ceiling before the Day 2 QA checkpoint, review remaining work and record a decision before continuing;
+- set `HOLD — COST` when a ceiling is exceeded or evidence is incomplete;
+- do not calculate contribution from a proposal, contract or invoice; cleared cash must be independently evidenced;
+- client acceptance, delivery completion and profitability are separate outcomes.
+
+### Synthetic margin snapshot
+
+This example is fictional and excluded from every buyer, delivery and revenue KPI.
+
+| Field | Synthetic value |
+| --- | --- |
+| Private client/project reference | SYN-DIAG-001 |
+| Final price and VAT treatment | £195 proposed; VAT treatment not approved |
+| Approved effort ceiling | Not approved |
+| Approved external-cost ceiling | £0 |
+| Planned hours by phase | Not approved |
+| Actual hours by phase | 0 |
+| External costs incurred | £0 |
+| Gross cash contribution | £0 |
+| Effective cleared hourly value | Blank — no cleared cash |
+| Variance | Not assessable |
+| Scope-change evidence | None |
+| Stop-loss state | HOLD — COST |
+| Review owner and UTC date | Not reviewed |
+
+The synthetic record remains on hold because price/VAT, effort and human review are incomplete. It is not evidence that the service is profitable.
+
