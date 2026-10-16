@@ -1,0 +1,67 @@
+# DRAFT ONLY until Cloudflare RETRY_JOB_TOKEN and the matching GitHub
+# NEWTON_NOTICE_RETRY_TOKEN repository secret have both been configured.
+# Separate retry-only credential; never put an ADMIN_TOKEN in Actions.
+name: Retry pending owner notices
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pending-owner-notices
+  cancel-in-progress: false
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      NEWTON_NOTICE_RETRY_TOKEN: ${{ secrets.NEWTON_NOTICE_RETRY_TOKEN }}
+    steps:
+      - name: Retry pending notices using scoped credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const token = process.env.NEWTON_NOTICE_RETRY_TOKEN;
+          if (typeof token !== 'string' || token.length < 32) {
+            console.error('Missing secure retry-only credential. No requests sent.');
+            process.exitCode = 1;
+          } else {
+            const base = 'https://newton-revenue-site.pages.dev/api/retry-owner-notices';
+            let cursor = null;
+            let completed = false;
+            for (let page = 0; page < 30; page++) {
+              const url = new URL(base);
+              if (cursor) url.searchParams.set('cursor', cursor);
+              const response = await fetch(url, {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token },
+                signal: AbortSignal.timeout(18000)
+              });
+              if (!response.ok) throw new Error('Retry service HTTP ' + response.status);
+              const result = await response.json();
+              if (result?.ok !== true || typeof result.hasMore !== 'boolean' ||
+                  !result.counts || typeof result.counts !== 'object') {
+                throw new Error('Unexpected retry service response');
+              }
+              const safe = Object.fromEntries(['delivered','pending','skipped','expired','deferred']
+                .map(k => [k, Number(result.counts[k] || 0)]));
+              if (Object.values(safe).some(n => !Number.isFinite(n) || n < 0)) {
+                throw new Error('Invalid retry counts');
+              }
+              console.log('Batch ' + (page + 1) + ': ' +
+                Object.entries(safe).map(([key,value]) => key + '=' + value).join(' '));
+              if (!result.hasMore) { completed = true; break; }
+              if (typeof result.nextCursor !== 'string' || !result.nextCursor) {
+                throw new Error('More records reported but cursor unavailable');
+              }
+              cursor = result.nextCursor;
+            }
+            if (!completed) throw new Error('Backlog pagination cap reached; will retry next run');
+          }
+          NODE
