@@ -19,8 +19,11 @@ test("builds a fictional £195 scope but refuses to represent it as a real bindi
 });
 test("adds operational legal, cancellation, data and payment gates without pretending approval", () => {
   const result = buildMockQuote(fresh());
-  assert.match(result, /Newton Strategic Holdings Ltd \(company number 17330041\)/);
-  assert.match(result, /Registered-office and invoice-address details must be checked/);
+  assert.match(result, /NEWTON STRATEGIC HOLDINGS LTD \(company number 17330041\)/);
+  assert.match(result, /find-and-update\.company-information\.service\.gov\.uk\/company\/17330041/);
+  assert.match(result, /invoice\/trading address requires Michael's explicit approval/);
+  assert.match(result, /Do not copy an address from a third-party directory/);
+  assert.match(result, /infer VAT registration from the Companies House record/);
   assert.match(result, /Michael must confirm.*VAT status/i);
   assert.match(result, /cancellation deadline/);
   assert.match(result, /statutory rights/);
