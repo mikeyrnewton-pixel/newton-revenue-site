@@ -13,9 +13,24 @@ test("builds a fictional £195 scope but refuses to represent it as a real bindi
   assert.match(result, /£195/);
   assert.match(result, /VAT status: UNKNOWN/);
   assert.match(result, /COMMERCIAL RELEASE HOLD/);
-  assert.match(result, /NO payment link has been generated/);
+  assert.match(result, /NO payment link, invoice or bank instruction has been generated/);
   assert.match(result, /20 anonymised or fictional/);
   assert.doesNotMatch(result, /payment received|VAT included|terms agreed/i);
+});
+test("adds operational legal, cancellation, data and payment gates without pretending approval", () => {
+  const result = buildMockQuote(fresh());
+  assert.match(result, /Newton Strategic Holdings Ltd \(company number 17330041\)/);
+  assert.match(result, /Registered-office and invoice-address details must be checked/);
+  assert.match(result, /Michael must confirm.*VAT status/i);
+  assert.match(result, /cancellation deadline/);
+  assert.match(result, /statutory rights/);
+  assert.match(result, /suitably redacted or anonymised/);
+  assert.match(result, /subprocessors, retention\/deletion date/);
+  assert.match(result, /buyer.*written acceptance/i);
+  assert.match(result, /Michael's explicit approval/);
+  assert.match(result, /settled bank\/merchant evidence may mark CLEARED/);
+  assert.match(result, /Never place bank details, merchant secrets or reusable payment URLs in source code/);
+  assert.doesNotMatch(result, /sort code|account number|IBAN|payment\.newton|revolut\.me/i);
 });
 test("refuses real scope, inflated example limits, other commercial prices and unknown fields", () => {
   const real = fresh(); real.synthetic = false;
@@ -40,6 +55,7 @@ test("actual CLI writes a usable private mock quote with HOLD status", () => {
     const output = readFileSync(target,"utf8");
     assert.match(output,/FICTIONAL diagnostic scope and quote/);
     assert.match(output,/VAT status: UNKNOWN/);
+    assert.match(output,/Buyer-specific acceptance and payment handoff/);
     assert.match(output,/COMMERCIAL RELEASE HOLD/);
   } finally {
     rmSync(dir,{recursive:true,force:true});
