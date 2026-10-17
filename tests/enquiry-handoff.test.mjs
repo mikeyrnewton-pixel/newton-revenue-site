@@ -91,4 +91,8 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
     base,
     {...base, id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"},
   ]), /conflicting records/);
+  assert.throws(() => buildCanonicalFictionalHandoffs([
+    base,
+    {...base, channel: "search"},
+  ]), /divergent records/);
 });
