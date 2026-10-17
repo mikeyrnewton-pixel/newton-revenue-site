@@ -37,6 +37,12 @@ export async function onRequestGet({ request, env }) {
       const notice = await env.LEADS.get('notice:' + record.id, 'json');
       if (notice) record.notification = notice;
     }));
+    // Owner-only operational state is stored separately to preserve immutable
+    // customer submissions and the original retention deadline.
+    await Promise.all(records.map(async record => {
+      const action = await env.LEADS.get('triage:' + record.id, 'json');
+      if (action?.version === 1) record.triage = action;
+    }));
     return reply({ records, hasMore: !page.list_complete, nextCursor: page.cursor || null });
   } catch {
     return reply({ error: "Could not retrieve leads." }, 503);
