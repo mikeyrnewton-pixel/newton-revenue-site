@@ -27,6 +27,10 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /suitably redacted or anonymised/);
   assert.match(result, /subprocessors, retention\/deletion date/);
   assert.match(result, /buyer.*written acceptance/i);
+  assert.match(result, /accepted document version or digest/);
+  assert.match(result, /acceptance timestamp/);
+  assert.match(result, /fresh written acceptance before invoicing/);
+  assert.match(result, /form submission, draft checkbox or verbal indication is not acceptance/i);
   assert.match(result, /Michael's explicit approval/);
   assert.match(result, /settled bank\/merchant evidence may mark CLEARED/);
   assert.match(result, /Never place bank details, merchant secrets or reusable payment URLs in source code/);
