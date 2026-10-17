@@ -60,6 +60,24 @@ git -C "$SITE" merge --ff-only FETCH_HEAD >/dev/null
 "$NODE" "$SITE/scripts/build-mock-quote.mjs" "$OUT/fictional-quote.md"
 grep -q 'Delivery release: HOLD' "$OUT/fictional-diagnostic.md"
 grep -q 'COMMERCIAL RELEASE HOLD' "$OUT/fictional-quote.md"
+# Zero-cost, read-only model inventory; never invokes providers or prints keys.
+if [[ ! -f "$SITE/scripts/atlas-provider-readiness.mjs" ]]; then
+  echo "BLOCKED: AI provider-readiness script absent from the approved public site checkout" >&2
+  exit 3
+fi
+"$NODE" "$SITE/scripts/atlas-provider-readiness.mjs" --json > "$OUT/AI_PROVIDER_READINESS.json"
+chmod 600 "$OUT/AI_PROVIDER_READINESS.json"
+PROVIDER_COUNTS="$("$NODE" -e '
+const fs=require("node:fs");
+const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+if(x.result!=="READ_ONLY_INVENTORY_COMPLETE" ||
+   x.authorisation!=="NO_PROVIDER_NETWORK_CALLS_NO_CHARGES") process.exit(3);
+const found=x.providers.filter(p=>p.credentialStatus==="PRESENT_UNTESTED");
+process.stdout.write("CREDENTIALS_PRESENT_UNTESTED="+found.length+" OPTIONAL_ROUTES_DISABLED="+x.optionalDirectRoutesInSource);
+' "$OUT/AI_PROVIDER_READINESS.json")" || {
+  echo "FAILED: local inventory integrity check; no AI provider enabled" >&2
+  exit 3
+}
 PRIVATE_STATUS="AUTH_REQUIRED"
 # Authenticated private repository access is attempted ONLY using credentials
 # already on the Mac. No token is printed, requested, stored or exposed.
@@ -98,6 +116,8 @@ fi
   echo "MAC_STAGED=YES"
   echo "PUBLIC_SITE_TESTS=PASS"
   echo "PRIVATE_BUILDS=$PRIVATE_STATUS"
+  echo "AI_PROVIDER_INVENTORY=COMPLETE_NO_API_CALLS"
+  echo "$PROVIDER_COUNTS"
   echo "FULL_CUSTOMER_REHEARSAL=$JOURNEY"
   echo "REAL_CUSTOMER_DELIVERY=HOLD"
   echo "MAC_RUNNING_BOTS_CHANGED=NO"
