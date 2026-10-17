@@ -30,7 +30,7 @@ const assertPrivate = (stat, label) => {
 const assertRecord = (record, seen) => {
   if (!record || typeof record !== 'object' || Array.isArray(record)) throw new Error('Invalid record');
   if (typeof record.id !== 'string' || record.id.length < 1 || seen.has(record.id)) throw new Error('Invalid or duplicate record ID');
-  if (!STATUSES.includes(record.state) || typeof record.synthetic !== 'boolean' || !Array.isArray(record.events)) throw new Error('Invalid record schema');
+  if (!STATUSES.includes(record.state) || typeof record.synthetic !== 'boolean' || typeof record.company !== 'string' || !Array.isArray(record.events)) throw new Error('Invalid record schema');
   if (record.synthetic && PAID.has(record.state)) throw new Error('Synthetic record cannot be cleared or delivered');
   if (APPROVED.has(record.state)) {
     if (record.termsApproved !== true || !['NOT_VAT_REGISTERED_CONFIRMED','VAT_AMOUNT_CONFIRMED'].includes(record.vatTreatment) || !Number.isSafeInteger(record.amountPence) || record.amountPence < 1) {
