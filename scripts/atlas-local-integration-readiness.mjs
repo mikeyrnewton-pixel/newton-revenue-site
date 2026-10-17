@@ -2,13 +2,15 @@
 /**
  * Read-only local Mac integration inventory; never starts/stops a service,
  * reads credentials, uses the public internet, or checks paid model endpoints.
- * Only loopback sockets and local status tools are queried.
+ * Only fixed localhost sockets, the documented Activepieces local health endpoint,
+ * and local status tools are queried.
  */
 import { lstatSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { connect } from 'node:net';
 import { spawnSync } from 'node:child_process';
+import { checkActivepiecesLocalHealth } from '../lib/atlas-loopback-health.mjs';
 
 const flags = new Set(process.argv.slice(2));
 if (flags.has('--help')) {
@@ -90,6 +92,7 @@ const report = {
   activepiecesDocker: probe ? activepiecesContainerState() : skipped,
   activepiecesLoopback: probe
     ? (await portOpen(8080) ? 'PORT_OPEN_APP_ID_UNVERIFIED' : 'PORT_NOT_LISTENING') : skipped,
+  activepiecesHealth: probe ? await checkActivepiecesLocalHealth() : skipped,
   salesDeskLoopback: probe
     ? (await portOpen(3777) ? 'PORT_OPEN_APP_ID_UNVERIFIED' : 'PORT_NOT_LISTENING') : skipped,
   assertion: 'No local detection alone proves end-to-end model routing, bot execution, customer delivery, or internet/iPhone reachability.',

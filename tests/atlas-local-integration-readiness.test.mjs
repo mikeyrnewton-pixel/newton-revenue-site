@@ -17,7 +17,7 @@ test('no-probes inventory is read-only and never claims integrations are connect
     assert.equal(data.result, 'LOCAL_INTEGRATION_READ_ONLY_COMPLETE');
     assert.equal(data.authorisation, 'NO_EXTERNAL_NETWORK_NO_PAID_API_NO_CHANGES');
     assert.equal(data.checkedOnMac, false);
-    for (const key of ['tailscale', 'activepiecesDocker', 'activepiecesLoopback', 'salesDeskLoopback'])
+    for (const key of ['tailscale', 'activepiecesDocker', 'activepiecesLoopback', 'activepiecesHealth', 'salesDeskLoopback'])
       assert.equal(data[key], 'NOT_CHECKED_REQUESTED');
     assert.equal(data.privateMacCheckout, 'NOT_DETECTED');
     assert.ok(!JSON.stringify(data).includes('HIDDEN_TEST_SECRET_38492'));
