@@ -107,6 +107,37 @@ if [[ -d "$EMPIRE/.git" ]]; then
     fi
   fi
 fi
+# Fallback to the user's PRE-EXISTING local private checkout. Do not request
+# a fresh GitHub login, reuse credentials, copy .env, or run unreviewed code.
+# A local checkout is independently known to exist at ~/Newton-Empire.
+if [[ "$PRIVATE_STATUS" == "AUTH_REQUIRED" ]]; then
+  LOCAL_EMPIRE="$HOME/Newton-Empire"
+  if [[ ! -L "$LOCAL_EMPIRE" && -d "$LOCAL_EMPIRE/.git" ]]; then
+    LOCAL_ORIGIN="$(git -C "$LOCAL_EMPIRE" remote get-url origin 2>/dev/null || true)"
+    case "$LOCAL_ORIGIN" in
+      "https://github.com/mikeyrnewton-pixel/Newton-Empire"|"https://github.com/mikeyrnewton-pixel/Newton-Empire.git"|https://*@github.com/mikeyrnewton-pixel/Newton-Empire|https://*@github.com/mikeyrnewton-pixel/Newton-Empire.git|"git@github.com:mikeyrnewton-pixel/Newton-Empire"|"git@github.com:mikeyrnewton-pixel/Newton-Empire.git")
+        if [[ "$(git -C "$LOCAL_EMPIRE" symbolic-ref -q --short HEAD || true)" != main ]] ||
+           [[ -n "$(git -C "$LOCAL_EMPIRE" status --porcelain --untracked-files=no)" ]]; then
+          PRIVATE_STATUS="LOCAL_PRIVATE_CHECKOUT_HAS_UNSAVED_EDITS_OR_NON_MAIN"
+        elif [[ ! -f "$LOCAL_EMPIRE/scripts/run_build_shift.sh" ]]; then
+          PRIVATE_STATUS="LOCAL_PRIVATE_CHECKOUT_FOUND_NEEDS_BUILD_CODE_UPDATE"
+        elif [[ "$(git hash-object "$LOCAL_EMPIRE/scripts/run_build_shift.sh")" != "7a484b9ab93ff49a6a463214cd4ff3518d452b5c" ]]; then
+          PRIVATE_STATUS="LOCAL_PRIVATE_BUILDER_DIFFERS_FROM_APPROVED_SOURCE"
+        else
+          # The exact local script content matches the already-reviewed private
+          # GitHub blob. Run ONLY deterministic, fictional no-API build tasks.
+          for task in TASK-009 TASK-010 TASK-012 TASK-013; do
+            ATLAS_BUILD_ONLY=1 ATLAS_BUILD_TASK_ID="$task" ATLAS_SITE_REPO="$SITE" \
+              ATLAS_BUILD_OUTPUT_DIR="$OUT" bash "$LOCAL_EMPIRE/scripts/run_build_shift.sh"
+          done
+          PRIVATE_STATUS="FOUR_APPROVED_LOCAL_OFFLINE_BUILD_TASKS_RUN"
+        fi
+        ;;
+      *) PRIVATE_STATUS="LOCAL_PRIVATE_CHECKOUT_ORIGIN_NOT_APPROVED" ;;
+    esac
+  fi
+fi
+
 JOURNEY="NOT_IN_MERGED_MAIN"
 if [[ -f "$SITE/scripts/run-customer-rehearsal.mjs" ]]; then
   "$NODE" "$SITE/scripts/run-customer-rehearsal.mjs" "$OUT/customer-rehearsal"

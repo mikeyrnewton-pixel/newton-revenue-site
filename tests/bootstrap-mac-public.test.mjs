@@ -38,3 +38,23 @@ test("source restricts private repo to authenticated Mac and never touches exist
     "git push", "AWS_SECRET_ACCESS_KEY", "gh auth token"
   ]) assert.ok(!src.includes(forbidden), "unsafe phrase "+forbidden);
 });
+
+
+test("existing private Mac checkout fallback is fingerprint-pinned and never prints credentials", () => {
+  const src = readFileSync(file, "utf8");
+  for (const required of [
+    'LOCAL_EMPIRE="$HOME/Newton-Empire"',
+    "git hash-object",
+    "7a484b9ab93ff49a6a463214cd4ff3518d452b5c",
+    "FOUR_APPROVED_LOCAL_OFFLINE_BUILD_TASKS_RUN",
+    "LOCAL_PRIVATE_CHECKOUT_FOUND_NEEDS_BUILD_CODE_UPDATE",
+    "LOCAL_PRIVATE_CHECKOUT_ORIGIN_NOT_APPROVED",
+    "status --porcelain --untracked-files=no",
+    "ATLAS_BUILD_ONLY=1"
+  ]) assert.ok(src.includes(required), "missing existing checkout guard " + required);
+  for (const forbidden of [
+    "git reset --hard", "gh auth token", "security find-generic-password",
+    "source $HOME/Newton-Empire/.env", "cp $HOME/Newton-Empire/.env",
+    "git push", "launchctl load", "launchctl unload"
+  ]) assert.ok(!src.includes(forbidden), "private or destructive action present: " + forbidden);
+});
