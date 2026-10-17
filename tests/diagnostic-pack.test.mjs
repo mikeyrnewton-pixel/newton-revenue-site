@@ -1,4 +1,9 @@
 import test from "node:test";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync as readGeneratedFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildDemoPack } from "../lib/diagnostic-pack.js";
@@ -58,4 +63,21 @@ test("requires exactly three unique evidence-based fixes and no unassigned silen
   assert.throws(() => buildDemoPack(repeated), /distinct priorities/);
   const missingEsc = clone(); missingEsc.records[1].exception = "None";
   assert.throws(() => buildDemoPack(missingEsc), /unassigned owner needs/);
+});
+
+test("actual CLI creates a fictional report with secure permissions and never releases it", () => {
+  const dir = mkdtempSync(join(tmpdir(), "newton-diag-"));
+  const target = join(dir, "test-demo.md");
+  try {
+    const output = execFileSync(process.execPath, [
+      new URL("../scripts/build-diagnostic-demo.mjs", import.meta.url).pathname,
+      target,
+    ], { encoding: "utf8" });
+    assert.match(output, /FICTIONAL demo generated/);
+    const markdown = readGeneratedFileSync(target, "utf8");
+    assert.match(markdown, /Source reconciliation: 3 = 2 canonical/);
+    assert.match(markdown, /Delivery release: HOLD/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
