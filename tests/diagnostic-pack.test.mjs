@@ -19,6 +19,10 @@ test("synthetic customer pack produces a fully reconciled three-fix report witho
   assert.match(markdown, /\| F-01 \|/);
   assert.match(markdown, /\| 3 \|/);
   assert.match(markdown, /EV-001/);
+  assert.match(markdown, /ENQUIRY_DIAGNOSTIC_DELIVERY_QA\.md/);
+  assert.match(markdown, /Separate actual delivery \| Immutable real pack version/);
+  const qaRows = markdown.match(/\| (?:Scope|Privacy|Completeness|Ownership|Action control|Status integrity|Duplicate control|Reconciliation|Fix quality|Claims|Human review|Client acceptance) \| NOT RUN \|/g);
+  assert.equal(qaRows?.length, 12);
   assert.doesNotMatch(markdown, /RELEASE APPROVED|cleared revenue|actual customer/i);
 });
 
@@ -77,6 +81,9 @@ test("actual CLI creates a fictional report with secure permissions and never re
     const markdown = readGeneratedFileSync(target, "utf8");
     assert.match(markdown, /Source reconciliation: 3 = 2 canonical/);
     assert.match(markdown, /Delivery release: HOLD/);
+    assert.match(markdown, /12-test QA execution record/);
+    assert.match(markdown, /\| Client acceptance \| NOT RUN \|/);
+    assert.match(markdown, /Client intake \| Written client\/project reference/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
