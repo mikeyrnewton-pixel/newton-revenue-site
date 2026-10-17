@@ -70,9 +70,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
       return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
     }
   }
+  const createdAt = new Date().toISOString();
   const record = {
     id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
+    createdAt,
+    submissionId,
+    contactPermissionCapturedAt: createdAt,
     source: ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(p.source) ? p.source : "newton-revenue-site",
     channel: ["facebook", "instagram", "youtube", "search", "partner"].includes(p.channel) ? p.channel : "direct",
     name: p.name.trim(),
