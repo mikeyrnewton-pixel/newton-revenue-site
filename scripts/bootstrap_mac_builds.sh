@@ -67,6 +67,23 @@ if [[ ! -f "$SITE/scripts/atlas-provider-readiness.mjs" ]]; then
 fi
 "$NODE" "$SITE/scripts/atlas-provider-readiness.mjs" --json > "$OUT/AI_PROVIDER_READINESS.json"
 chmod 600 "$OUT/AI_PROVIDER_READINESS.json"
+# Local-only status of EXISTING Tailscale, Activepieces, staged Sales Desk.
+# The presence of any port/process/folder does NOT prove working integration.
+[[ -f "$SITE/scripts/atlas-local-integration-readiness.mjs" ]] || {
+  echo "BLOCKED: local integration readiness script absent" >&2
+  exit 3
+}
+"$NODE" "$SITE/scripts/atlas-local-integration-readiness.mjs" --json > "$OUT/LOCAL_INTEGRATION_READINESS.json"
+chmod 600 "$OUT/LOCAL_INTEGRATION_READINESS.json"
+"$NODE" -e '
+const fs=require("node:fs");
+const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+if(r.result!=="LOCAL_INTEGRATION_READ_ONLY_COMPLETE" ||
+   r.authorisation!=="NO_EXTERNAL_NETWORK_NO_PAID_API_NO_CHANGES") process.exit(3);
+' "$OUT/LOCAL_INTEGRATION_READINESS.json" || {
+  echo "FAILED: local integration inventory; no services changed" >&2
+  exit 3
+}
 PROVIDER_COUNTS="$("$NODE" -e '
 const fs=require("node:fs");
 const x=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
@@ -148,6 +165,7 @@ fi
   echo "PUBLIC_SITE_TESTS=PASS"
   echo "PRIVATE_BUILDS=$PRIVATE_STATUS"
   echo "AI_PROVIDER_INVENTORY=COMPLETE_NO_API_CALLS"
+  echo "LOCAL_INTEGRATION_INVENTORY=COMPLETE_READ_ONLY_NOT_CONNECTED"
   echo "$PROVIDER_COUNTS"
   echo "FULL_CUSTOMER_REHEARSAL=$JOURNEY"
   echo "REAL_CUSTOMER_DELIVERY=HOLD"
