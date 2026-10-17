@@ -32,3 +32,21 @@ The bootstrap receipt includes LOCAL_INTEGRATION_INVENTORY=COMPLETE_READ_ONLY_NO
 ### Activepieces health endpoint verification
 
 The existing Mac integration receipt now checks `GET http://127.0.0.1:8080/api/v1/health` without any tokens, external DNS, redirects, request body or paid-provider calls. This is the Activepieces-documented health endpoint, including for version 0.92.0. A 2xx response is recorded as `HEALTH_HTTP_2XX_APP_ID_AND_WORKERS_UNVERIFIED`, **not** proof that the running process is Activepieces, its workers are healthy, its flows are active or end-to-end integrations work. HTTP error/redirects and network errors fail closed. This check uses port 8080 only: a different pre-existing mapped port needs a separate grounded local read, not an automated reconfiguration. No Docker, Tailscale or app configuration changes are made.
+
+## Reviewed iPhone SSH handoff — one controlled local action
+
+Use the **existing Tailscale iPhone Shortcut → Run Script over SSH** targeting the already-authorised Mac. Paste this script as the remote command; do not paste passwords or API keys. The script verifies the public launcher bytes before executing. It first dry-runs and then stages only previously authorised offline work.
+
+```sh
+set -eu
+atlas_tmp="$(mktemp "${TMPDIR:-/tmp}/atlas-bootstrap.XXXXXX")"
+trap 'rm -f "$atlas_tmp"' EXIT
+curl -fsSL --proto '=https' --tlsv1.2 -o "$atlas_tmp" 'https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/d900efde1c5753a3f627bb780c9d89163a6efb43/scripts/bootstrap_mac_builds.sh'
+printf '%s  %s\n' '133bb312b4a4f30b743aab72aaf42252ad544571ea927a1e8ded02d906fe12f1' "$atlas_tmp" | shasum -a 256 -c -
+bash "$atlas_tmp" --dry-run
+bash "$atlas_tmp" --apply
+```
+
+**Success** prints `MAC_STAGED=YES`, public tests, optional private builds result, nonsecret AI and integration inventory receipts, and `REAL_CUSTOMER_DELIVERY=HOLD`. If download/checksum/preflight fails, stop; do **not** run a fallback unverified installer. The script does not create/enable long-running services and never activates paid AI APIs. The site repository source is updated from its checked main branch by the bootstrap; the checksum above covers the launcher script itself, not every downstream file in that repository. Source/CI status was checked at writing; the owner should avoid this command if a subsequent unreviewed site source change appears. A status receipt is proof of the staging checks only, not full end-to-end AI/bot connectivity.
+
+After running, the safe text receipt is `~/ATLAS-BUILD-READY/results/ATLAS_BUILD_STATUS.txt`. Do **not** share `.env`, any JSON with credentials, SSH details or Git remotes. If a health check shows Activepieces HTTP 2xx, this is still only local endpoint responsiveness; it does not prove workers or flows have executed.
