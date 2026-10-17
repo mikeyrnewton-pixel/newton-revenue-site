@@ -5,8 +5,8 @@ import { createHash } from 'node:crypto';
 
 const doc = readFileSync(new URL('../docs/PUBLIC_MAC_BOOTSTRAP.md', import.meta.url), 'utf8');
 const installer = readFileSync(new URL('../scripts/bootstrap_mac_builds.sh', import.meta.url));
-const expected = '133bb312b4a4f30b743aab72aaf42252ad544571ea927a1e8ded02d906fe12f1';
-const commit = 'd900efde1c5753a3f627bb780c9d89163a6efb43';
+const expected = 'a4c299d28ad66409f553da2bbee9dfd732d105667249f4b18188d6fc0eadf416';
+const commit = '8c45c0993437603639e978af5124dff48e0c8d25';
 
 test('iPhone bootstrap command pins exact immutable reviewed script SHA256', () => {
   const actual = createHash('sha256').update(installer).digest('hex');
