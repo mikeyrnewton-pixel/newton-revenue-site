@@ -32,9 +32,9 @@ const examples = [
   { name: "Mistral", vars: ["MISTRAL_API_KEY"], route: true },
   { name: "NVIDIA", vars: ["NVIDIA_API_KEY"], route: true },
   { name: "Cloudflare AI", vars: ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"], route: true },
-  { name: "DeepSeek", vars: ["DEEPSEEK_API_KEY"], route: false },
-  { name: "xAI (Grok API)", vars: ["XAI_API_KEY"], route: false },
-  { name: "Perplexity API", vars: ["PERPLEXITY_API_KEY"], route: false },
+  { name: "DeepSeek", vars: ["DEEPSEEK_API_KEY"], route: false, optionalDirectRoute: true },
+  { name: "xAI (Grok API)", vars: ["XAI_API_KEY", "NEWTON_XAI_MODEL"], route: false, optionalDirectRoute: true },
+  { name: "Perplexity API", vars: ["PERPLEXITY_API_KEY"], route: false, optionalDirectRoute: true },
   { name: "Voyage (retrieval)", vars: ["VOYAGE_API_KEY"], route: false }
 ];
 const wanted = new Set(examples.flatMap(item => item.vars));
@@ -92,6 +92,7 @@ for (const key of wanted) {
 const providers = examples.map(item => ({
   provider: item.name,
   inExistingRouter: item.route,
+  routeType: item.route ? "CORE_IN_SOURCE" : item.optionalDirectRoute ? "OPTIONAL_DISABLED_IN_SOURCE" : "NOT_A_ROUTED_LLM",
   credentialStatus: item.vars.every(key => entries.get(key) === true)
     ? "PRESENT_UNTESTED" : "MISSING_OR_NOT_DISCOVERED"
 }));
@@ -102,6 +103,8 @@ const report = {
   configFoundAtKnownLocations: entries.get("__SOURCE_FOUND") === true,
   routedProvidersWithCredentials: routed.filter(x => x.credentialStatus === "PRESENT_UNTESTED").length,
   routedProviderFamilies: routed.length,
+  optionalDirectRoutesInSource: providers.filter(x => x.routeType === "OPTIONAL_DISABLED_IN_SOURCE").length,
+  macRouterDeploymentVerified: false,
   providers,
   localQwen: "NOT_CHECKED",
   privateGitHubAuthentication: "NOT_CHECKED",
@@ -138,6 +141,8 @@ if (cli.has("--json")) {
   console.log("Qwen: " + report.localQwen);
   console.log("Routed credentials found: " + report.routedProvidersWithCredentials +
     "/" + report.routedProviderFamilies);
+  console.log("Optional direct API routes in source: " + report.optionalDirectRoutesInSource + " (all disabled without separate billing permission).");
+  console.log("Mac installation of private router and its billing status NOT verified.");
   console.log("Grok Bot, Perplexity Pro and paid/free quotas are NOT verified by API-key presence.");
   console.log("No keys printed. No accounts connected or changed. No paid API calls made.");
 }
