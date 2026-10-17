@@ -13,3 +13,9 @@ For the eventual always-on setup:
 - Minimise commands/logs sent over a private client app; never paste macOS passwords, GitHub tokens or Cloudflare admin secrets into ChatGPT.
 
 The post-bootstrap `ATLAS_BUILD_STATUS.txt` is the only output necessary to interpret next safe steps; status should remain `REAL_CUSTOMER_DELIVERY=HOLD` until human commercial/security gates are independently verified.
+
+## Existing private Mac checkout recovery
+
+A prior authenticated Mac installation placed the private Newton-Empire repository at `~/Newton-Empire`. If authenticated cloning into the stage folder still fails, the public bootstrap now checks **that existing local checkout** without displaying its origin or credentials. It does **not** pull, reset, copy private `.env`, or alter the installed source. It may execute the four already-reviewed **offline synthetic** build tasks in-place only if the local Git origin, clean main branch, and exact source Git-blob SHA (`7a484b9ab93ff49a6a463214cd4ff3518d452b5c`) match the approved private builder. Otherwise it returns a precise `LOCAL_PRIVATE_CHECKOUT_...` or `LOCAL_PRIVATE_BUILDER_...` blocker instead of silently running older code. The owner still has to approve any later GitHub authentication change, local code upgrade or always-on daemon modification.
+
+The same stage run also writes a nonsecret read-only AI credential summary to `results/AI_PROVIDER_READINESS.json`. The separate xAI/Grok API, DeepSeek and Perplexity API routes remain inactive unless there is verified account approval and acceptable billing. Nothing here automatically enables additional providers or modifies Grok Bot.
