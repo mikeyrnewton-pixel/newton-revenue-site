@@ -58,3 +58,18 @@ test("existing private Mac checkout fallback is fingerprint-pinned and never pri
     "git push", "launchctl load", "launchctl unload"
   ]) assert.ok(!src.includes(forbidden), "private or destructive action present: " + forbidden);
 });
+
+
+test("local integration scanner is part of existing bootstrap but changes no bots", () => {
+  const src = readFileSync(file, "utf8");
+  for (const required of [
+    "atlas-local-integration-readiness.mjs",
+    "LOCAL_INTEGRATION_READINESS.json",
+    "LOCAL_INTEGRATION_INVENTORY=COMPLETE_READ_ONLY_NOT_CONNECTED",
+    "NO_EXTERNAL_NETWORK_NO_PAID_API_NO_CHANGES",
+    "chmod 600"
+  ]) assert.ok(src.includes(required), "missing local inventory guard " + required);
+  for (const unsafe of ["docker start", "docker run", "tailscale up", "launchctl bootstrap", "launchctl kickstart"]) {
+    assert.ok(!src.includes(unsafe), "unexpected service-changing action " + unsafe);
+  }
+});
