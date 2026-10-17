@@ -62,6 +62,7 @@ test("intake provenance supports one deduped PII-free fictional handoff", async 
   assert.equal(handoff.workflow.customerDelivery, "HOLD");
   assert.equal(handoff.consent.purpose, "respond_to_enquiry");
   assert.equal(handoff.consent.marketing, false);
+  assert.deepEqual(handoff.ownerNotice, {version: 1, status: "pending", attempts: 0});
 
   const serialized = JSON.stringify(handoff);
   for (const privateValue of [record.name, record.company, record.email, record.problem]) {
@@ -87,6 +88,9 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
   };
   assert.throws(() => toFictionalDeliveryHandoff({...base, contactPermission: false}), /contact permission/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, email: "person@example.com"}), /only explicit/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: undefined}), /owner-notice evidence/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 2, status: "pending", attempts: 0}}), /schema version 1/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "pending", attempts: -1}}), /non-negative owner-notice attempts/);
   assert.throws(() => buildCanonicalFictionalHandoffs([
     base,
     {...base, id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"},
