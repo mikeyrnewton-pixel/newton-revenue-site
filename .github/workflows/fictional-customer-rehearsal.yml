@@ -1,0 +1,40 @@
+name: Build fictional customer handoff package
+on:
+  pull_request:
+    paths:
+      - "scripts/run-customer-rehearsal.mjs"
+      - "tests/customer-rehearsal.test.mjs"
+      - "lib/**"
+      - "examples/**"
+      - ".github/workflows/fictional-customer-rehearsal.yml"
+permissions:
+  contents: read
+jobs:
+  build-fictional-handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build one full fictional owner/customer handoff
+        run: node scripts/run-customer-rehearsal.mjs generated/customer-rehearsal
+      - name: Refuse accidental real-client release or missing output
+        run: |
+          node --input-type=module -e '
+            import {readFileSync} from "node:fs";
+            const m=JSON.parse(readFileSync("generated/customer-rehearsal/handoff.json","utf8"));
+            if(m.synthetic!==true || m.state!=="STAGED_OFFLINE_ONLY" ||
+               m.customerDelivery!=="HOLD" || m.vatApproved!==false ||
+               m.productionNoticeVerified!==false || m.productionPaymentVerified!==false) {
+              throw Error("Not a safe fictional HOLD handoff");
+            }
+          '
+      - name: Attach only the fictional report, quote and HOLD manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: newton-fictional-customer-handoff
+          path: generated/customer-rehearsal/
+          if-no-files-found: error
+          retention-days: 1
