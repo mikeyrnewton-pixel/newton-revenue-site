@@ -155,6 +155,53 @@ if [[ "$PRIVATE_STATUS" == "AUTH_REQUIRED" ]]; then
   fi
 fi
 
+
+# Preserve the user's live CONTROL BRIDGE checkout and its development branch.
+# An old local main cannot supply a builder, but the approved newer private
+# main can be fetched as immutable Git objects WITHOUT changing HEAD or files.
+# Only this specifically inspected control branch/head is supported; fail shut
+# if its state, approved remote, or reviewed private main has changed.
+if [[ "$PRIVATE_STATUS" == "LOCAL_PRIVATE_CHECKOUT_HAS_UNSAVED_EDITS_OR_NON_MAIN" ]]; then
+  LOCAL_EMPIRE="$HOME/Newton-Empire"
+  if [[ ! -L "$LOCAL_EMPIRE" && -d "$LOCAL_EMPIRE/.git" ]]; then
+    LOCAL_ORIGIN="$(git -C "$LOCAL_EMPIRE" remote get-url origin 2>/dev/null || true)"
+    case "$LOCAL_ORIGIN" in
+      "https://github.com/mikeyrnewton-pixel/Newton-Empire"|"https://github.com/mikeyrnewton-pixel/Newton-Empire.git"|https://*@github.com/mikeyrnewton-pixel/Newton-Empire|https://*@github.com/mikeyrnewton-pixel/Newton-Empire.git|"git@github.com:mikeyrnewton-pixel/Newton-Empire"|"git@github.com:mikeyrnewton-pixel/Newton-Empire.git")
+        if [[ "$(git -C "$LOCAL_EMPIRE" symbolic-ref -q --short HEAD || true)" != "build/control-bridge-2026-09-30" ]] ||
+           [[ "$(git -C "$LOCAL_EMPIRE" rev-parse --verify HEAD 2>/dev/null || true)" != "1e376b1eaa28e88b07136682f9e1a179b2de5a95" ]] ||
+           [[ -n "$(git -C "$LOCAL_EMPIRE" status --porcelain --untracked-files=no)" ]]; then
+          PRIVATE_STATUS="CONTROL_BRIDGE_CHANGED_NO_PRIVATE_EXECUTION"
+        elif ! GIT_TERMINAL_PROMPT=0 git -C "$LOCAL_EMPIRE" fetch --quiet --no-tags origin main >/dev/null 2>&1; then
+          PRIVATE_STATUS="PRIVATE_FETCH_NEEDS_EXISTING_GITHUB_AUTH"
+        elif [[ "$(git -C "$LOCAL_EMPIRE" rev-parse --verify FETCH_HEAD 2>/dev/null || true)" != "301f7d31c6f4b34bc71ad0967cbc85e73a5c2805" ]]; then
+          PRIVATE_STATUS="PRIVATE_REMOTE_MAIN_CHANGED_REVIEW_REQUIRED"
+        else
+          # Fetch only updates Git objects/FETCH_HEAD, never the current branch,
+          # working tree, private .env or any live launchd/Activepieces service.
+          REVIEWED_BUILDER="$(mktemp "$OUT/.approved-private-builder.XXXXXXXX")"
+          if git -C "$LOCAL_EMPIRE" show "301f7d31c6f4b34bc71ad0967cbc85e73a5c2805:scripts/run_build_shift.sh" > "$REVIEWED_BUILDER" 2>/dev/null &&
+             [[ "$(git hash-object "$REVIEWED_BUILDER")" == "7a484b9ab93ff49a6a463214cd4ff3518d452b5c" ]]; then
+            # Only synthetic, previously reviewed tasks, written inside the
+            # existing locked-down build-stage results folder.
+            trap 'rm -f "$REVIEWED_BUILDER"' EXIT
+            for task in TASK-009 TASK-010 TASK-012 TASK-013; do
+              ATLAS_BUILD_ONLY=1 ATLAS_BUILD_TASK_ID="$task" ATLAS_SITE_REPO="$SITE" \
+                ATLAS_BUILD_OUTPUT_DIR="$OUT" bash "$REVIEWED_BUILDER"
+            done
+            PRIVATE_STATUS="FOUR_PINNED_PRIVATE_SYNTHETIC_BUILDS_RUN"
+            rm -f "$REVIEWED_BUILDER"
+            trap - EXIT
+          else
+            PRIVATE_STATUS="PRIVATE_BUILDER_FINGERPRINT_MISMATCH"
+            rm -f "$REVIEWED_BUILDER"
+          fi
+        fi
+        ;;
+      *) PRIVATE_STATUS="LOCAL_PRIVATE_CHECKOUT_ORIGIN_NOT_APPROVED" ;;
+    esac
+  fi
+fi
+
 JOURNEY="NOT_IN_MERGED_MAIN"
 if [[ -f "$SITE/scripts/run-customer-rehearsal.mjs" ]]; then
   "$NODE" "$SITE/scripts/run-customer-rehearsal.mjs" "$OUT/customer-rehearsal"

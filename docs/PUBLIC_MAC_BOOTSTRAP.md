@@ -41,8 +41,8 @@ Use the **existing Tailscale iPhone Shortcut → Run Script over SSH** targeting
 set -eu
 atlas_tmp="$(mktemp "${TMPDIR:-/tmp}/atlas-bootstrap.XXXXXX")"
 trap 'rm -f "$atlas_tmp"' EXIT
-curl -fsSL --proto '=https' --tlsv1.2 -o "$atlas_tmp" 'https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/d900efde1c5753a3f627bb780c9d89163a6efb43/scripts/bootstrap_mac_builds.sh'
-printf '%s  %s\n' '133bb312b4a4f30b743aab72aaf42252ad544571ea927a1e8ded02d906fe12f1' "$atlas_tmp" | shasum -a 256 -c -
+curl -fsSL --proto '=https' --tlsv1.2 -o "$atlas_tmp" 'https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/8c45c0993437603639e978af5124dff48e0c8d25/scripts/bootstrap_mac_builds.sh'
+printf '%s  %s\n' 'a4c299d28ad66409f553da2bbee9dfd732d105667249f4b18188d6fc0eadf416' "$atlas_tmp" | shasum -a 256 -c -
 bash "$atlas_tmp" --dry-run
 bash "$atlas_tmp" --apply
 ```
@@ -50,3 +50,12 @@ bash "$atlas_tmp" --apply
 **Success** prints `MAC_STAGED=YES`, public tests, optional private builds result, nonsecret AI and integration inventory receipts, and `REAL_CUSTOMER_DELIVERY=HOLD`. If download/checksum/preflight fails, stop; do **not** run a fallback unverified installer. The script does not create/enable long-running services and never activates paid AI APIs. The site repository source is updated from its checked main branch by the bootstrap; the checksum above covers the launcher script itself, not every downstream file in that repository. Source/CI status was checked at writing; the owner should avoid this command if a subsequent unreviewed site source change appears. A status receipt is proof of the staging checks only, not full end-to-end AI/bot connectivity.
 
 After running, the safe text receipt is `~/ATLAS-BUILD-READY/results/ATLAS_BUILD_STATUS.txt`. Do **not** share `.env`, any JSON with credentials, SSH details or Git remotes. If a health check shows Activepieces HTTP 2xx, this is still only local endpoint responsiveness; it does not prove workers or flows have executed.
+
+
+### Recovery for a preserved control-bridge branch (17 October)
+
+Mac-side evidence establishes the live private repo is clean but on build/control-bridge-2026-09-30 (HEAD 1e376b1eaa28e88b07136682f9e1a179b2de5a95), with a stale local main and no run_build_shift.sh in that local main. **Do not checkout/switch, merge, pull, reset, stash, clean or delete this branch.** Its control bridge has separate unmerged work.
+
+The bootstrap's new narrowly pinned fallback checks the existing private origin silently, current branch and exact commit, and no tracked edits. It then tries a non-interactive, existing-credentials-only `git fetch --no-tags origin main`. Git fetch updates local Git objects/FETCH_HEAD but does **not** switch branches or change the checked-out working files. The fetched HEAD must equal the reviewed private commit 301f7d31c6f4b34bc71ad0967cbc85e73a5c2805. Its reviewed run_build_shift.sh must have Git blob fingerprint 7a484b9ab93ff49a6a463214cd4ff3518d452b5c. The installer extracts only that runner into a temporary permission-restricted local file, runs the same four offline fictional build tasks, then deletes the temporary copy. No private .env, token, remote URL, full source tree or live launchd job is copied or changed.
+
+If Git authentication fails, it records PRIVATE_FETCH_NEEDS_EXISTING_GITHUB_AUTH without prompting for keys. If commits/fingerprints differ, the installer refuses execution. A four-task result is proof of staged synthetic builders, never proof of connected AI, running automation, customer service or revenue. This is a recovery for this single inspected branch/commit, not permission to overwrite future developer changes. After source merge and CI, use a **new immutable checksum-verified launcher**; the older script pinned in the previous section will not include this recovery. No change to Grok Bot, AI API billing or real services is authorised.

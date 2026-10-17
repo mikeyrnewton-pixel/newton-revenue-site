@@ -73,3 +73,42 @@ test("local integration scanner is part of existing bootstrap but changes no bot
     assert.ok(!src.includes(unsafe), "unexpected service-changing action " + unsafe);
   }
 });
+
+
+test("reviewed private builder fetch preserves active control-bridge work and fails closed", () => {
+  const src = readFileSync(file, "utf8");
+  for (const required of [
+    'build/control-bridge-2026-09-30',
+    '1e376b1eaa28e88b07136682f9e1a179b2de5a95',
+    '301f7d31c6f4b34bc71ad0967cbc85e73a5c2805',
+    '7a484b9ab93ff49a6a463214cd4ff3518d452b5c',
+    'git -C "$LOCAL_EMPIRE" fetch --quiet --no-tags origin main',
+    'git -C "$LOCAL_EMPIRE" show "301f7d31c6f4b34bc71ad0967cbc85e73a5c2805:scripts/run_build_shift.sh"',
+    'git hash-object "$REVIEWED_BUILDER"',
+    'PRIVATE_FETCH_NEEDS_EXISTING_GITHUB_AUTH',
+    'CONTROL_BRIDGE_CHANGED_NO_PRIVATE_EXECUTION',
+    'PRIVATE_REMOTE_MAIN_CHANGED_REVIEW_REQUIRED',
+    'PRIVATE_BUILDER_FINGERPRINT_MISMATCH',
+    'FOUR_PINNED_PRIVATE_SYNTHETIC_BUILDS_RUN',
+    'rm -f "$REVIEWED_BUILDER"',
+    'ATLAS_BUILD_ONLY=1'
+  ]) assert.ok(src.includes(required), "missing specific guard: "+required);
+  for (const forbidden of [
+    "git checkout ", "git switch ", "git reset ",
+    "git clean ", "git stash ", "git worktree ",
+    "git config --global", "gh auth login",
+    "git push ", "source .env", "cat .env",
+    "launchctl bootout", "launchctl kickstart",
+    "docker start", "docker restart"
+  ]) assert.ok(!src.includes(forbidden), "unexpected state-changing command: "+forbidden);
+  assert.match(src, /TASK-009 TASK-010 TASK-012 TASK-013/);
+  assert.match(src, /git -C "\$LOCAL_EMPIRE" status --porcelain --untracked-files=no/);
+});
+
+test("reviewed private recovery stays after local checkout guard and before report receipt", () => {
+  const src = readFileSync(file, "utf8");
+  const existing = src.indexOf('LOCAL_PRIVATE_CHECKOUT_HAS_UNSAVED_EDITS_OR_NON_MAIN');
+  const guardedFetch = src.indexOf('PRIVATE_FETCH_NEEDS_EXISTING_GITHUB_AUTH');
+  const receipt = src.indexOf('JOURNEY="NOT_IN_MERGED_MAIN"');
+  assert.ok(existing >= 0 && existing < guardedFetch && guardedFetch < receipt);
+});
