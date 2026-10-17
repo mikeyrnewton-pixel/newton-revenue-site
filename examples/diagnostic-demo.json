@@ -1,0 +1,108 @@
+{
+  "synthetic": true,
+  "projectRef": "DEMO-REPAIR-01",
+  "channel": "Website",
+  "records": [
+    {
+      "id": "SYN-001",
+      "evidenceRef": "EV-001",
+      "classification": "canonical",
+      "receivedAt": "2026-10-19T08:05:00Z",
+      "status": "IN_PROGRESS",
+      "owner": "Office administrator",
+      "nextAction": "Request missing repair description",
+      "dueAt": "2026-10-19T09:05:00Z",
+      "exception": "None"
+    },
+    {
+      "id": "SYN-002",
+      "evidenceRef": "EV-002",
+      "classification": "canonical",
+      "receivedAt": "2026-10-19T08:08:00Z",
+      "status": "EXCEPTION",
+      "owner": "UNASSIGNED",
+      "nextAction": "Office manager to assign estimator",
+      "dueAt": "2026-10-19T09:30:00Z",
+      "exception": "Estimator handoff lacks accountable owner"
+    },
+    {
+      "id": "SYN-003",
+      "evidenceRef": "EV-003",
+      "classification": "duplicate",
+      "duplicateOf": "SYN-002",
+      "receivedAt": "2026-10-19T08:12:00Z",
+      "status": "DUPLICATE",
+      "owner": "Office manager",
+      "nextAction": "Retain source audit reference; link to canonical row",
+      "dueAt": "2026-10-19T09:45:00Z",
+      "exception": "Duplicate route needs one owner"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-01",
+      "title": "Missing owner at estimator handoff",
+      "explanation": "An example job request lacks a named estimator and may wait unnoticed",
+      "evidenceRefs": [
+        "EV-002"
+      ],
+      "limitation": "Fictional timeline only; no measured customer delay"
+    },
+    {
+      "id": "F-02",
+      "title": "Duplicate submission can confuse workload",
+      "explanation": "Two example records refer to one canonical enquiry and need reconciliation",
+      "evidenceRefs": [
+        "EV-002",
+        "EV-003"
+      ],
+      "limitation": "Demonstration, not an observed client failure"
+    },
+    {
+      "id": "F-03",
+      "title": "Recorded next action is useful but not enough",
+      "explanation": "The office administrator has an action but no closure evidence yet",
+      "evidenceRefs": [
+        "EV-001"
+      ],
+      "limitation": "No external customer responses have occurred"
+    }
+  ],
+  "fixes": [
+    {
+      "priority": 1,
+      "action": "Assign exactly one estimator owner before handoff",
+      "impact": "Makes accountability visible",
+      "effort": "Low, manual workflow",
+      "owner": "Office manager",
+      "acceptanceTest": "All five synthetic enquiries show one owner and recorded assignment",
+      "evidenceRefs": [
+        "EV-002"
+      ]
+    },
+    {
+      "priority": 2,
+      "action": "Link duplicate requests under the canonical source record",
+      "impact": "Reduces double counting in the demo",
+      "effort": "Low, shared tracker rule",
+      "owner": "Office administrator",
+      "acceptanceTest": "One duplicate references a canonical record and is not counted twice",
+      "evidenceRefs": [
+        "EV-002",
+        "EV-003"
+      ]
+    },
+    {
+      "priority": 3,
+      "action": "Record due time and human exception outcome",
+      "impact": "Makes missed handoffs visible",
+      "effort": "Low, daily review",
+      "owner": "Office manager",
+      "acceptanceTest": "An overdue sample shows a reviewer, due time and written resolution",
+      "evidenceRefs": [
+        "EV-001",
+        "EV-002"
+      ]
+    }
+  ]
+}
