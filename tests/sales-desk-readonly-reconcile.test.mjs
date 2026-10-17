@@ -6,7 +6,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 
-const script = path.resolve(import.meta.dirname,'sales-desk-readonly-reconcile.mjs');
+const script = path.resolve(import.meta.dirname,'..','scripts','sales-desk-readonly-reconcile.mjs');
 const setup = () => fs.mkdtempSync(path.join(os.tmpdir(),'atlas-reconcile-test-'));
 const run = (root) => spawnSync(process.execPath,[script,'--data-dir',path.join(root,'data'),'--output',path.join(root,'out','receipt.json')],{encoding:'utf8'});
 const record = (overrides={}) => ({id:crypto.randomUUID(),company:'Fixture Ltd',state:'NEW',synthetic:false,events:[],...overrides});
