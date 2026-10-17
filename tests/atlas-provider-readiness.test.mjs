@@ -43,6 +43,7 @@ test("reads existing local .env without printing keys or confusing a key with a 
       "CEREBRAS_API_KEY=" + secrets[0],
       "MISTRAL_API_KEY='" + secrets[1] + "'",
       "XAI_API_KEY=" + secrets[2],
+      "NEWTON_XAI_MODEL=approved-existing-model-id",
       "GROQ_API_KEY=your_key_here",
       "GEMINI_API_KEY=<your-gemini-key>",
       "CLOUDFLARE_ACCOUNT_ID=fake-account-id",
@@ -57,6 +58,9 @@ test("reads existing local .env without printing keys or confusing a key with a 
     assert.equal(get(out, "Mistral").credentialStatus, "PRESENT_UNTESTED");
     assert.equal(get(out, "xAI (Grok API)").credentialStatus, "PRESENT_UNTESTED");
     assert.equal(get(out, "xAI (Grok API)").inExistingRouter, false);
+    assert.equal(get(out, "xAI (Grok API)").routeType, "OPTIONAL_DISABLED_IN_SOURCE");
+    assert.equal(out.optionalDirectRoutesInSource, 3);
+    assert.equal(out.macRouterDeploymentVerified, false);
     assert.equal(get(out, "Cloudflare AI").credentialStatus, "MISSING_OR_NOT_DISCOVERED");
     assert.equal(get(out, "Gemini").credentialStatus, "MISSING_OR_NOT_DISCOVERED");
     const payload = JSON.stringify(out);
@@ -84,4 +88,15 @@ test("unknown options fail before inspecting files, network or providers", () =>
   assert.equal(result.status, 2);
   assert.match(result.stderr, /Unknown argument/);
   assert.doesNotMatch(result.stdout, /SECRET/);
+});
+
+
+test("xAI credential alone does not mean an executable configured route", () => {
+  const tmp = mkdtempSync(join(tmpdir(), "atlas-provider-xai-"));
+  try {
+    const out = run(tmp, { XAI_API_KEY: "SYNTHETIC_XAI_NOT_A_KEY" });
+    assert.equal(get(out, "xAI (Grok API)").credentialStatus, "MISSING_OR_NOT_DISCOVERED");
+    assert.equal(get(out, "xAI (Grok API)").routeType, "OPTIONAL_DISABLED_IN_SOURCE");
+    assert.equal(out.optionalDirectRoutesInSource, 3);
+  } finally { rmSync(tmp, { recursive: true, force: true }); }
 });

@@ -29,6 +29,8 @@ test("source restricts private repo to authenticated Mac and never touches exist
     "merge --ff-only", "status --porcelain", "REAL_CUSTOMER_DELIVERY=HOLD",
     "MAC_RUNNING_BOTS_CHANGED=NO", "NEW_SERVICES_INSTALLED=NO",
     "site-tests.log", "ATLAS_BUILD_STATUS.txt",
+    "atlas-provider-readiness.mjs", "AI_PROVIDER_READINESS.json",
+    "NO_PROVIDER_NETWORK_CALLS_NO_CHARGES",
   ]) assert.ok(src.includes(required), "missing "+required);
   for(const forbidden of [
     "git reset --hard", "sudo ", "launchctl load", "launchctl unload",
