@@ -18,4 +18,6 @@ jobs:
       - name: Run website API tests
         run: npm test
       - name: Record public Mac bootstrap SHA256
-        run: shasum -a 256 scripts/bootstrap_mac_builds.sh
+        run: |
+          shasum -a 256 scripts/bootstrap_mac_builds.sh
+          shasum -a 256 scripts/atlas-provider-readiness.mjs
