@@ -17,3 +17,5 @@ jobs:
           node-version: '22'
       - name: Run website API tests
         run: npm test
+      - name: Record public Mac bootstrap SHA256
+        run: shasum -a 256 scripts/bootstrap_mac_builds.sh
