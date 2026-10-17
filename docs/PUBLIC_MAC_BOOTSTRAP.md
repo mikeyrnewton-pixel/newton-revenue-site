@@ -41,8 +41,8 @@ Use the **existing Tailscale iPhone Shortcut → Run Script over SSH** targeting
 set -eu
 atlas_tmp="$(mktemp "${TMPDIR:-/tmp}/atlas-bootstrap.XXXXXX")"
 trap 'rm -f "$atlas_tmp"' EXIT
-curl -fsSL --proto '=https' --tlsv1.2 -o "$atlas_tmp" 'https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/d900efde1c5753a3f627bb780c9d89163a6efb43/scripts/bootstrap_mac_builds.sh'
-printf '%s  %s\n' '133bb312b4a4f30b743aab72aaf42252ad544571ea927a1e8ded02d906fe12f1' "$atlas_tmp" | shasum -a 256 -c -
+curl -fsSL --proto '=https' --tlsv1.2 -o "$atlas_tmp" 'https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/8c45c0993437603639e978af5124dff48e0c8d25/scripts/bootstrap_mac_builds.sh'
+printf '%s  %s\n' 'a4c299d28ad66409f553da2bbee9dfd732d105667249f4b18188d6fc0eadf416' "$atlas_tmp" | shasum -a 256 -c -
 bash "$atlas_tmp" --dry-run
 bash "$atlas_tmp" --apply
 ```
