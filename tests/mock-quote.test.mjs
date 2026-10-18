@@ -38,6 +38,9 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /authorised representative and evidence of that representative's authority/);
   assert.match(result, /matching email domain.*is not acceptance/i);
   assert.match(result, /fresh written acceptance before invoicing/);
+  assert.match(result, /quote-validity deadline with timezone/);
+  assert.match(result, /expired, backdated or stale acceptance is not authority to invoice/);
+  assert.match(result, /validity deadline passes.*recheck current delivery capacity, price and VAT treatment/i);
   assert.match(result, /purchase order, supplier onboarding or named finance approver/);
   assert.match(result, /INVOICE HOLD.*buyer-issued reference\/approval/i);
   assert.match(result, /procurement correspondence as scope acceptance/);
