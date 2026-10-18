@@ -60,6 +60,11 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /private invoice register to prevent a duplicate request/);
   assert.match(result, /never silently overwrite an invoice/i);
   assert.match(result, /cancellation, credit-note and replacement-invoice trail/);
+  assert.match(result, /ACCEPTED, INVOICED, CLEARED, DATA_READY and CAPACITY_CONFIRMED/);
+  assert.match(result, /only Michael's buyer-specific READY_TO_START approval/i);
+  assert.match(result, /payment reversal, recall, chargeback, buyer dispute, acceptance withdrawal/i);
+  assert.match(result, /cancels READY_TO_START and enters DELIVERY RELEASE HOLD/i);
+  assert.match(result, /never retry a charge or issue a second payment request automatically/i);
   assert.doesNotMatch(result, /sort code|account number|IBAN|payment\.newton|revolut\.me/i);
 });
 test("refuses real scope, inflated example limits, other commercial prices and unknown fields", () => {
