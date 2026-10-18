@@ -87,6 +87,8 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
     notification: {version: 1, status: "pending", attempts: 0},
   };
   assert.throws(() => toFictionalDeliveryHandoff({...base, contactPermission: false}), /contact permission/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, createdAt: "2026-02-30T20:00:00.000Z"}), /canonical UTC creation timestamp/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, contactPermissionCapturedAt: "2026-10-17T20:00:01.000Z"}), /consent capture cannot follow record creation/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, email: "person@example.com"}), /only explicit/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: undefined}), /owner-notice evidence/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 2, status: "pending", attempts: 0}}), /schema version 1/);
