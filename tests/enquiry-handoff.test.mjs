@@ -4,6 +4,7 @@ import {onRequestPost as submit} from "../functions/api/enquiry.js";
 import {
   toFictionalDeliveryHandoff,
   buildCanonicalFictionalHandoffs,
+  acknowledgeFictionalHandoff,
 } from "../lib/enquiry-handoff.js";
 
 const ORIGIN = "https://newton-revenue-site.pages.dev";
@@ -163,4 +164,71 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
     base,
     {...base, channel: "search"},
   ]), /divergent records/);
+});
+
+
+test("creates one deterministic PII-free offline acknowledgement and fails closed on mismatch", () => {
+  const record = {
+    id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    submissionId: SUBMISSION_ID,
+    createdAt: "2026-10-17T20:00:00.000Z",
+    contactPermissionCapturedAt: "2026-10-17T20:00:00.000Z",
+    source: "enquiry-check",
+    channel: "direct",
+    name: "SYNTHETIC TASK011",
+    company: "FICTIONAL REPAIR CO",
+    email: "task011@example.invalid",
+    problem: "FICTIONAL offline delivery rehearsal",
+    contactPermission: true,
+    marketingConsent: false,
+    notification: {
+      version: 1,
+      status: "delivered",
+      attempts: 1,
+      lastAttemptAt: "2026-10-17T20:01:00.000Z",
+      deliveredAt: "2026-10-17T20:01:01.000Z",
+    },
+  };
+  const handoff = toFictionalDeliveryHandoff(record);
+  const evidence = {
+    version: 1,
+    handoffId: handoff.handoffId,
+    enquiryRef: handoff.enquiryRef,
+    consumer: "fictional-delivery-rehearsal",
+    acknowledgedAt: "2026-10-17T20:01:02.000Z",
+  };
+  const first = acknowledgeFictionalHandoff(handoff, evidence);
+  const retry = acknowledgeFictionalHandoff(handoff, {...evidence});
+  assert.deepEqual(retry, first, "same evidence produces one deterministic receipt");
+  assert.deepEqual(first, {
+    schema: "NEWTON_FICTIONAL_HANDOFF_ACK_V1",
+    synthetic: true,
+    receiptId: "enquiry:" + SUBMISSION_ID + ":" + record.id,
+    handoffId: "enquiry:" + SUBMISSION_ID,
+    enquiryRef: record.id,
+    consumer: "fictional-delivery-rehearsal",
+    acknowledgedAt: "2026-10-17T20:01:02.000Z",
+    state: "ACKNOWLEDGED_OFFLINE",
+    customerDelivery: "HOLD",
+  });
+  const serialized = JSON.stringify(first);
+  for (const privateValue of [record.name, record.company, record.email, record.problem]) {
+    assert.equal(serialized.includes(privateValue), false, "receipt must omit customer PII");
+  }
+
+  const pending = toFictionalDeliveryHandoff({
+    ...record,
+    notification: {version: 1, status: "pending", attempts: 0},
+  });
+  assert.throws(() => acknowledgeFictionalHandoff(pending, evidence),
+    /delivered owner-notice evidence/);
+  assert.throws(() => acknowledgeFictionalHandoff(handoff, {
+    ...evidence, enquiryRef: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+  }), /enquiry reference mismatch/);
+  assert.throws(() => acknowledgeFictionalHandoff(handoff, {
+    ...evidence, acknowledgedAt: "2026-10-17T20:00:59.000Z",
+  }), /cannot predate owner-notice delivery/);
+  assert.throws(() => acknowledgeFictionalHandoff(handoff, {
+    ...evidence, email: "task011@example.invalid",
+  }), /unapproved acknowledgement field/);
 });
