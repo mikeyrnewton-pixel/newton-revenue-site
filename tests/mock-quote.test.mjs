@@ -47,7 +47,11 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /purchase-order\/reference where required/);
   assert.match(result, /form submission, draft checkbox or verbal indication is not acceptance/i);
   assert.match(result, /Michael's explicit approval/);
+  assert.match(result, /buyer screenshot, remittance advice or pending merchant event is not cleared funds/i);
   assert.match(result, /settled bank\/merchant evidence may mark CLEARED/);
+  assert.match(result, /PAYMENT RECONCILIATION HOLD/);
+  assert.match(result, /partial, duplicate, overpayment, third-party payment, unknown sender or reference mismatch/i);
+  assert.match(result, /do not start work, allocate, return or redirect funds/i);
   assert.match(result, /Never place bank details, merchant secrets or reusable payment URLs in source code/);
   assert.match(result, /buyer-approved billing contact through the approved channel/);
   assert.match(result, /change-request email alone/);
