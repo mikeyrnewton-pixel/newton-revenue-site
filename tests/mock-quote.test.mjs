@@ -71,6 +71,13 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /Silence, link access, an automated receipt or payment is not delivery acceptance/);
   assert.match(result, /Mark COMPLETE only after verified receipt plus buyer acceptance or an owner-approved contractual acceptance rule/);
   assert.match(result, /DELIVERY ACCEPTANCE HOLD/);
+  assert.match(result, /complaint or claimed non-conformity.*accepted scope.*delivered-version digest/i);
+  assert.match(result, /complaint alone is not proof of breach/i);
+  assert.match(result, /prior acceptance does not remove applicable statutory rights/i);
+  assert.match(result, /CLAIM_RECEIVED, EVIDENCE_REVIEWED, RESOLUTION_APPROVED and RESOLUTION_COMPLETED/);
+  assert.match(result, /do not admit liability, promise rework, refund or credit/i);
+  assert.match(result, /replacement delivery requires a new digest and the receipt\/acceptance cycle again/i);
+  assert.match(result, /COMPLAINT RESOLUTION HOLD/);
   assert.doesNotMatch(result, /sort code|account number|IBAN|payment\.newton|revolut\.me/i);
 });
 test("refuses real scope, inflated example limits, other commercial prices and unknown fields", () => {
