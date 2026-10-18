@@ -65,6 +65,12 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /payment reversal, recall, chargeback, buyer dispute, acceptance withdrawal/i);
   assert.match(result, /cancels READY_TO_START and enters DELIVERY RELEASE HOLD/i);
   assert.match(result, /never retry a charge or issue a second payment request automatically/i);
+  assert.match(result, /DELIVERY_SENT separate from DELIVERY_RECEIVED/);
+  assert.match(result, /outbound email, upload event or link creation is not proof of receipt/i);
+  assert.match(result, /Record BUYER_ACCEPTED only against the delivered version/);
+  assert.match(result, /Silence, link access, an automated receipt or payment is not delivery acceptance/);
+  assert.match(result, /Mark COMPLETE only after verified receipt plus buyer acceptance or an owner-approved contractual acceptance rule/);
+  assert.match(result, /DELIVERY ACCEPTANCE HOLD/);
   assert.doesNotMatch(result, /sort code|account number|IBAN|payment\.newton|revolut\.me/i);
 });
 test("refuses real scope, inflated example limits, other commercial prices and unknown fields", () => {
