@@ -17,6 +17,27 @@ function reply(body, status = 200) {
 function validText(value, max) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
 }
+function normalisedSource(value) {
+  return ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(value)
+    ? value : "newton-revenue-site";
+}
+function normalisedChannel(value) {
+  return ["facebook", "instagram", "youtube", "search", "partner"].includes(value)
+    ? value : "direct";
+}
+async function submissionFingerprint(p, email) {
+  const canonical = JSON.stringify({
+    name: p.name.trim(),
+    company: p.company.trim(),
+    email: email.toLowerCase(),
+    problem: p.problem.trim(),
+    contactPermission: true,
+    source: normalisedSource(p.source),
+    channel: normalisedChannel(p.channel),
+  });
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
 export async function onRequestPost({ request, env, waitUntil }) {
   if (!env.LEADS || typeof env.LEADS.put !== "function") {
     return reply({ error: "Lead intake is not configured. Please email us instead." }, 503);
@@ -61,10 +82,27 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const submissionId = typeof p.submissionId === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.submissionId)
     ? p.submissionId.toLowerCase() : null;
+  const fingerprint = submissionId ? await submissionFingerprint(p, email) : null;
   if (submissionId && typeof env.LEADS.get === "function") {
     try {
       const receipt = await env.LEADS.get("receipt:" + submissionId);
-      if (receipt) return reply({ ok: true, received: true, reference: receipt }, 200);
+      if (receipt) {
+        let parsed;
+        try {
+          parsed = JSON.parse(receipt);
+        } catch {
+          return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
+        }
+        if (!parsed || parsed.version !== 1 ||
+            !/^[0-9a-f-]{36}$/i.test(parsed.reference || "") ||
+            !/^[0-9a-f]{64}$/.test(parsed.fingerprint || "")) {
+          return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
+        }
+        if (parsed.fingerprint !== fingerprint) {
+          return reply({ error: "Submission reference conflicts with different enquiry details." }, 409);
+        }
+        return reply({ ok: true, received: true, reference: parsed.reference }, 200);
+      }
     } catch {
       // If the duplicate check fails, do not silently claim it has been recorded.
       return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
@@ -76,8 +114,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
     createdAt,
     submissionId,
     contactPermissionCapturedAt: createdAt,
-    source: ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(p.source) ? p.source : "newton-revenue-site",
-    channel: ["facebook", "instagram", "youtube", "search", "partner"].includes(p.channel) ? p.channel : "direct",
+    source: normalisedSource(p.source),
+    channel: normalisedChannel(p.channel),
     name: p.name.trim(),
     company: p.company.trim(),
     email,
@@ -93,7 +131,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
     });
     if (submissionId) {
       try {
-        await env.LEADS.put("receipt:" + submissionId, record.id, { expirationTtl: 24 * 60 * 60 });
+        await env.LEADS.put("receipt:" + submissionId, JSON.stringify({
+          version: 1,
+          reference: record.id,
+          fingerprint,
+        }), { expirationTtl: 24 * 60 * 60 });
       } catch {
         // The lead is already stored. Do not tell the customer their enquiry failed.
       }

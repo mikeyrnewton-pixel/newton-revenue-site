@@ -18,7 +18,7 @@ class MemoryKV {
     return format === "json" ? JSON.parse(value) : value;
   }
 }
-function request() {
+function request(overrides = {}) {
   return new Request(ORIGIN + "/api/enquiry", {
     method: "POST",
     headers: {"Content-Type": "application/json", Origin: ORIGIN},
@@ -32,6 +32,7 @@ function request() {
       source: "enquiry-check",
       channel: "direct",
       website: "",
+      ...overrides,
     }),
   });
 }
@@ -70,6 +71,25 @@ test("intake provenance supports one deduped PII-free fictional handoff", async 
   for (const privateValue of [record.name, record.company, record.email, record.problem]) {
     assert.equal(serialized.includes(privateValue), false, "handoff must omit customer PII");
   }
+});
+
+
+test("same submission ID rejects divergent retry payload without another lead", async () => {
+  const kv = new MemoryKV();
+  const env = {LEADS: kv};
+  const first = await submit({request: request(), env});
+  assert.equal(first.status, 201);
+  const changed = await submit({
+    request: request({problem: "FICTIONAL: materially different offline rehearsal"}),
+    env,
+  });
+  assert.equal(changed.status, 409);
+  assert.match((await changed.json()).error, /conflicts with different enquiry details/);
+  assert.equal([...kv.data.keys()].filter(key => key.startsWith("lead:")).length, 1);
+  const receipt = JSON.parse(await kv.get("receipt:" + SUBMISSION_ID));
+  assert.equal(receipt.version, 1);
+  assert.match(receipt.fingerprint, /^[0-9a-f]{64}$/);
+  assert.equal(Object.keys(receipt).sort().join(","), "fingerprint,reference,version");
 });
 
 test("handoff fails closed on missing consent, real-looking data or dedupe conflict", () => {
