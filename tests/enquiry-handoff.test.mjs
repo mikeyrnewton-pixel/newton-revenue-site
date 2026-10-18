@@ -98,9 +98,19 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "delivered", attempts: 0}}), /terminal owner-notice state/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "pending", attempts: 1}}), /attempt timestamp/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {
+    version: 1, status: "pending", attempts: 0, lastAttemptAt: "2026-10-17T20:00:01.000Z",
+  }}), /unattempted owner notice/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {
+    version: 1, status: "pending", attempts: 1, lastAttemptAt: "2026-10-17T19:59:59.000Z",
+  }}), /attempt cannot predate record creation/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {
+    version: 1, status: "pending", attempts: 1,
+    lastAttemptAt: "2026-10-17T20:00:01.000Z", deliveredAt: "2026-10-17T20:00:02.000Z",
+  }}), /undelivered owner notice/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {
     version: 1, status: "delivered", attempts: 1,
-    lastAttemptAt: "2026-10-17T20:00:01.000Z", deliveredAt: "2026-10-17T19:59:59.000Z",
-  }}), /cannot predate record creation/);
+    lastAttemptAt: "2026-10-17T20:00:02.000Z", deliveredAt: "2026-10-17T20:00:01.000Z",
+  }}), /delivery cannot predate its last attempt/);
   const delivered = toFictionalDeliveryHandoff({...base, notification: {
     version: 1, status: "delivered", attempts: 1,
     lastAttemptAt: "2026-10-17T20:00:01.000Z", deliveredAt: "2026-10-17T20:00:01.000Z",
