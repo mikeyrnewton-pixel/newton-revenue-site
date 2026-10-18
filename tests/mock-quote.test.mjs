@@ -35,7 +35,13 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /buyer.*written acceptance/i);
   assert.match(result, /accepted document version or digest/);
   assert.match(result, /acceptance timestamp/);
+  assert.match(result, /authorised representative and evidence of that representative's authority/);
+  assert.match(result, /matching email domain.*is not acceptance/i);
   assert.match(result, /fresh written acceptance before invoicing/);
+  assert.match(result, /purchase order, supplier onboarding or named finance approver/);
+  assert.match(result, /INVOICE HOLD.*buyer-issued reference\/approval/i);
+  assert.match(result, /procurement correspondence as scope acceptance/);
+  assert.match(result, /purchase-order\/reference where required/);
   assert.match(result, /form submission, draft checkbox or verbal indication is not acceptance/i);
   assert.match(result, /Michael's explicit approval/);
   assert.match(result, /settled bank\/merchant evidence may mark CLEARED/);
