@@ -32,6 +32,13 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /Never ask for fresh bank details by email/);
   assert.match(result, /suitably redacted or anonymised/);
   assert.match(result, /subprocessors, retention\/deletion date/);
+  assert.match(result, /wrong-recipient transfer, unauthorised access\/disclosure, lost device/);
+  assert.match(result, /stops further transfer and delivery/);
+  assert.match(result, /do not recall, forward, delete or conceal evidence ad hoc/i);
+  assert.match(result, /INCIDENT_DETECTED, CONTAINMENT_CONFIRMED, IMPACT_ASSESSED, NOTIFICATION_APPROVED and INCIDENT_CLOSED/);
+  assert.match(result, /contractual, insurer, regulator and affected-person duties and deadlines/);
+  assert.match(result, /does not decide whether notification is legally required/);
+  assert.match(result, /fresh READY_TO_START approval/);
   assert.match(result, /buyer.*written acceptance/i);
   assert.match(result, /accepted document version or digest/);
   assert.match(result, /acceptance timestamp/);
