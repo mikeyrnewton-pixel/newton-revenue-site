@@ -53,6 +53,9 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /change-request email alone/);
   assert.match(result, /fresh approval plus independent verification through a previously trusted channel/);
   assert.match(result, /issued invoice\/payment-request version and delivery evidence privately/);
+  assert.match(result, /private invoice register to prevent a duplicate request/);
+  assert.match(result, /never silently overwrite an invoice/i);
+  assert.match(result, /cancellation, credit-note and replacement-invoice trail/);
   assert.doesNotMatch(result, /sort code|account number|IBAN|payment\.newton|revolut\.me/i);
 });
 test("refuses real scope, inflated example limits, other commercial prices and unknown fields", () => {
