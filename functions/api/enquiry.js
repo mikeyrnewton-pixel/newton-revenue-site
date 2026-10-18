@@ -56,6 +56,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
       !validText(p.problem, 2000) || p.contactPermission !== true) {
     return reply({ error: "Please complete all required fields and agree to enquiry contact." }, 400);
   }
+  // Canonicalise source/channel before evaluating the idempotency receipt,
+  // so a reused ID cannot silently acknowledge a different enquiry.
+  const source = ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(p.source)
+    ? p.source : "newton-revenue-site";
+  const channel = ["facebook", "instagram", "youtube", "search", "partner"].includes(p.channel)
+    ? p.channel : "direct";
   // Retry protection: client reuses a random 36-character ID when a network reply is lost.
   // Cloudflare KV is eventually consistent; this is best-effort, not a transaction lock.
   const submissionId = typeof p.submissionId === "string" &&
@@ -64,7 +70,27 @@ export async function onRequestPost({ request, env, waitUntil }) {
   if (submissionId && typeof env.LEADS.get === "function") {
     try {
       const receipt = await env.LEADS.get("receipt:" + submissionId);
-      if (receipt) return reply({ ok: true, received: true, reference: receipt }, 200);
+      if (receipt) {
+        // Receipts are only an acknowledgement of the SAME enquiry.
+        // KV stores the real lead for 30 days but receipt IDs for 24 hours.
+        // A damaged, missing or mismatching original must fail closed.
+        const previous = await env.LEADS.get("lead:" + receipt, "json");
+        if (!previous || typeof previous !== "object") {
+          return reply({ error: "Could not validate the previous enquiry. Please email us." }, 503);
+        }
+        const unchanged =
+          previous.name === p.name.trim() &&
+          previous.company === p.company.trim() &&
+          previous.email === email &&
+          previous.problem === p.problem.trim() &&
+          previous.source === source &&
+          previous.channel === channel &&
+          previous.contactPermission === true;
+        if (!unchanged) {
+          return reply({ error: "This submission ID already belongs to a different enquiry. Refresh and submit again." }, 409);
+        }
+        return reply({ ok: true, received: true, reference: receipt }, 200);
+      }
     } catch {
       // If the duplicate check fails, do not silently claim it has been recorded.
       return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
@@ -73,8 +99,8 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const record = {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    source: ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(p.source) ? p.source : "newton-revenue-site",
-    channel: ["facebook", "instagram", "youtube", "search", "partner"].includes(p.channel) ? p.channel : "direct",
+    source,
+    channel,
     name: p.name.trim(),
     company: p.company.trim(),
     email,
