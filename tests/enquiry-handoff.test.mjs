@@ -64,7 +64,12 @@ test("intake provenance supports one deduped PII-free fictional handoff", async 
   assert.equal(handoff.consent.purpose, "respond_to_enquiry");
   assert.equal(handoff.consent.marketing, false);
   assert.deepEqual(handoff.ownerNotice, {
-    version: 1, status: "pending", attempts: 0, nextAction: "RETRY_OWNER_NOTICE",
+    version: 1,
+    status: "pending",
+    attempts: 0,
+    lastAttemptAt: null,
+    deliveredAt: null,
+    nextAction: "RETRY_OWNER_NOTICE",
   });
 
   const serialized = JSON.stringify(handoff);
@@ -136,11 +141,15 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
     lastAttemptAt: "2026-10-17T20:00:01.000Z", deliveredAt: "2026-10-17T20:00:01.000Z",
   }});
   assert.equal(delivered.ownerNotice.nextAction, "NONE");
+  assert.equal(delivered.ownerNotice.lastAttemptAt, "2026-10-17T20:00:01.000Z");
+  assert.equal(delivered.ownerNotice.deliveredAt, "2026-10-17T20:00:01.000Z");
   const deadLetter = toFictionalDeliveryHandoff({...base, notification: {
     version: 1, status: "dead-letter", attempts: 3,
     lastAttemptAt: "2026-10-17T20:03:00.000Z", failure: "missing_ack",
   }});
   assert.equal(deadLetter.ownerNotice.nextAction, "MANUAL_OWNER_NOTICE_REVIEW");
+  assert.equal(deadLetter.ownerNotice.lastAttemptAt, "2026-10-17T20:03:00.000Z");
+  assert.equal(deadLetter.ownerNotice.deliveredAt, null);
   assert.throws(() => buildCanonicalFictionalHandoffs([
     base,
     {...base, id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"},
