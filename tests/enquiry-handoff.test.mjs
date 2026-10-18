@@ -253,6 +253,31 @@ test("creates one deterministic PII-free offline acknowledgement and fails close
     assert.equal(serialized.includes(privateValue), false, "receipt must omit customer PII");
   }
 
+  const withPii = structuredClone(handoff);
+  withPii.email = "task011@example.invalid";
+  assert.throws(() => acknowledgeFictionalHandoff(withPii, evidence),
+    /exact PII-free canonical handoff fields/);
+  const badSource = structuredClone(handoff);
+  badSource.source = "unapproved-source";
+  assert.throws(() => acknowledgeFictionalHandoff(badSource, evidence),
+    /canonical handoff source/);
+  const badConsent = structuredClone(handoff);
+  badConsent.consent.marketing = true;
+  assert.throws(() => acknowledgeFictionalHandoff(badConsent, evidence),
+    /canonical consent evidence/);
+  const badNoticeShape = structuredClone(handoff);
+  badNoticeShape.ownerNotice.failure = "secret detail";
+  assert.throws(() => acknowledgeFictionalHandoff(badNoticeShape, evidence),
+    /exact owner-notice evidence/);
+  const badAttemptLimit = structuredClone(handoff);
+  badAttemptLimit.ownerNotice.attemptLimit = 99;
+  assert.throws(() => acknowledgeFictionalHandoff(badAttemptLimit, evidence),
+    /delivered owner-notice evidence/);
+  const badWorkflow = structuredClone(handoff);
+  badWorkflow.workflow.unapproved = true;
+  assert.throws(() => acknowledgeFictionalHandoff(badWorkflow, evidence),
+    /exact offline workflow evidence/);
+
   const pending = toFictionalDeliveryHandoff({
     ...record,
     notification: {version: 1, status: "pending", attempts: 0},
