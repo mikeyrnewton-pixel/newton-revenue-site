@@ -230,6 +230,7 @@ test("creates one deterministic PII-free offline acknowledgement and fails close
     handoffId: handoff.handoffId,
     enquiryRef: handoff.enquiryRef,
     consumer: "fictional-delivery-rehearsal",
+    ownerNoticeDeliveredAt: "2026-10-17T20:01:01.000Z",
     acknowledgedAt: "2026-10-17T20:01:02.000Z",
   };
   const first = acknowledgeFictionalHandoff(handoff, evidence);
@@ -242,6 +243,7 @@ test("creates one deterministic PII-free offline acknowledgement and fails close
     handoffId: "enquiry:" + SUBMISSION_ID,
     enquiryRef: record.id,
     consumer: "fictional-delivery-rehearsal",
+    ownerNoticeDeliveredAt: "2026-10-17T20:01:01.000Z",
     acknowledgedAt: "2026-10-17T20:01:02.000Z",
     state: "ACKNOWLEDGED_OFFLINE",
     customerDelivery: "HOLD",
@@ -263,6 +265,12 @@ test("creates one deterministic PII-free offline acknowledgement and fails close
   assert.throws(() => acknowledgeFictionalHandoff(handoff, {
     ...evidence, acknowledgedAt: "2026-10-17T20:00:59.000Z",
   }), /cannot predate owner-notice delivery/);
+  assert.throws(() => acknowledgeFictionalHandoff(handoff, {
+    ...evidence, ownerNoticeDeliveredAt: "2026-10-17T20:01:00.000Z",
+  }), /owner-notice delivery mismatch/);
+  const {ownerNoticeDeliveredAt, ...missingNoticeBinding} = evidence;
+  assert.throws(() => acknowledgeFictionalHandoff(handoff, missingNoticeBinding),
+    /owner-notice delivery timestamp required/);
   assert.throws(() => acknowledgeFictionalHandoff(handoff, {
     ...evidence, email: "task011@example.invalid",
   }), /unapproved acknowledgement field/);
