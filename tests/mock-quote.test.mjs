@@ -27,6 +27,9 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /Michael must confirm.*VAT status/i);
   assert.match(result, /cancellation deadline/);
   assert.match(result, /statutory rights/);
+  assert.match(result, /tied to the original invoice\/payment reference/);
+  assert.match(result, /REFUND_REQUESTED, REFUND_APPROVED, REFUND_ISSUED and REFUND_SETTLED/);
+  assert.match(result, /Never ask for fresh bank details by email/);
   assert.match(result, /suitably redacted or anonymised/);
   assert.match(result, /subprocessors, retention\/deletion date/);
   assert.match(result, /buyer.*written acceptance/i);
