@@ -62,7 +62,9 @@ test("intake provenance supports one deduped PII-free fictional handoff", async 
   assert.equal(handoff.workflow.customerDelivery, "HOLD");
   assert.equal(handoff.consent.purpose, "respond_to_enquiry");
   assert.equal(handoff.consent.marketing, false);
-  assert.deepEqual(handoff.ownerNotice, {version: 1, status: "pending", attempts: 0});
+  assert.deepEqual(handoff.ownerNotice, {
+    version: 1, status: "pending", attempts: 0, nextAction: "RETRY_OWNER_NOTICE",
+  });
 
   const serialized = JSON.stringify(handoff);
   for (const privateValue of [record.name, record.company, record.email, record.problem]) {
@@ -93,6 +95,22 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: undefined}), /owner-notice evidence/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 2, status: "pending", attempts: 0}}), /schema version 1/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "pending", attempts: -1}}), /non-negative owner-notice attempts/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "delivered", attempts: 0}}), /terminal owner-notice state/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "pending", attempts: 1}}), /attempt timestamp/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {
+    version: 1, status: "delivered", attempts: 1,
+    lastAttemptAt: "2026-10-17T20:00:01.000Z", deliveredAt: "2026-10-17T19:59:59.000Z",
+  }}), /cannot predate record creation/);
+  const delivered = toFictionalDeliveryHandoff({...base, notification: {
+    version: 1, status: "delivered", attempts: 1,
+    lastAttemptAt: "2026-10-17T20:00:01.000Z", deliveredAt: "2026-10-17T20:00:01.000Z",
+  }});
+  assert.equal(delivered.ownerNotice.nextAction, "NONE");
+  const deadLetter = toFictionalDeliveryHandoff({...base, notification: {
+    version: 1, status: "dead-letter", attempts: 3,
+    lastAttemptAt: "2026-10-17T20:03:00.000Z", failure: "missing_ack",
+  }});
+  assert.equal(deadLetter.ownerNotice.nextAction, "MANUAL_OWNER_NOTICE_REVIEW");
   assert.throws(() => buildCanonicalFictionalHandoffs([
     base,
     {...base, id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"},
