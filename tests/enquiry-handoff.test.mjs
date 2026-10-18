@@ -5,6 +5,7 @@ import {
   toFictionalDeliveryHandoff,
   buildCanonicalFictionalHandoffs,
   acknowledgeFictionalHandoff,
+  reconcileFictionalHandoffReceipts,
 } from "../lib/enquiry-handoff.js";
 
 const ORIGIN = "https://newton-revenue-site.pages.dev";
@@ -299,4 +300,70 @@ test("creates one deterministic PII-free offline acknowledgement and fails close
   assert.throws(() => acknowledgeFictionalHandoff(handoff, {
     ...evidence, email: "task011@example.invalid",
   }), /unapproved acknowledgement field/);
+});
+
+
+test("reconciles exactly one validated receipt per canonical handoff and holds incomplete batches", () => {
+  const base = {
+    createdAt: "2026-10-17T20:00:00.000Z",
+    contactPermissionCapturedAt: "2026-10-17T20:00:00.000Z",
+    source: "enquiry-check",
+    channel: "direct",
+    name: "SYNTHETIC TASK011",
+    company: "FICTIONAL REPAIR CO",
+    email: "task011@example.invalid",
+    problem: "FICTIONAL offline delivery rehearsal",
+    contactPermission: true,
+    marketingConsent: false,
+    notification: {
+      version: 1,
+      status: "delivered",
+      attempts: 1,
+      lastAttemptAt: "2026-10-17T20:01:00.000Z",
+      deliveredAt: "2026-10-17T20:01:01.000Z",
+    },
+  };
+  const handoffs = [
+    toFictionalDeliveryHandoff({
+      ...base,
+      id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      submissionId: SUBMISSION_ID,
+    }),
+    toFictionalDeliveryHandoff({
+      ...base,
+      id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+      submissionId: "00000000-1111-4222-8333-444444444444",
+    }),
+  ];
+  const receipts = handoffs.map((handoff, index) =>
+    acknowledgeFictionalHandoff(handoff, {
+      version: 1,
+      handoffId: handoff.handoffId,
+      enquiryRef: handoff.enquiryRef,
+      consumer: "fictional-delivery-rehearsal",
+      ownerNoticeDeliveredAt: handoff.ownerNotice.deliveredAt,
+      acknowledgedAt: `2026-10-17T20:01:0${index + 2}.000Z`,
+    }));
+  const batch = reconcileFictionalHandoffReceipts(handoffs, receipts);
+  assert.deepEqual(batch, {
+    schema: "NEWTON_FICTIONAL_HANDOFF_BATCH_V1",
+    synthetic: true,
+    state: "RECONCILED_OFFLINE",
+    handoffCount: 2,
+    receiptIds: [...receipts.map(item => item.receiptId)].sort(),
+    customerDelivery: "HOLD",
+  });
+  assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, receipts.slice(0, 1)),
+    /missing acknowledgement receipt/);
+  assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, [receipts[0], receipts[0]]),
+    /duplicate acknowledgement receipt/);
+  const extra = {...receipts[0], handoffId: "enquiry:99999999-8888-4777-8666-555555555555"};
+  assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, [extra, receipts[1]]),
+    /no canonical handoff/);
+  const forged = {...receipts[0], acknowledgedAt: "2026-10-17T20:01:09.000Z"};
+  assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, [forged, receipts[1]]),
+    /does not match canonical handoff/);
+  const pii = {...receipts[0], email: "task011@example.invalid"};
+  assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, [pii, receipts[1]]),
+    /exact acknowledgement receipt fields/);
 });
