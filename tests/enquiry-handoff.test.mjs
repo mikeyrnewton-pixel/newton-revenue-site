@@ -360,7 +360,7 @@ test("reconciles exactly one validated receipt per canonical handoff and holds i
   const extra = {...receipts[0], handoffId: "enquiry:99999999-8888-4777-8666-555555555555"};
   assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, [extra, receipts[1]]),
     /no canonical handoff/);
-  const forged = {...receipts[0], acknowledgedAt: "2026-10-17T20:01:09.000Z"};
+  const forged = {...receipts[0], receiptId: "forged-receipt-id"};
   assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, [forged, receipts[1]]),
     /does not match canonical handoff/);
   const pii = {...receipts[0], email: "task011@example.invalid"};
