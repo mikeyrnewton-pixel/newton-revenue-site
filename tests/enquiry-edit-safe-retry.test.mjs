@@ -52,7 +52,7 @@ function mount(fetchImpl) {
 
 class MockKV {
   entries = new Map();
-  async get(key) { return this.entries.get(key) ?? null; }
+  async get(key, format) { const item = this.entries.get(key) ?? null; return format === "json" && item !== null ? JSON.parse(item) : item; }
   async put(key, value) { this.entries.set(key, value); }
 }
 
