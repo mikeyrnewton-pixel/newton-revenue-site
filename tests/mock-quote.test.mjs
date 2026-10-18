@@ -37,6 +37,10 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /Michael's explicit approval/);
   assert.match(result, /settled bank\/merchant evidence may mark CLEARED/);
   assert.match(result, /Never place bank details, merchant secrets or reusable payment URLs in source code/);
+  assert.match(result, /buyer-approved billing contact through the approved channel/);
+  assert.match(result, /change-request email alone/);
+  assert.match(result, /fresh approval plus independent verification through a previously trusted channel/);
+  assert.match(result, /issued invoice\/payment-request version and delivery evidence privately/);
   assert.doesNotMatch(result, /sort code|account number|IBAN|payment\.newton|revolut\.me/i);
 });
 test("refuses real scope, inflated example limits, other commercial prices and unknown fields", () => {
