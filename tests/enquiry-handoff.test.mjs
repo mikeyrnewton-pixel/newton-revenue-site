@@ -67,6 +67,7 @@ test("intake provenance supports one deduped PII-free fictional handoff", async 
     version: 1,
     status: "pending",
     attempts: 0,
+    attemptLimit: 3,
     lastAttemptAt: null,
     deliveredAt: null,
     nextAction: "RETRY_OWNER_NOTICE",
@@ -120,6 +121,9 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: undefined}), /owner-notice evidence/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 2, status: "pending", attempts: 0}}), /schema version 1/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "pending", attempts: -1}}), /non-negative owner-notice attempts/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "pending", attempts: 3}}), /retry budget must be dead-lettered/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "dead-letter", attempts: 2}}), /requires an exhausted retry budget/);
+  assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "dead-letter", attempts: 4}}), /exceed the retry budget/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "delivered", attempts: 0}}), /terminal owner-notice state/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {version: 1, status: "pending", attempts: 1}}), /attempt timestamp/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, notification: {
@@ -141,6 +145,7 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
     lastAttemptAt: "2026-10-17T20:00:01.000Z", deliveredAt: "2026-10-17T20:00:01.000Z",
   }});
   assert.equal(delivered.ownerNotice.nextAction, "NONE");
+  assert.equal(delivered.ownerNotice.attemptLimit, 3);
   assert.equal(delivered.ownerNotice.lastAttemptAt, "2026-10-17T20:00:01.000Z");
   assert.equal(delivered.ownerNotice.deliveredAt, "2026-10-17T20:00:01.000Z");
   const deadLetter = toFictionalDeliveryHandoff({...base, notification: {
