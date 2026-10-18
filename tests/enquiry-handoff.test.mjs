@@ -80,6 +80,41 @@ test("intake provenance supports one deduped PII-free fictional handoff", async 
   }
 });
 
+test("equal consent timestamps produce one deterministic manifest order across retries", () => {
+  const common = {
+    createdAt: "2026-10-17T20:00:00.000Z",
+    contactPermissionCapturedAt: "2026-10-17T20:00:00.000Z",
+    source: "enquiry-check",
+    channel: "direct",
+    name: "SYNTHETIC TASK011",
+    company: "FICTIONAL REPAIR CO",
+    email: "task011@example.invalid",
+    problem: "FICTIONAL offline delivery rehearsal",
+    contactPermission: true,
+    marketingConsent: false,
+    notification: {version: 1, status: "pending", attempts: 0},
+  };
+  const first = {
+    ...common,
+    id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+    submissionId: "11111111-2222-4333-8444-555555555555",
+  };
+  const second = {
+    ...common,
+    id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+    submissionId: "00000000-1111-4222-8333-444444444444",
+  };
+  const forward = buildCanonicalFictionalHandoffs([first, second]);
+  const retried = buildCanonicalFictionalHandoffs([second, first]);
+
+  assert.deepEqual(retried, forward, "input order must not change the canonical manifest");
+  assert.deepEqual(forward.map(item => item.handoffId), [
+    "enquiry:00000000-1111-4222-8333-444444444444",
+    "enquiry:11111111-2222-4333-8444-555555555555",
+  ]);
+});
+
+
 
 test("same submission ID rejects divergent retry payload without another lead", async () => {
   const kv = new MemoryKV();
