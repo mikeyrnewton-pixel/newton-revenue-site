@@ -56,6 +56,9 @@ test("creates deterministic enquiry-only ledger seed with every money state held
   assert.match(first.batchDigest,/^sha256:[0-9a-f]{64}$/);
 
   const row=first.rows[0];
+  assert.equal(row.source_record_id,"11111111-1111-4111-8111-111111111111");
+  assert.equal(row.source_classification,"SYNTHETIC");
+  assert.match(row.source_evidence_digest,/^[0-9a-f]{64}$/);
   assert.equal(row.commercial_state,"ENQUIRY_ONLY");
   assert.equal(row.quote_state,"NOT_QUOTED");
   assert.equal(row.acceptance_state,"NOT_ACCEPTED");
@@ -70,6 +73,21 @@ test("creates deterministic enquiry-only ledger seed with every money state held
     "Fictional Buyer","fictional@example.invalid","Synthetic Ltd",
     "Synthetic missed enquiry",
   ]) assert.equal(serialized.includes(pii),false);
+});
+
+test("emits deterministic PR29-compatible source bindings per lead",()=>{
+  const first=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig()).rows[0];
+  const retry=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig()).rows[0];
+  assert.equal(first.source_record_id,retry.source_record_id);
+  assert.equal(first.source_evidence_digest,retry.source_evidence_digest);
+
+  const distinct=buildOfflineCommercialLeadExport(exportFor({
+    id:"22222222-2222-4222-8222-222222222222",
+    submissionId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  }),ledgerConfig()).rows[0];
+  assert.notEqual(first.source_record_id,distinct.source_record_id);
+  assert.notEqual(first.source_evidence_digest,distinct.source_evidence_digest);
+  assert.equal(distinct.source_classification,"SYNTHETIC");
 });
 
 test("owner notice delivery never becomes buyer acceptance or payment evidence",()=>{
