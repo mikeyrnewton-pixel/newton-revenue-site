@@ -34,8 +34,23 @@ test("compatible contracts create a private HOLD manifest",()=>{
     assert.equal(out.manifest.paymentState,"NOT_CLEARED");
     assert.equal(out.manifest.connectionState,"NEEDS_CONNECTION");
     assert.equal(out.manifest.live,false);
+    assert.equal(out.manifest.enquiryId,"11111111-2222-4333-8444-555555555555");
     assert.deepEqual(out.manifest.compatibleContracts,["PR11_QA","PR29_COMMERCIAL","PR30_ACQUISITION","PR43_LIFECYCLE"]);
     assert.equal(lstatSync(out.output).mode&0o077,0);
+  }finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+test("actual lifecycle generator output is accepted end to end",()=>{
+  const dir=temp();
+  try{
+    const record=join(dir,"record.json"),policy=join(dir,"policy.json"),receipt=join(dir,"receipt.json");
+    writeFileSync(record,JSON.stringify({schemaVersion:1,enquiryId:"11111111-2222-4333-8444-555555555555",email:"qa@example.invalid",createdAt:"2026-10-01T09:00:00.000Z",syntheticOnly:true,personalData:false,deletionRequested:false}),{mode:0o600});
+    writeFileSync(policy,JSON.stringify({schemaVersion:1,retentionDays:30,deletionGraceDays:7,storageAdapter:"",deletionAdapter:"",connectionStatus:"NEEDS_CONNECTION",ownerApproval:"NOT_GRANTED",liveEnabled:false}),{mode:0o600});
+    const lifecycle=new URL("../scripts/enquiry-lifecycle-receipt.mjs",import.meta.url).pathname;
+    const generated=spawnSync(process.execPath,[lifecycle,"--record",record,"--policy",policy,"--as-of","2026-10-20T08:00:00.000Z","--output",receipt],{encoding:"utf8"});
+    assert.equal(generated.status,0,generated.stderr);
+    const bundle=JSON.parse(readFileSync(fixture,"utf8"));bundle.lifecycle=JSON.parse(readFileSync(receipt,"utf8"));
+    const out=run(dir,bundle);assert.equal(out.manifest.enquiryId,bundle.lifecycle.enquiryId);
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
 
@@ -75,6 +90,12 @@ test("lifecycle deletion, connection or live promotion fails closed",()=>{
     const r=rejected(b,JSON.parse(readFileSync(template,"utf8")));
     assert.equal(r.status,2); assert.match(r.stderr,/lifecycle contract mismatch/);
   }
+});
+
+test("PR30 handoff identity must match the PR43 lifecycle enquiry",()=>{
+  const b=JSON.parse(readFileSync(fixture,"utf8")); b.lifecycle.enquiryId="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  const r=rejected(b,JSON.parse(readFileSync(template,"utf8")));
+  assert.equal(r.status,2); assert.match(r.stderr,/lifecycle contract mismatch/);
 });
 
 test("nonblank connection placeholders and approval are rejected",()=>{

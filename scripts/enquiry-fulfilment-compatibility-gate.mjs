@@ -82,10 +82,13 @@ if(!exact(q,["schema","synthetic","projectRef","outcomes","humanReview","clientA
   fail("PR11 twelve-test QA rehearsal contract mismatch");
 
 const l=b.lifecycle;
-if(!exact(l,["component","state","testMode","connectionStatus","live","decision","ownerApproval","storageConnected","deletionExecuted"])||
+const lifecycleKeys=["schemaVersion","component","state","testMode","connectionStatus","live","decision","enquiryId","emailClass","createdAt","asOf","deleteEligibleAt","ownerApproval","storageConnected","deletionExecuted","externalContact","inputFingerprintSha256"];
+if(!exact(l,lifecycleKeys)||l.schemaVersion!==1||
   l.component!=="ENQUIRY_LIFECYCLE_REVIEW"||l.state!=="STAGED"||l.testMode!=="OFFLINE_SYNTHETIC_ONLY"||
   l.connectionStatus!=="NEEDS_CONNECTION"||l.live!==false||l.decision!=="RETAIN_UNTIL_POLICY_DATE"||
-  l.ownerApproval!=="NOT_GRANTED"||l.storageConnected!==false||l.deletionExecuted!==false)
+  l.emailClass!=="SYNTHETIC_EXAMPLE_INVALID_REDACTED"||!iso(l.createdAt)||!iso(l.asOf)||!iso(l.deleteEligibleAt)||
+  l.ownerApproval!=="NOT_GRANTED"||l.storageConnected!==false||l.deletionExecuted!==false||l.externalContact!==false||
+  !/^[a-f0-9]{64}$/.test(l.inputFingerprintSha256||"")||a.handoffId!=="enquiry:"+l.enquiryId)
   fail("PR43 lifecycle contract mismatch");
 
 const digest=createHash("sha256").update(bundleFile.raw+"\n"+configFile.raw).digest("hex");
@@ -93,6 +96,7 @@ const manifest={
   schema:"NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1",
   synthetic:true,
   projectRef:b.projectRef,
+  enquiryId:l.enquiryId,
   result:"READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN",
   evidenceDigest:"sha256:"+digest,
   compatibleContracts:["PR11_QA","PR29_COMMERCIAL","PR30_ACQUISITION","PR43_LIFECYCLE"],

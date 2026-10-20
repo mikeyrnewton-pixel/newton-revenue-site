@@ -2,12 +2,14 @@
 
 Status: **READY / TESTED_OFFLINE pending / NEEDS_CONNECTION / customer delivery HOLD / not LIVE**
 
-This gate reconciles the existing contracts rather than creating a second fulfilment system:
+This gate reconciles the existing contracts rather than creating a second fulfilment system. It consumes the actual output schema of `enquiry-lifecycle-receipt.mjs`, not a manually reduced substitute:
 
 - PR11: 12-test £195 diagnostic QA and human/client acceptance hold;
 - PR29: commercial evidence ordering, with fictional rehearsal excluded from revenue;
 - PR30: consent-backed, PII-free acquisition handoff held offline;
 - PR43: retention/deletion review held offline and disconnected.
+
+The PR30 `handoffId` enquiry UUID must exactly match the PR43 lifecycle `enquiryId`; contradictory customer identities fail closed.
 
 It emits a private `0600` manifest only when project references and safety states agree. Even a passing rehearsal remains `READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN`; it cannot claim delivery, acceptance, cleared payment, connection or live browser verification.
 
