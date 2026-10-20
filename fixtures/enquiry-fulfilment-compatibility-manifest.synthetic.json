@@ -1,0 +1,12 @@
+{
+  "schema": "NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1",
+  "synthetic": true,
+  "projectRef": "DEMO-DIAG-001",
+  "result": "READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN",
+  "evidenceDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "customerDelivery": "HOLD",
+  "paymentState": "NOT_CLEARED",
+  "connectionState": "NEEDS_CONNECTION",
+  "live": false,
+  "externalAction": false
+}

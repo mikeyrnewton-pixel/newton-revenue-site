@@ -1,0 +1,9 @@
+{
+  "schema": "NEWTON_REDACTED_REPORT_CONNECT_LATER_V1",
+  "mode": "OFFLINE_REVIEW_ONLY",
+  "reportAdapter": "",
+  "deliveryRoute": "",
+  "recipientRole": "",
+  "ownerApproval": "NOT_GRANTED",
+  "liveEnabled": false
+}
