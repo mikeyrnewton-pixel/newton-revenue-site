@@ -165,6 +165,16 @@ test("observation boundary rejects real activity raw references and malformed ev
     ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),providerReference:"pi_secret"},binding()),
     /exact synthetic observation/,
   );
+  for(const key of ["observationId","sourceRecordId","invoiceEventId"]){
+    assert.throws(
+      ()=>assessSyntheticPaymentObservation({
+        ...observation("SETTLED"),
+        [key]:observation("SETTLED")[key].toUpperCase(),
+      },binding()),
+      /valid .* ID required/,
+      `uppercase ${key} aliases must fail closed`,
+    );
+  }
 });
 
 
