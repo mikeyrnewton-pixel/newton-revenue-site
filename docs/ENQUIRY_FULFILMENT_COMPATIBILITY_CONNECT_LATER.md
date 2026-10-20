@@ -10,7 +10,7 @@ This gate reconciles the existing contracts rather than creating a second fulfil
 - PR43: retention/deletion review held offline and disconnected.
 
 The PR30 `handoffId` enquiry UUID must exactly match the PR43 lifecycle `enquiryId`; contradictory customer identities fail closed.
-The PR29 `sourceRecordId` must match that same enquiry ID. The gate accepts the exact `NEWTON_COMMERCIAL_READINESS_V1` output shape from PR29 and requires `COMMERCIAL_GATE_READY`, no accepted commercial events, £0 recorded/cleared evidence and `FICTIONAL_ONLY_NOT_REVENUE`. A quote draft or synthetic £195 rehearsal is never treated as acceptance, payment or revenue.
+The PR29 `sourceRecordId` must match that same enquiry ID. The gate accepts the exact `NEWTON_COMMERCIAL_READINESS_V1` output shape from PR29 and requires the £195 price, an explicitly resolved VAT treatment, approved supplier address and terms, `COMMERCIAL_GATE_READY`, no accepted commercial events, £0 recorded/cleared evidence and `FICTIONAL_ONLY_NOT_REVENUE`. Those four commercial fields are preserved in the output manifest as `commercialBasis`. A quote draft or synthetic £195 rehearsal is never treated as acceptance, payment or revenue.
 
 It emits a private `0600` manifest only when project references and safety states agree. Even a passing rehearsal remains `READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN`; it cannot claim delivery, acceptance, cleared payment, connection or live browser verification.
 

@@ -68,10 +68,12 @@ const lifecycleEnquiryId=b.lifecycle?.enquiryId;
 if(a.handoffId!=="enquiry:"+lifecycleEnquiryId)fail("cross-contract enquiry identity mismatch");
 
 const m=b.commercial;
-const commercialKeys=["schema","synthetic","projectRef","sourceRecordId","sourceClassification","state","blockers","acceptedEventIds","recordedPaymentEvidenceGBP","clearedEvidenceGBP","commercialTruth","customerDelivery"];
+const commercialKeys=["schema","synthetic","projectRef","sourceRecordId","sourceClassification","priceGBP","vatTreatment","supplierAddressApproved","termsApproved","state","blockers","acceptedEventIds","recordedPaymentEvidenceGBP","clearedEvidenceGBP","commercialTruth","customerDelivery"];
 if(!exact(m,commercialKeys)||
   m.schema!=="NEWTON_COMMERCIAL_READINESS_V1"||m.synthetic!==true||m.projectRef!==b.projectRef||
   m.sourceRecordId!==lifecycleEnquiryId||m.sourceClassification!=="SYNTHETIC"||
+  m.priceGBP!==195||!["VAT_INCLUDED","VAT_EXCLUDED","OUTSIDE_SCOPE"].includes(m.vatTreatment)||
+  m.supplierAddressApproved!==true||m.termsApproved!==true||
   m.state!=="COMMERCIAL_GATE_READY"||!Array.isArray(m.blockers)||m.blockers.length!==0||
   !Array.isArray(m.acceptedEventIds)||m.acceptedEventIds.length!==0||
   m.recordedPaymentEvidenceGBP!==0||m.clearedEvidenceGBP!==0||
@@ -103,6 +105,7 @@ const manifest={
   synthetic:true,
   projectRef:b.projectRef,
   enquiryId:l.enquiryId,
+  commercialBasis:{priceGBP:m.priceGBP,vatTreatment:m.vatTreatment,supplierAddressApproved:true,termsApproved:true},
   result:"READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN",
   evidenceDigest:"sha256:"+digest,
   compatibleContracts:["PR11_QA","PR29_COMMERCIAL","PR30_ACQUISITION","PR43_LIFECYCLE"],

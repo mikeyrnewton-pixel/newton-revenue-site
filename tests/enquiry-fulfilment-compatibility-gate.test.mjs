@@ -35,6 +35,7 @@ test("compatible contracts create a private HOLD manifest",()=>{
     assert.equal(out.manifest.connectionState,"NEEDS_CONNECTION");
     assert.equal(out.manifest.live,false);
     assert.equal(out.manifest.enquiryId,"11111111-2222-4333-8444-555555555555");
+    assert.deepEqual(out.manifest.commercialBasis,{priceGBP:195,vatTreatment:"VAT_INCLUDED",supplierAddressApproved:true,termsApproved:true});
     assert.deepEqual(out.manifest.compatibleContracts,["PR11_QA","PR29_COMMERCIAL","PR30_ACQUISITION","PR43_LIFECYCLE"]);
     assert.equal(lstatSync(out.output).mode&0o077,0);
   }finally{rmSync(dir,{recursive:true,force:true});}
@@ -64,6 +65,14 @@ test("PR29 commercial source must be the same enquiry as PR30 and PR43",()=>{
   const b=JSON.parse(readFileSync(fixture,"utf8")); b.commercial.sourceRecordId="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
   const r=rejected(b,JSON.parse(readFileSync(template,"utf8")));
   assert.equal(r.status,2); assert.match(r.stderr,/commercial readiness contract mismatch/);
+});
+
+test("£195, approved VAT basis, supplier address and terms are mandatory",()=>{
+  for(const edit of [b=>b.commercial.priceGBP=295,b=>b.commercial.vatTreatment="UNKNOWN",b=>b.commercial.supplierAddressApproved=false,b=>b.commercial.termsApproved=false]){
+    const b=JSON.parse(readFileSync(fixture,"utf8"));edit(b);
+    const r=rejected(b,JSON.parse(readFileSync(template,"utf8")));
+    assert.equal(r.status,2);assert.match(r.stderr,/commercial readiness contract mismatch/);
+  }
 });
 
 test("consent or acquisition delivery promotion fails closed",()=>{
