@@ -4,10 +4,12 @@ import {reconcileCommercialReadiness} from "../lib/commercial-readiness.js";
 
 const TYPES=["QUOTE_READY","WRITTEN_ACCEPTANCE","OWNER_APPROVED","INVOICE_READY","INVOICED","PAYMENT_RECORDED","CLEARED"];
 const ids=TYPES.map((_,index)=>`${index+1}1111111-1111-4111-8111-111111111111`);
+const sourceRecordId="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const events=()=>TYPES.map((type,index)=>({
   version:1,
   synthetic:true,
   eventId:ids[index],
+  sourceRecordId,
   type,
   occurredAt:`2026-10-20T08:0${index}:00.000Z`,
   evidenceDigest:String(index+1).repeat(64),
@@ -15,6 +17,9 @@ const events=()=>TYPES.map((type,index)=>({
 const base=()=>({
   synthetic:true,
   projectRef:"DEMO-CASH-195",
+  sourceRecordId,
+  sourceClassification:"SYNTHETIC",
+  sourceEvidenceDigest:"a".repeat(64),
   channel:"Website",
   priceGBP:195,
   vatTreatment:"VAT_INCLUDED",
@@ -30,6 +35,8 @@ test("reconciles the exact quote-to-cleared evidence sequence without claiming r
   assert.equal(snapshot.clearedEvidenceGBP,195);
   assert.equal(snapshot.commercialTruth,"FICTIONAL_ONLY_NOT_REVENUE");
   assert.equal(snapshot.customerDelivery,"HOLD");
+  assert.equal(snapshot.sourceRecordId,sourceRecordId);
+  assert.equal(snapshot.sourceClassification,"SYNTHETIC");
   assert.deepEqual(snapshot.acceptedEventIds,ids);
   const retry=base();
   retry.events.splice(1,0,{...retry.events[0]});
@@ -83,6 +90,23 @@ test("fails closed on skipped stages, conflicting replay and backwards evidence"
   const backwards=base();
   backwards.events[1]={...backwards.events[1],occurredAt:"2026-10-20T07:59:00.000Z"};
   assert.throws(()=>reconcileCommercialReadiness(backwards),/timeline moved backwards/);
+});
+
+test("binds every commercial event to one privacy-safe source record",()=>{
+  const crossLead=base();
+  crossLead.events[4]={...crossLead.events[4],
+    sourceRecordId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"};
+  assert.throws(()=>reconcileCommercialReadiness(crossLead),
+    /commercial event source record mismatch/);
+
+  assert.throws(
+    ()=>reconcileCommercialReadiness({...base(),sourceClassification:"GENUINE"}),
+    /synthetic source classification required/,
+  );
+  assert.throws(
+    ()=>reconcileCommercialReadiness({...base(),sourceEvidenceDigest:"not-a-digest"}),
+    /source SHA-256 evidence digest required/,
+  );
 });
 
 test("refuses real activity, unknown evidence and activity while gates are blocked",()=>{
