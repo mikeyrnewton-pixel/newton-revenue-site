@@ -157,6 +157,11 @@ test("observation boundary rejects real activity raw references and malformed ev
     /SHA-256 evidence digest/,
   );
   assert.throws(
+    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),evidenceDigest:"A".repeat(64)},binding()),
+    /SHA-256 evidence digest/,
+    "uppercase digest must not bypass the canonical lowercase cross-PR contract",
+  );
+  assert.throws(
     ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),providerReference:"pi_secret"},binding()),
     /exact synthetic observation/,
   );
