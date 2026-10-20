@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {reconcileCommercialReadiness} from "../lib/commercial-readiness.js";
 
-const TYPES=["QUOTE_READY","WRITTEN_ACCEPTANCE","OWNER_APPROVED","INVOICE_READY","INVOICED","CLEARED"];
+const TYPES=["QUOTE_READY","WRITTEN_ACCEPTANCE","OWNER_APPROVED","INVOICE_READY","INVOICED","PAYMENT_RECORDED","CLEARED"];
 const ids=TYPES.map((_,index)=>`${index+1}1111111-1111-4111-8111-111111111111`);
 const events=()=>TYPES.map((type,index)=>({
   version:1,
@@ -26,6 +26,7 @@ const base=()=>({
 test("reconciles the exact quote-to-cleared evidence sequence without claiming revenue",()=>{
   const snapshot=reconcileCommercialReadiness(base());
   assert.equal(snapshot.state,"CLEARED");
+  assert.equal(snapshot.recordedPaymentEvidenceGBP,195);
   assert.equal(snapshot.clearedEvidenceGBP,195);
   assert.equal(snapshot.commercialTruth,"FICTIONAL_ONLY_NOT_REVENUE");
   assert.equal(snapshot.customerDelivery,"HOLD");
@@ -49,8 +50,25 @@ test("reports VAT, address and terms blockers before any commercial event",()=>{
     "SUPPLIER_ADDRESS_UNAPPROVED",
     "COMMERCIAL_TERMS_UNAPPROVED",
   ]);
+  assert.equal(snapshot.recordedPaymentEvidenceGBP,0);
   assert.equal(snapshot.clearedEvidenceGBP,0);
   assert.equal(snapshot.customerDelivery,"HOLD");
+});
+
+test("payment recorded remains distinct from cleared funds",()=>{
+  const input=base();
+  input.events=input.events.slice(0,-1);
+  const recorded=reconcileCommercialReadiness(input);
+  assert.equal(recorded.state,"PAYMENT_RECORDED");
+  assert.equal(recorded.recordedPaymentEvidenceGBP,195);
+  assert.equal(recorded.clearedEvidenceGBP,0);
+  assert.equal(recorded.commercialTruth,"FICTIONAL_ONLY_NOT_REVENUE");
+  assert.equal(recorded.customerDelivery,"HOLD");
+
+  const skipped=base();
+  skipped.events.splice(-2,1);
+  assert.throws(()=>reconcileCommercialReadiness(skipped),
+    /commercial event order skipped or repeated/);
 });
 
 test("fails closed on skipped stages, conflicting replay and backwards evidence",()=>{
