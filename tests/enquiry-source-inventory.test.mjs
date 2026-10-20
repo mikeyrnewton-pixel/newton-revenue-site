@@ -69,14 +69,27 @@ test("unreadable primary stores remain unknown instead of becoming zero",()=>{
   assert.equal(result.customerDelivery,"HOLD");
 });
 
-test("even fully read aggregate sources still require cross-source dedupe",()=>{
+test("bounded Gmail searches remain partial even when every source is readable",()=>{
   const input=fixture();
   input.sources=input.sources.map(source=>
     source.accessState==="READ_VERIFIED"?source:readable(source.sourceId));
   const result=reconcileEnquirySourceInventory(input);
-  assert.equal(result.classificationStatus,"ALL_SOURCES_READ_DEDUPE_REQUIRED");
+  assert.equal(result.classificationStatus,"PARTIAL_COVERAGE_DEDUPE_REQUIRED");
   assert.equal(result.genuineEnquiries,null);
   assert.deepEqual(result.unreadableSources,[]);
+  assert.deepEqual(result.partialCoverageSources,[
+    "NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL",
+  ]);
+  assert.equal(result.automaticBuyerPromotion,false);
+});
+
+test("all sources fully read still require cross-source deduplication",()=>{
+  const input=fixture();
+  input.sources=input.sources.map(source=>readable(source.sourceId));
+  const result=reconcileEnquirySourceInventory(input);
+  assert.equal(result.classificationStatus,"ALL_SOURCES_READ_DEDUPE_REQUIRED");
+  assert.deepEqual(result.partialCoverageSources,[]);
+  assert.equal(result.genuineEnquiries,null);
   assert.equal(result.automaticBuyerPromotion,false);
 });
 
