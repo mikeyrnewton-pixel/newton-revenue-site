@@ -37,6 +37,10 @@ test("reconciles the exact quote-to-cleared evidence sequence without claiming r
   assert.equal(snapshot.customerDelivery,"HOLD");
   assert.equal(snapshot.sourceRecordId,sourceRecordId);
   assert.equal(snapshot.sourceClassification,"SYNTHETIC");
+  assert.equal(snapshot.priceGBP,195);
+  assert.equal(snapshot.vatTreatment,"VAT_INCLUDED");
+  assert.equal(snapshot.supplierAddressApproved,true);
+  assert.equal(snapshot.termsApproved,true);
   assert.deepEqual(snapshot.acceptedEventIds,ids);
   const retry=base();
   retry.events.splice(1,0,{...retry.events[0]});
@@ -60,6 +64,10 @@ test("reports VAT, address and terms blockers before any commercial event",()=>{
   assert.equal(snapshot.recordedPaymentEvidenceGBP,0);
   assert.equal(snapshot.clearedEvidenceGBP,0);
   assert.equal(snapshot.customerDelivery,"HOLD");
+  assert.equal(snapshot.priceGBP,195);
+  assert.equal(snapshot.vatTreatment,"UNKNOWN");
+  assert.equal(snapshot.supplierAddressApproved,false);
+  assert.equal(snapshot.termsApproved,false);
 });
 
 test("payment recorded remains distinct from cleared funds",()=>{
@@ -121,3 +129,4 @@ test("refuses real activity, unknown evidence and activity while gates are block
   extra.buyerEmail="person@example.com";
   assert.throws(()=>reconcileCommercialReadiness(extra),/exact readiness input/);
 });
+
