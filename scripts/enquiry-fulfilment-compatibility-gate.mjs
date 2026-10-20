@@ -64,11 +64,17 @@ if(!exact(a,["schema","synthetic","projectRef","handoffId","consent","workflow"]
   !iso(a.consent.capturedAt)||a.consent.marketing!==false||
   !exact(a.workflow,["state","customerDelivery"])||a.workflow.state!=="STAGED_OFFLINE_ONLY"||a.workflow.customerDelivery!=="HOLD")
   fail("PR30 acquisition handoff contract mismatch");
+const lifecycleEnquiryId=b.lifecycle?.enquiryId;
+if(a.handoffId!=="enquiry:"+lifecycleEnquiryId)fail("cross-contract enquiry identity mismatch");
 
 const m=b.commercial;
-if(!exact(m,["schema","synthetic","projectRef","state","recordedPaymentEvidenceGBP","clearedEvidenceGBP","commercialTruth","customerDelivery"])||
+const commercialKeys=["schema","synthetic","projectRef","sourceRecordId","sourceClassification","state","blockers","acceptedEventIds","recordedPaymentEvidenceGBP","clearedEvidenceGBP","commercialTruth","customerDelivery"];
+if(!exact(m,commercialKeys)||
   m.schema!=="NEWTON_COMMERCIAL_READINESS_V1"||m.synthetic!==true||m.projectRef!==b.projectRef||
-  m.state!=="COMMERCIAL_GATE_READY"||m.recordedPaymentEvidenceGBP!==0||m.clearedEvidenceGBP!==0||
+  m.sourceRecordId!==lifecycleEnquiryId||m.sourceClassification!=="SYNTHETIC"||
+  m.state!=="COMMERCIAL_GATE_READY"||!Array.isArray(m.blockers)||m.blockers.length!==0||
+  !Array.isArray(m.acceptedEventIds)||m.acceptedEventIds.length!==0||
+  m.recordedPaymentEvidenceGBP!==0||m.clearedEvidenceGBP!==0||
   m.commercialTruth!=="FICTIONAL_ONLY_NOT_REVENUE"||m.customerDelivery!=="HOLD")
   fail("PR29 commercial readiness contract mismatch");
 

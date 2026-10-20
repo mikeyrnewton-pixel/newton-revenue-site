@@ -60,6 +60,12 @@ test("project-reference mismatch fails closed",()=>{
   assert.equal(r.status,2); assert.match(r.stderr,/commercial readiness contract mismatch/);
 });
 
+test("PR29 commercial source must be the same enquiry as PR30 and PR43",()=>{
+  const b=JSON.parse(readFileSync(fixture,"utf8")); b.commercial.sourceRecordId="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  const r=rejected(b,JSON.parse(readFileSync(template,"utf8")));
+  assert.equal(r.status,2); assert.match(r.stderr,/commercial readiness contract mismatch/);
+});
+
 test("consent or acquisition delivery promotion fails closed",()=>{
   for(const edit of [b=>b.acquisition.consent.marketing=true,b=>b.acquisition.workflow.customerDelivery="RELEASE"]){
     const b=JSON.parse(readFileSync(fixture,"utf8")); edit(b);
@@ -69,7 +75,7 @@ test("consent or acquisition delivery promotion fails closed",()=>{
 });
 
 test("invented payment or revenue state fails closed",()=>{
-  for(const edit of [b=>b.commercial.clearedEvidenceGBP=195,b=>b.commercial.commercialTruth="REVENUE"]){
+  for(const edit of [b=>b.commercial.clearedEvidenceGBP=195,b=>b.commercial.commercialTruth="REVENUE",b=>b.commercial.acceptedEventIds=["11111111-1111-4111-8111-111111111111"]]){
     const b=JSON.parse(readFileSync(fixture,"utf8")); edit(b);
     const r=rejected(b,JSON.parse(readFileSync(template,"utf8")));
     assert.equal(r.status,2); assert.match(r.stderr,/commercial readiness contract mismatch/);
@@ -95,7 +101,7 @@ test("lifecycle deletion, connection or live promotion fails closed",()=>{
 test("PR30 handoff identity must match the PR43 lifecycle enquiry",()=>{
   const b=JSON.parse(readFileSync(fixture,"utf8")); b.lifecycle.enquiryId="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
   const r=rejected(b,JSON.parse(readFileSync(template,"utf8")));
-  assert.equal(r.status,2); assert.match(r.stderr,/lifecycle contract mismatch/);
+  assert.equal(r.status,2); assert.match(r.stderr,/cross-contract enquiry identity mismatch/);
 });
 
 test("nonblank connection placeholders and approval are rejected",()=>{
