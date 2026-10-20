@@ -188,7 +188,7 @@ test("rejects source UUIDs incompatible with the PR29 commercial contract",()=>{
   );
   const uppercaseAlias={
     ...original.rows[0],
-    enquiry_ref:original.rows[0].enquiry_ref.toUpperCase(),
+    enquiry_ref:"ABCDEFAB-CDEF-4ABC-8DEF-ABCDEFABCDEF",
   };
   assert.throws(
     ()=>buildOfflineCommercialLeadExport({...original,rows:[uppercaseAlias]},ledgerConfig()),
