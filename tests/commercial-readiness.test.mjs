@@ -98,6 +98,16 @@ test("fails closed on skipped stages, conflicting replay and backwards evidence"
   const backwards=base();
   backwards.events[1]={...backwards.events[1],occurredAt:"2026-10-20T07:59:00.000Z"};
   assert.throws(()=>reconcileCommercialReadiness(backwards),/timeline moved backwards/);
+
+  const reusedEvidence=base();
+  reusedEvidence.events[5]={
+    ...reusedEvidence.events[5],
+    evidenceDigest:reusedEvidence.events[4].evidenceDigest,
+  };
+  assert.throws(
+    ()=>reconcileCommercialReadiness(reusedEvidence),
+    /evidence digest reused across commercial events/,
+  );
 });
 
 test("binds every commercial event to one privacy-safe source record",()=>{
