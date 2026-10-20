@@ -130,6 +130,19 @@ test("binds every commercial event to one privacy-safe source record",()=>{
     /source SHA-256 evidence digest required/,
     "source digest must match the canonical lowercase PR30 handoff",
   );
+  assert.throws(
+    ()=>reconcileCommercialReadiness({...base(),sourceRecordId:sourceRecordId.toUpperCase()}),
+    /valid source record ID required/,
+    "uppercase UUID aliases must not cross the PR30 to PR29 boundary",
+  );
+  const uppercaseEventId=base();
+  uppercaseEventId.events[0]={...uppercaseEventId.events[0],
+    eventId:uppercaseEventId.events[0].eventId.toUpperCase()};
+  assert.throws(
+    ()=>reconcileCommercialReadiness(uppercaseEventId),
+    /valid event ID required/,
+    "uppercase event UUID aliases must not bypass idempotency",
+  );
 });
 
 test("refuses real activity, unknown evidence and activity while gates are blocked",()=>{
