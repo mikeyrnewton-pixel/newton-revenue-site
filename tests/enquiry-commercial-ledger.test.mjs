@@ -186,4 +186,13 @@ test("rejects source UUIDs incompatible with the PR29 commercial contract",()=>{
     ()=>buildOfflineCommercialLeadExport({...original,rows:[invalidVersion]},ledgerConfig()),
     /canonical enquiry identifiers required/,
   );
+  const uppercaseAlias={
+    ...original.rows[0],
+    enquiry_ref:original.rows[0].enquiry_ref.toUpperCase(),
+  };
+  assert.throws(
+    ()=>buildOfflineCommercialLeadExport({...original,rows:[uppercaseAlias]},ledgerConfig()),
+    /canonical enquiry identifiers required/,
+    "uppercase UUID aliases must fail at the final ledger boundary",
+  );
 });
