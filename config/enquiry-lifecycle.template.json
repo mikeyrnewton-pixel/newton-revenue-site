@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "retentionDays": 30,
+  "deletionGraceDays": 7,
+  "storageAdapter": "",
+  "deletionAdapter": "",
+  "connectionStatus": "NEEDS_CONNECTION",
+  "ownerApproval": "NOT_GRANTED",
+  "liveEnabled": false
+}
