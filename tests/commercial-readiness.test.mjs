@@ -150,6 +150,16 @@ test("refuses real activity, unknown evidence and activity while gates are block
   const badDigest=base();
   badDigest.events[0]={...badDigest.events[0],evidenceDigest:"not-a-digest"};
   assert.throws(()=>reconcileCommercialReadiness(badDigest),/SHA-256 evidence digest/);
+  const sourceDigestReuse=base();
+  sourceDigestReuse.events[0]={
+    ...sourceDigestReuse.events[0],
+    evidenceDigest:sourceDigestReuse.sourceEvidenceDigest,
+  };
+  assert.throws(
+    ()=>reconcileCommercialReadiness(sourceDigestReuse),
+    /evidence digest reused across commercial events/,
+    "source evidence cannot be replayed as stage evidence",
+  );
   const uppercaseDigest=base();
   uppercaseDigest.events[0]={...uppercaseDigest.events[0],evidenceDigest:"A".repeat(64)};
   assert.throws(
