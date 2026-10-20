@@ -40,7 +40,12 @@ for(const [label,raw] of [["acceptance receipt",acceptance.raw],["compatibility 
 const a=acceptance.value,c=compat.value,l=lifecycle.value,k=config.value,reportSha=sha(report);
 if(a?.schema!=="NEWTON_REDACTED_REPORT_ACCEPTANCE_V1"||a.synthetic!==true||a.result!=="REDACTED_REPORT_ACCEPTED_FOR_PRIVATE_REVIEW"||a.reportSha256!==reportSha||a.customerDelivery!=="HOLD"||a.paymentState!=="NOT_CLEARED"||a.connectionState!=="NEEDS_CONNECTION"||a.live!==false||a.externalAction!==false)fail("acceptance receipt is not checksum-bound offline HOLD evidence");
 if(c?.schema!=="NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1"||c.synthetic!==true||c.result!=="READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN"||c.projectRef!==a.projectRef||c.evidenceDigest!==a.compatibilityEvidenceDigest||c.customerDelivery!=="HOLD"||c.paymentState!=="NOT_CLEARED"||c.connectionState!=="NEEDS_CONNECTION"||c.live!==false||c.externalAction!==false)fail("compatibility manifest does not match the accepted report");
-if(l?.schema!=="NEWTON_ENQUIRY_LIFECYCLE_RECEIPT_V1"||l.synthetic!==true||l.projectRef!==a.projectRef||l.result!=="READY_FOR_PRIVATE_HUMAN_REVIEW"||l.customerDelivery!=="HOLD"||l.connectionState!=="NEEDS_CONNECTION"||l.live!==false||l.externalAction!==false)fail("lifecycle receipt is missing or promoted beyond offline HOLD");
+const safeLifecycleDecisions=new Set(["RETAIN_UNTIL_POLICY_DATE","HOLD_OWNER_APPROVAL_FOR_DELETION_REVIEW","RETENTION_EXPIRED_HOLD_FOR_REVIEW"]);
+if(l?.schemaVersion!==1||l.component!=="ENQUIRY_LIFECYCLE_REVIEW"||l.state!=="STAGED"||l.testMode!=="OFFLINE_SYNTHETIC_ONLY"||
+  l.connectionStatus!=="NEEDS_CONNECTION"||l.live!==false||!safeLifecycleDecisions.has(l.decision)||
+  l.emailClass!=="SYNTHETIC_EXAMPLE_INVALID_REDACTED"||l.ownerApproval!=="NOT_GRANTED"||l.storageConnected!==false||
+  l.deletionExecuted!==false||l.externalContact!==false||!/^[a-f0-9]{64}$/.test(l.inputFingerprintSha256||""))
+  fail("lifecycle receipt is not an actual offline output or was promoted beyond HOLD");
 const exact=(value,keys)=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
 const configKeys=["schema","mode","storageAdapter","deliveryRoute","recipientRole","ownerApproval","rollbackApproval","liveEnabled"];
 if(!exact(k,configKeys)||k.schema!=="NEWTON_PRIVATE_HANDOVER_CONNECT_LATER_V1"||k.mode!=="OFFLINE_PRIVATE_REVIEW_ONLY"||k.storageAdapter!==""||k.deliveryRoute!==""||k.recipientRole!==""||k.ownerApproval!=="NOT_GRANTED"||k.rollbackApproval!=="NOT_GRANTED"||k.liveEnabled!==false)fail("config must remain blank, disconnected, NOT_GRANTED and non-live");
@@ -53,7 +58,7 @@ const files=[
 ];
 if(new Set(files.map(file=>file.name)).size!==files.length)fail("handover artefact basenames must be unique");
 const evidenceDigest="sha256:"+sha(files.map(file=>`${file.role}:${file.name}:${file.sha256}`).join("\n")+"\n");
-const manifest={schema:"NEWTON_PRIVATE_HANDOVER_BUNDLE_V1",synthetic:true,projectRef:a.projectRef,result:"READY_FOR_OWNER_PRIVATE_HANDOVER_REVIEW",files,evidenceDigest,blockers:["OWNER_APPROVAL_NOT_GRANTED","DELIVERY_ROUTE_NOT_CONNECTED","CLIENT_ACCEPTANCE_NOT_RUN","PAYMENT_NOT_CLEARED","LIVE_BROWSER_NOT_RUN","CLOUDFLARE_PREVIEW_NOT_RUN"],customerDelivery:"HOLD",connectionState:"NEEDS_CONNECTION",paymentState:"NOT_CLEARED",live:false,externalAction:false};
+const manifest={schema:"NEWTON_PRIVATE_HANDOVER_BUNDLE_V1",synthetic:true,projectRef:a.projectRef,lifecycleEnquiryId:l.enquiryId,lifecycleDecision:l.decision,result:"READY_FOR_OWNER_PRIVATE_HANDOVER_REVIEW",files,evidenceDigest,blockers:["OWNER_APPROVAL_NOT_GRANTED","DELIVERY_ROUTE_NOT_CONNECTED","CLIENT_ACCEPTANCE_NOT_RUN","PAYMENT_NOT_CLEARED","LIVE_BROWSER_NOT_RUN","CLOUDFLARE_PREVIEW_NOT_RUN"],customerDelivery:"HOLD",connectionState:"NEEDS_CONNECTION",paymentState:"NOT_CLEARED",live:false,externalAction:false};
 const output=paths[5];
 try{const stat=lstatSync(output);if(stat.isSymbolicLink()||!stat.isFile())fail("output path is unsafe")}catch(error){if(error?.code!=="ENOENT")fail("output path is unsafe")}
 writeFileSync(output,JSON.stringify(manifest,null,2)+"\n",{mode:0o600});chmodSync(output,0o600);

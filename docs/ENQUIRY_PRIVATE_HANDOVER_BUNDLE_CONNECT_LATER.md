@@ -2,7 +2,7 @@
 
 ## Purpose and current state
 
-This gate binds the existing fictional diagnostic report, redacted-report acceptance receipt, cross-PR compatibility manifest and privacy lifecycle receipt into one checksum-locked manifest. It is a private owner-review aid, not client delivery.
+This gate binds the existing fictional diagnostic report, redacted-report acceptance receipt, cross-PR compatibility manifest and the **actual output schema** of `enquiry-lifecycle-receipt.mjs` into one checksum-locked manifest. It is a private owner-review aid, not client delivery.
 
 State: **READY / TESTED_OFFLINE / NEEDS_CONNECTION / customer delivery HOLD / not LIVE**.
 
@@ -17,7 +17,7 @@ State: **READY / TESTED_OFFLINE / NEEDS_CONNECTION / customer delivery HOLD / no
 4. Confirm the command returns `READY_FOR_OWNER_PRIVATE_HANDOVER_REVIEW`, four checksummed files, mode `0600`, `customerDelivery: HOLD`, `connectionState: NEEDS_CONNECTION` and `live: false`.
 5. Modify one input byte and rerun to confirm checksum mismatch or a changed aggregate evidence digest. Restore the original private copy afterwards.
 
-The gate fails closed for missing or reused paths, symlinks, non-private permissions, PII or credential-like text, mismatched project/evidence digests, promoted lifecycle states, delivery/payment claims, or populated connection settings.
+The gate fails closed for missing or reused paths, symlinks, non-private permissions, PII or credential-like text, mismatched project/evidence digests, invented lifecycle schemas, promoted lifecycle states, delivery/payment claims, or populated connection settings.
 
 ## Wednesday human-assisted dry-run
 
