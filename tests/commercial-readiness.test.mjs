@@ -115,6 +115,11 @@ test("binds every commercial event to one privacy-safe source record",()=>{
     ()=>reconcileCommercialReadiness({...base(),sourceEvidenceDigest:"not-a-digest"}),
     /source SHA-256 evidence digest required/,
   );
+  assert.throws(
+    ()=>reconcileCommercialReadiness({...base(),sourceEvidenceDigest:"A".repeat(64)}),
+    /source SHA-256 evidence digest required/,
+    "source digest must match the canonical lowercase PR30 handoff",
+  );
 });
 
 test("refuses real activity, unknown evidence and activity while gates are blocked",()=>{
@@ -122,6 +127,13 @@ test("refuses real activity, unknown evidence and activity while gates are block
   const badDigest=base();
   badDigest.events[0]={...badDigest.events[0],evidenceDigest:"not-a-digest"};
   assert.throws(()=>reconcileCommercialReadiness(badDigest),/SHA-256 evidence digest/);
+  const uppercaseDigest=base();
+  uppercaseDigest.events[0]={...uppercaseDigest.events[0],evidenceDigest:"A".repeat(64)};
+  assert.throws(
+    ()=>reconcileCommercialReadiness(uppercaseDigest),
+    /SHA-256 evidence digest/,
+    "event digest must remain canonical lowercase",
+  );
   const blocked=base();
   blocked.vatTreatment="UNKNOWN";
   assert.throws(()=>reconcileCommercialReadiness(blocked),/events forbidden/);
