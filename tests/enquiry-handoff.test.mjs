@@ -378,3 +378,39 @@ test("reconciles exactly one validated receipt per canonical handoff and holds i
   assert.throws(() => reconcileFictionalHandoffReceipts(handoffs, [pii, receipts[1]]),
     /exact acknowledgement receipt fields/);
 });
+
+
+test("rejects uppercase UUID aliases before canonical handoff", () => {
+  const record = {
+    id: "abcdefab-cdef-4abc-8def-abcdefabcdef",
+    submissionId: "abcdefab-cdef-4abc-8def-abcdefabcdea",
+    createdAt: "2026-10-20T19:00:01.000Z",
+    contactPermissionCapturedAt: "2026-10-20T19:00:00.000Z",
+    contactPermission: true,
+    marketingConsent: false,
+    source: "newton-revenue-site",
+    channel: "direct",
+    name: "Fictional Test Buyer",
+    email: "fictional@example.invalid",
+    company: "Synthetic Venue Ltd",
+    problem: "Synthetic missed enquiry",
+    notification: {
+      version: 1,
+      status: "pending",
+      attempts: 0,
+      lastAttemptAt: null,
+      deliveredAt: null,
+    },
+  };
+  assert.throws(
+    () => toFictionalDeliveryHandoff({...record, id: record.id.toUpperCase()}),
+    /valid enquiry reference required/,
+  );
+  assert.throws(
+    () => toFictionalDeliveryHandoff({
+      ...record,
+      submissionId: record.submissionId.toUpperCase(),
+    }),
+    /submission ID required for canonical dedupe/,
+  );
+});
