@@ -96,6 +96,7 @@ const observation=(status)=>({
 const binding=()=>({
   sourceRecordId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   invoiceEventId:"ccccccec-cccc-4ccc-8ccc-cccccccccccc",
+  invoicedAt:"2026-10-20T10:59:59.000Z",
 });
 
 test("pending evidence is review-only and cannot become cleared",()=>{
@@ -178,5 +179,20 @@ test("payment observation cannot be reused across leads or invoices",()=>{
   assert.throws(
     ()=>assessSyntheticPaymentObservation(observation("SETTLED")),
     /expected commercial binding/,
+  );
+});
+
+test("payment observation must follow its bound invoice event",()=>{
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),invoicedAt:"2026-10-20T11:00:01.000Z",
+    }),
+    /cannot predate invoice event/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),invoicedAt:"20 October 2026 10:59:59 UTC",
+    }),
+    /canonical UTC invoice timestamp/,
   );
 });
