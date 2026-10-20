@@ -95,7 +95,9 @@ const observation=(status)=>({
 });
 const binding=()=>({
   sourceRecordId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  sourceEvidenceDigest:"b".repeat(64),
   invoiceEventId:"ccccccec-cccc-4ccc-8ccc-cccccccccccc",
+  invoiceEvidenceDigest:"c".repeat(64),
   invoicedAt:"2026-10-20T10:59:59.000Z",
 });
 
@@ -196,6 +198,27 @@ test("payment observation cannot be reused across leads or invoices",()=>{
     /expected commercial binding/,
   );
 });
+
+
+test("payment evidence cannot reuse source or invoice-stage evidence",()=>{
+  for(const key of ["sourceEvidenceDigest","invoiceEvidenceDigest"]){
+    assert.throws(
+      ()=>assessSyntheticPaymentObservation({
+        ...observation("SETTLED"),
+        evidenceDigest:binding()[key],
+      },binding()),
+      /reused from an earlier commercial stage/,
+      `${key} must identify a distinct artefact`,
+    );
+  }
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),invoiceEvidenceDigest:"C".repeat(64),
+    }),
+    /canonical source and invoice evidence digests/,
+  );
+});
+
 
 test("payment observation must follow its bound invoice event",()=>{
   assert.throws(
