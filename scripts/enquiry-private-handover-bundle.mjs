@@ -40,12 +40,11 @@ for(const [label,raw] of [["acceptance receipt",acceptance.raw],["compatibility 
 const a=acceptance.value,c=compat.value,l=lifecycle.value,k=config.value,reportSha=sha(report);
 if(a?.schema!=="NEWTON_REDACTED_REPORT_ACCEPTANCE_V1"||a.synthetic!==true||a.result!=="REDACTED_REPORT_ACCEPTED_FOR_PRIVATE_REVIEW"||a.reportSha256!==reportSha||a.customerDelivery!=="HOLD"||a.paymentState!=="NOT_CLEARED"||a.connectionState!=="NEEDS_CONNECTION"||a.live!==false||a.externalAction!==false)fail("acceptance receipt is not checksum-bound offline HOLD evidence");
 if(c?.schema!=="NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1"||c.synthetic!==true||c.result!=="READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN"||c.projectRef!==a.projectRef||c.evidenceDigest!==a.compatibilityEvidenceDigest||c.customerDelivery!=="HOLD"||c.paymentState!=="NOT_CLEARED"||c.connectionState!=="NEEDS_CONNECTION"||c.live!==false||c.externalAction!==false)fail("compatibility manifest does not match the accepted report");
-const safeLifecycleDecisions=new Set(["RETAIN_UNTIL_POLICY_DATE","HOLD_OWNER_APPROVAL_FOR_DELETION_REVIEW","RETENTION_EXPIRED_HOLD_FOR_REVIEW"]);
 if(l?.schemaVersion!==1||l.component!=="ENQUIRY_LIFECYCLE_REVIEW"||l.state!=="STAGED"||l.testMode!=="OFFLINE_SYNTHETIC_ONLY"||
-  l.connectionStatus!=="NEEDS_CONNECTION"||l.live!==false||!safeLifecycleDecisions.has(l.decision)||
+  l.connectionStatus!=="NEEDS_CONNECTION"||l.live!==false||l.decision!=="RETAIN_UNTIL_POLICY_DATE"||
   l.emailClass!=="SYNTHETIC_EXAMPLE_INVALID_REDACTED"||l.ownerApproval!=="NOT_GRANTED"||l.storageConnected!==false||
   l.deletionExecuted!==false||l.externalContact!==false||!/^[a-f0-9]{64}$/.test(l.inputFingerprintSha256||""))
-  fail("lifecycle receipt is not an actual offline output or was promoted beyond HOLD");
+  fail("lifecycle receipt is not current retention evidence or was promoted beyond HOLD");
 const exact=(value,keys)=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
 const configKeys=["schema","mode","storageAdapter","deliveryRoute","recipientRole","ownerApproval","rollbackApproval","liveEnabled"];
 if(!exact(k,configKeys)||k.schema!=="NEWTON_PRIVATE_HANDOVER_CONNECT_LATER_V1"||k.mode!=="OFFLINE_PRIVATE_REVIEW_ONLY"||k.storageAdapter!==""||k.deliveryRoute!==""||k.recipientRole!==""||k.ownerApproval!=="NOT_GRANTED"||k.rollbackApproval!=="NOT_GRANTED"||k.liveEnabled!==false)fail("config must remain blank, disconnected, NOT_GRANTED and non-live");
