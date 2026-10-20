@@ -1,0 +1,43 @@
+{
+  "schema": "NEWTON_FULFILMENT_COMPATIBILITY_INPUT_V1",
+  "synthetic": true,
+  "projectRef": "DEMO-DIAG-001",
+  "acquisition": {
+    "schema": "NEWTON_FICTIONAL_DISTRIBUTION_V1",
+    "synthetic": true,
+    "projectRef": "DEMO-DIAG-001",
+    "handoffId": "enquiry:11111111-2222-4333-8444-555555555555",
+    "consent": {"purpose": "respond_to_enquiry", "capturedAt": "2026-10-20T08:00:00.000Z", "marketing": false},
+    "workflow": {"state": "STAGED_OFFLINE_ONLY", "customerDelivery": "HOLD"}
+  },
+  "commercial": {
+    "schema": "NEWTON_COMMERCIAL_READINESS_V1",
+    "synthetic": true,
+    "projectRef": "DEMO-DIAG-001",
+    "state": "COMMERCIAL_GATE_READY",
+    "recordedPaymentEvidenceGBP": 0,
+    "clearedEvidenceGBP": 0,
+    "commercialTruth": "FICTIONAL_ONLY_NOT_REVENUE",
+    "customerDelivery": "HOLD"
+  },
+  "qa": {
+    "schema": "NEWTON_DIAGNOSTIC_QA_V1",
+    "synthetic": true,
+    "projectRef": "DEMO-DIAG-001",
+    "outcomes": {"Scope":"PASS","Privacy":"PASS","Completeness":"PASS","Ownership":"PASS","Action control":"PASS","Status integrity":"PASS","Duplicate control":"PASS","Reconciliation":"PASS","Fix quality":"PASS","Claims":"PASS","Human review":"PASS","Client acceptance":"PASS"},
+    "humanReview": "NOT_RUN",
+    "clientAcceptance": "NOT_RUN",
+    "overallGate": "HOLD"
+  },
+  "lifecycle": {
+    "component": "ENQUIRY_LIFECYCLE_REVIEW",
+    "state": "STAGED",
+    "testMode": "OFFLINE_SYNTHETIC_ONLY",
+    "connectionStatus": "NEEDS_CONNECTION",
+    "live": false,
+    "decision": "RETAIN_UNTIL_POLICY_DATE",
+    "ownerApproval": "NOT_GRANTED",
+    "storageConnected": false,
+    "deletionExecuted": false
+  }
+}

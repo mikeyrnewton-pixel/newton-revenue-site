@@ -1,0 +1,11 @@
+{
+  "schema": "NEWTON_FULFILMENT_CONNECT_LATER_V1",
+  "mode": "OFFLINE_REVIEW_ONLY",
+  "acquisitionAdapter": "",
+  "cashEvidenceAdapter": "",
+  "qaRecordAdapter": "",
+  "lifecycleAdapter": "",
+  "previewUrl": "",
+  "ownerApproval": "NOT_GRANTED",
+  "liveEnabled": false
+}
