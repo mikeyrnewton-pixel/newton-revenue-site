@@ -84,6 +84,8 @@ const observation=(status)=>({
   version:1,
   synthetic:true,
   observationId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  sourceRecordId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  invoiceEventId:"ccccccec-cccc-4ccc-8ccc-cccccccccccc",
   provider:"OWNER_SELECTED_PROVIDER",
   currency:"GBP",
   amountMinor:19500,
@@ -91,11 +93,17 @@ const observation=(status)=>({
   status,
   evidenceDigest:"a".repeat(64),
 });
+const binding=()=>({
+  sourceRecordId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  invoiceEventId:"ccccccec-cccc-4ccc-8ccc-cccccccccccc",
+});
 
 test("pending evidence is review-only and cannot become cleared",()=>{
-  const result=assessSyntheticPaymentObservation(observation("PENDING"));
+  const result=assessSyntheticPaymentObservation(observation("PENDING"),binding());
   assert.equal(result.state,"PAYMENT_RECORDED_REVIEW");
   assert.equal(result.commercialEventCandidate,"PAYMENT_RECORDED");
+  assert.equal(result.sourceRecordId,binding().sourceRecordId);
+  assert.equal(result.invoiceEventId,binding().invoiceEventId);
   assert.deepEqual(result.blockers,[
     "PROVIDER_SETTLEMENT_NOT_OBSERVED",
     "OWNER_APPROVAL_REQUIRED",
@@ -107,7 +115,7 @@ test("pending evidence is review-only and cannot become cleared",()=>{
 });
 
 test("settled evidence remains an owner-reviewed candidate, never cash",()=>{
-  const result=assessSyntheticPaymentObservation(observation("SETTLED"));
+  const result=assessSyntheticPaymentObservation(observation("SETTLED"),binding());
   assert.equal(result.state,"CLEARED_EVIDENCE_REVIEW");
   assert.equal(result.commercialEventCandidate,"CLEARED");
   assert.deepEqual(result.blockers,["OWNER_APPROVAL_REQUIRED"]);
@@ -121,7 +129,7 @@ test("settled evidence remains an owner-reviewed candidate, never cash",()=>{
 
 test("failed refunded and disputed observations enter reconciliation hold",()=>{
   for(const status of ["FAILED","REFUNDED","DISPUTED"]){
-    const result=assessSyntheticPaymentObservation(observation(status));
+    const result=assessSyntheticPaymentObservation(observation(status),binding());
     assert.equal(result.state,"PAYMENT_EXCEPTION_HOLD");
     assert.equal(result.commercialEventCandidate,null);
     assert.deepEqual(result.blockers,[`PAYMENT_${status}_REQUIRES_RECONCILIATION`]);
@@ -132,23 +140,43 @@ test("failed refunded and disputed observations enter reconciliation hold",()=>{
 
 test("observation boundary rejects real activity raw references and malformed evidence",()=>{
   assert.throws(
-    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),synthetic:false}),
+    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),synthetic:false},binding()),
     /fictional observation/,
   );
   assert.throws(
-    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),provider:"UNSET"}),
+    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),provider:"UNSET"},binding()),
     /named provider/,
   );
   assert.throws(
-    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),amountMinor:19501}),
+    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),amountMinor:19501},binding()),
     /fixed GBP 195.00/,
   );
   assert.throws(
-    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),evidenceDigest:"raw-ref"}),
+    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),evidenceDigest:"raw-ref"},binding()),
     /SHA-256 evidence digest/,
   );
   assert.throws(
-    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),providerReference:"pi_secret"}),
+    ()=>assessSyntheticPaymentObservation({...observation("SETTLED"),providerReference:"pi_secret"},binding()),
     /exact synthetic observation/,
+  );
+});
+
+
+test("payment observation cannot be reused across leads or invoices",()=>{
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),sourceRecordId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    }),
+    /source record mismatch/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),invoiceEventId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+    }),
+    /invoice event mismatch/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED")),
+    /expected commercial binding/,
   );
 });
