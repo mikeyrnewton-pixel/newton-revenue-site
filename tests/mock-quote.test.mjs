@@ -44,6 +44,9 @@ test("adds operational legal, cancellation, data and payment gates without prete
   assert.match(result, /acceptance timestamp/);
   assert.match(result, /authorised representative and evidence of that representative's authority/);
   assert.match(result, /matching email domain.*is not acceptance/i);
+  assert.match(result, /complete accepted document plus every referenced schedule, attachment and linked term/i);
+  assert.match(result, /missing, blank, inaccessible or later-mutated attachment\/link enters TERMS EVIDENCE HOLD/i);
+  assert.match(result, /never reconstruct terms from an email summary/i);
   assert.match(result, /fresh written acceptance before invoicing/);
   assert.match(result, /quote-validity deadline with timezone/);
   assert.match(result, /expired, backdated or stale acceptance is not authority to invoice/);
