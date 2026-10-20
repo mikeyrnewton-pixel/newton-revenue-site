@@ -137,7 +137,7 @@ test("binds every commercial event to one privacy-safe source record",()=>{
   );
   const uppercaseEventId=base();
   uppercaseEventId.events[0]={...uppercaseEventId.events[0],
-    eventId:uppercaseEventId.events[0].eventId.toUpperCase()};
+    eventId:"AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA"};
   assert.throws(
     ()=>reconcileCommercialReadiness(uppercaseEventId),
     /valid event ID required/,
