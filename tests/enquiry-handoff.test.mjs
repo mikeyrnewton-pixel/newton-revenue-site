@@ -151,6 +151,12 @@ test("handoff fails closed on missing consent, real-looking data or dedupe confl
     marketingConsent: false,
     notification: {version: 1, status: "pending", attempts: 0},
   };
+  assert.throws(() => toFictionalDeliveryHandoff({
+    ...base, id: "00000000-0000-0000-0000-000000000000",
+  }), /valid enquiry reference/);
+  assert.throws(() => toFictionalDeliveryHandoff({
+    ...base, submissionId: "00000000-0000-0000-0000-000000000000",
+  }), /submission ID required/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, contactPermission: false}), /contact permission/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, createdAt: "2026-02-30T20:00:00.000Z"}), /canonical UTC creation timestamp/);
   assert.throws(() => toFictionalDeliveryHandoff({...base, contactPermissionCapturedAt: "2026-10-17T20:00:01.000Z"}), /consent capture cannot follow record creation/);
@@ -258,6 +264,11 @@ test("creates one deterministic PII-free offline acknowledgement and fails close
   withPii.email = "task011@example.invalid";
   assert.throws(() => acknowledgeFictionalHandoff(withPii, evidence),
     /exact PII-free canonical handoff fields/);
+  const badHandoffId = structuredClone(handoff);
+  badHandoffId.handoffId = "enquiry:00000000-0000-0000-0000-000000000000";
+  assert.throws(() => acknowledgeFictionalHandoff(badHandoffId, {
+    ...evidence, handoffId: badHandoffId.handoffId,
+  }), /canonical handoff ID/);
   const badSource = structuredClone(handoff);
   badSource.source = "unapproved-source";
   assert.throws(() => acknowledgeFictionalHandoff(badSource, evidence),
