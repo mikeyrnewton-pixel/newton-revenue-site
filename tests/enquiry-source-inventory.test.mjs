@@ -14,6 +14,8 @@ const readable=(sourceId,overrides={})=>({
   sourceId,
   accessState:"READ_VERIFIED",
   coverage:"COMPLETE",
+  coverageStartedAt:"2026-10-01T00:00:00.000Z",
+  coverageEndedAt:"2026-10-20T12:13:59.000Z",
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
   observedCounts:zeroCounts(),
   verifiedAt:"2026-10-20T12:14:00.000Z",
@@ -24,6 +26,8 @@ const unreadable=sourceId=>({
   sourceId,
   accessState:"UNKNOWN_UNREADABLE",
   coverage:"UNREADABLE",
+  coverageStartedAt:null,
+  coverageEndedAt:null,
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
@@ -156,4 +160,30 @@ test("counts and evidence must be bounded and canonical",()=>{
   extra.ownerEmail="person@example.com";
   assert.throws(()=>reconcileEnquirySourceInventory(extra),
     /exact inventory fields/);
+});
+
+
+test("readable counts require a canonical bounded evidence window",()=>{
+  const backwards=fixture();
+  backwards.sources[1]={
+    ...backwards.sources[1],
+    coverageStartedAt:"2026-10-20T12:14:00.000Z",
+    coverageEndedAt:"2026-10-01T00:00:00.000Z",
+  };
+  assert.throws(()=>reconcileEnquirySourceInventory(backwards),
+    /coverage window cannot move backwards/);
+
+  const future=fixture();
+  future.sources[1]={
+    ...future.sources[1],coverageEndedAt:"2026-10-20T12:14:01.000Z",
+  };
+  assert.throws(()=>reconcileEnquirySourceInventory(future),
+    /coverage cannot end after verification/);
+
+  const unreadableWindow=fixture();
+  unreadableWindow.sources[0]={
+    ...unreadableWindow.sources[0],coverageStartedAt:"2026-10-01T00:00:00.000Z",
+  };
+  assert.throws(()=>reconcileEnquirySourceInventory(unreadableWindow),
+    /unreadable source cannot claim a coverage window/);
 });
