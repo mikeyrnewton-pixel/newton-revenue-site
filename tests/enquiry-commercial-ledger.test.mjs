@@ -166,4 +166,11 @@ test("fails closed on altered CRM evidence metadata",()=>{
     ()=>buildOfflineCommercialLeadExport({...original,target:"LIVE_SUPABASE"},ledgerConfig()),
     /canonical CRM placeholder source required/,
   );
+  assert.throws(
+    ()=>buildOfflineCommercialLeadExport({
+      ...original,
+      rows:[{...original.rows[0],owner_notice_status:"delivered"}],
+    },ledgerConfig()),
+    /rows do not match batch evidence digest/,
+  );
 });
