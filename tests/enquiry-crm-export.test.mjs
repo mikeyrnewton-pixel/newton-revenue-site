@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {toFictionalDeliveryHandoff} from "../lib/enquiry-handoff.js";
 import {toFictionalCrmEvent} from "../lib/enquiry-crm-adapter.js";
-import {buildOfflineCrmExport} from "../lib/enquiry-crm-export.js";
+import {buildOfflineCrmExport,prepareReadOnlyCrmConnector} from "../lib/enquiry-crm-export.js";
 
 const config=()=>({
   schema:"NEWTON_CRM_EXPORT_CONFIG_V1",
@@ -101,5 +101,68 @@ test("rejects live, PII-bearing or conflicting CRM events",()=>{
       {...original,ownerNoticeStatus:"dead-letter"},
     ],config()),
     /conflicting CRM events share one event key/,
+  );
+});
+
+const connectorConfig=()=>({
+  version:1,
+  provider:"SUPABASE",
+  projectRefEnv:"NEWTON_SUPABASE_PROJECT_REF",
+  credentialEnv:"NEWTON_SUPABASE_READ_TOKEN",
+  table:"enquiry_events",
+  readOnly:true,
+  allowInsert:false,
+  allowUpdate:false,
+  allowDelete:false,
+});
+
+test("prepares a non-secret read-only CRM contract without claiming connection",()=>{
+  const result=prepareReadOnlyCrmConnector(connectorConfig());
+  assert.equal(result.state,"NEEDS_CONNECTION");
+  assert.equal(result.capability,"READ_SCHEMA_METADATA_ONLY");
+  assert.equal(result.expectedTable,"enquiry_events");
+  assert.deepEqual(result.expectedColumns,[
+    "event_key","event_type","handoff_id","enquiry_ref","source","channel",
+    "consent_purpose","consent_captured_at","marketing_consent",
+    "owner_notice_status","state","customer_delivery",
+  ]);
+  assert.deepEqual(result.blockers,[
+    "OWNER_APPROVED_READONLY_CREDENTIAL_REQUIRED",
+    "MAC_RUNTIME_CONNECTIVITY_UNVERIFIED",
+  ]);
+  assert.equal(result.networkCalled,false);
+  assert.equal(result.authenticated,false);
+  assert.equal(result.connected,false);
+  assert.equal(result.writeIntent,"NONE");
+  assert.equal(result.customerDataAccess,false);
+  assert.equal(result.customerDelivery,"HOLD");
+});
+
+test("CRM connector contract rejects writes secrets and ambiguous placeholders",()=>{
+  for(const permission of ["allowInsert","allowUpdate","allowDelete"]){
+    assert.throws(
+      ()=>prepareReadOnlyCrmConnector({...connectorConfig(),[permission]:true}),
+      /write permissions must remain disabled/,
+    );
+  }
+  assert.throws(
+    ()=>prepareReadOnlyCrmConnector({...connectorConfig(),readOnly:false}),
+    /read-only permission required/,
+  );
+  for(const value of ["https://example.supabase.co","actual token","TOKEN_VALUE"]){
+    assert.throws(
+      ()=>prepareReadOnlyCrmConnector({...connectorConfig(),credentialEnv:value}),
+      /credential environment name required/,
+    );
+  }
+  assert.throws(
+    ()=>prepareReadOnlyCrmConnector({
+      ...connectorConfig(),credentialEnv:"NEWTON_SUPABASE_PROJECT_REF",
+    }),
+    /placeholders must differ/,
+  );
+  assert.throws(
+    ()=>prepareReadOnlyCrmConnector({...connectorConfig(),apiKey:"secret"}),
+    /exact non-secret connector descriptor required/,
   );
 });
