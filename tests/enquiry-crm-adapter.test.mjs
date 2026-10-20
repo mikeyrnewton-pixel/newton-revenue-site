@@ -163,3 +163,25 @@ test("preserves owner-notice integrity across pending, delivered and dead-letter
     ["pending", "delivered", "dead-letter"],
   );
 });
+
+
+test("rejects uppercase UUID aliases at the CRM boundary", () => {
+  const handoff = toFictionalDeliveryHandoff(fictionalRecord({
+    id: "abcdefab-cdef-4abc-8def-abcdefabcdef",
+    submissionId: "abcdefab-cdef-4abc-8def-abcdefabcdea",
+  }));
+  assert.throws(
+    () => toFictionalCrmEvent({
+      ...handoff,
+      handoffId: handoff.handoffId.toUpperCase(),
+    }),
+    /canonical handoff ID required/,
+  );
+  assert.throws(
+    () => toFictionalCrmEvent({
+      ...handoff,
+      enquiryRef: handoff.enquiryRef.toUpperCase(),
+    }),
+    /canonical enquiry reference required/,
+  );
+});
