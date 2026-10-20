@@ -104,6 +104,30 @@ test("rejects live, PII-bearing or conflicting CRM events",()=>{
   );
 });
 
+
+test("rejects uppercase and non-RFC UUID aliases at the CRM export boundary",()=>{
+  const original=event();
+  const uppercase=original.enquiryRef.toUpperCase();
+  assert.throws(
+    ()=>buildOfflineCrmExport([{
+      ...original,
+      enquiryRef:uppercase,
+    }],config()),
+    /canonical enquiry reference required/,
+  );
+  const nil="00000000-0000-0000-0000-000000000000";
+  assert.throws(
+    ()=>buildOfflineCrmExport([{
+      ...original,
+      eventKey:"crm:enquiry:"+nil,
+      handoffId:"enquiry:"+nil,
+      enquiryRef:nil,
+    }],config()),
+    /canonical CRM event key|required|reference/,
+  );
+});
+
+
 const connectorConfig=()=>({
   version:1,
   provider:"SUPABASE",
