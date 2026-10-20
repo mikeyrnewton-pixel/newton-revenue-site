@@ -8,6 +8,7 @@ const zeroCounts=()=>({
   SYNTHETIC:0,
   NON_ENQUIRY_ACTIVITY:0,
   OUTBOUND_PROSPECT:0,
+  OUTBOUND_REPLY:0,
   UNKNOWN:0,
 });
 const readable=(sourceId,overrides={})=>({
@@ -39,7 +40,7 @@ const fixture=()=>({
   sources:[
     unreadable("CLOUDFLARE_KV"),
     readable("NEWTON_REVENUE_GMAIL",{coverage:"SEARCH_WINDOW"}),
-    readable("PERSONAL_GMAIL",{coverage:"SEARCH_WINDOW",observedCounts:{...zeroCounts(),UNKNOWN:1}}),
+    readable("PERSONAL_GMAIL",{coverage:"SEARCH_WINDOW",observedCounts:{...zeroCounts(),OUTBOUND_REPLY:1}}),
     unreadable("SOCIAL_BUSINESS_DMS"),
     readable("ATLAS_WATCH",{observedCounts:{
       ...zeroCounts(),
@@ -66,11 +67,21 @@ test("unreadable primary stores remain unknown instead of becoming zero",()=>{
     syntheticFixtures:3,
     activityEvents:29,
     outboundProspects:92,
+    outboundReplies:1,
   });
   assert.equal(result.automaticBuyerPromotion,false);
   assert.equal(result.customerDataCopied,false);
   assert.equal(result.productionMutation,false);
   assert.equal(result.customerDelivery,"HOLD");
+});
+
+test("authenticated reply to prior outreach cannot become a genuine enquiry",()=>{
+  const result=reconcileEnquirySourceInventory(fixture());
+  assert.equal(result.sourceCounts.PERSONAL_GMAIL.OUTBOUND_REPLY,1);
+  assert.equal(result.sourceCounts.PERSONAL_GMAIL.GENUINE,0);
+  assert.equal(result.accessibleGenuineObservations,0);
+  assert.equal(result.excludedFromGenuine.outboundReplies,1);
+  assert.equal(result.automaticBuyerPromotion,false);
 });
 
 test("bounded Gmail searches remain partial even when every source is readable",()=>{
