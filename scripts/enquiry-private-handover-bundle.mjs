@@ -38,14 +38,14 @@ for(const marker of ["FICTIONAL DEMONSTRATION","NOT CLIENT WORK","Delivery relea
 const acceptance=json(paths[1],"acceptance receipt"),compat=json(paths[2],"compatibility manifest"),lifecycle=json(paths[3],"lifecycle receipt"),config=json(paths[4],"config");
 for(const [label,raw] of [["acceptance receipt",acceptance.raw],["compatibility manifest",compat.raw],["lifecycle receipt",lifecycle.raw],["config",config.raw]])safeText(raw,label);
 const a=acceptance.value,c=compat.value,l=lifecycle.value,k=config.value,reportSha=sha(report);
+const exact=(value,keys)=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
 if(a?.schema!=="NEWTON_REDACTED_REPORT_ACCEPTANCE_V1"||a.synthetic!==true||a.result!=="REDACTED_REPORT_ACCEPTED_FOR_PRIVATE_REVIEW"||a.reportSha256!==reportSha||a.customerDelivery!=="HOLD"||a.paymentState!=="NOT_CLEARED"||a.connectionState!=="NEEDS_CONNECTION"||a.live!==false||a.externalAction!==false)fail("acceptance receipt is not checksum-bound offline HOLD evidence");
-if(c?.schema!=="NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1"||c.synthetic!==true||c.result!=="READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN"||c.projectRef!==a.projectRef||c.enquiryId!==l?.enquiryId||c.evidenceDigest!==a.compatibilityEvidenceDigest||c.customerDelivery!=="HOLD"||c.paymentState!=="NOT_CLEARED"||c.connectionState!=="NEEDS_CONNECTION"||c.live!==false||c.externalAction!==false)fail("compatibility manifest does not match the accepted report");
+if(c?.schema!=="NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1"||c.synthetic!==true||c.result!=="READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN"||c.projectRef!==a.projectRef||c.enquiryId!==l?.enquiryId||c.evidenceDigest!==a.compatibilityEvidenceDigest||!exact(c.commercialBasis,["priceGBP","vatTreatment","supplierAddressApproved","termsApproved"])||c.commercialBasis.priceGBP!==195||!["VAT_INCLUDED","VAT_EXCLUDED","OUTSIDE_SCOPE"].includes(c.commercialBasis.vatTreatment)||c.commercialBasis.supplierAddressApproved!==true||c.commercialBasis.termsApproved!==true||c.customerDelivery!=="HOLD"||c.paymentState!=="NOT_CLEARED"||c.connectionState!=="NEEDS_CONNECTION"||c.live!==false||c.externalAction!==false)fail("compatibility manifest does not match the accepted report");
 if(l?.schemaVersion!==1||l.component!=="ENQUIRY_LIFECYCLE_REVIEW"||l.state!=="STAGED"||l.testMode!=="OFFLINE_SYNTHETIC_ONLY"||
   l.connectionStatus!=="NEEDS_CONNECTION"||l.live!==false||l.decision!=="RETAIN_UNTIL_POLICY_DATE"||
   l.emailClass!=="SYNTHETIC_EXAMPLE_INVALID_REDACTED"||l.ownerApproval!=="NOT_GRANTED"||l.storageConnected!==false||
   l.deletionExecuted!==false||l.externalContact!==false||!/^[a-f0-9]{64}$/.test(l.inputFingerprintSha256||""))
   fail("lifecycle receipt is not current retention evidence or was promoted beyond HOLD");
-const exact=(value,keys)=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&Object.keys(value).every(key=>keys.includes(key));
 const configKeys=["schema","mode","storageAdapter","deliveryRoute","recipientRole","ownerApproval","rollbackApproval","liveEnabled"];
 if(!exact(k,configKeys)||k.schema!=="NEWTON_PRIVATE_HANDOVER_CONNECT_LATER_V1"||k.mode!=="OFFLINE_PRIVATE_REVIEW_ONLY"||k.storageAdapter!==""||k.deliveryRoute!==""||k.recipientRole!==""||k.ownerApproval!=="NOT_GRANTED"||k.rollbackApproval!=="NOT_GRANTED"||k.liveEnabled!==false)fail("config must remain blank, disconnected, NOT_GRANTED and non-live");
 
@@ -57,7 +57,7 @@ const files=[
 ];
 if(new Set(files.map(file=>file.name)).size!==files.length)fail("handover artefact basenames must be unique");
 const evidenceDigest="sha256:"+sha(files.map(file=>`${file.role}:${file.name}:${file.sha256}`).join("\n")+"\n");
-const manifest={schema:"NEWTON_PRIVATE_HANDOVER_BUNDLE_V1",synthetic:true,projectRef:a.projectRef,lifecycleEnquiryId:l.enquiryId,lifecycleDecision:l.decision,result:"READY_FOR_OWNER_PRIVATE_HANDOVER_REVIEW",files,evidenceDigest,blockers:["OWNER_APPROVAL_NOT_GRANTED","DELIVERY_ROUTE_NOT_CONNECTED","CLIENT_ACCEPTANCE_NOT_RUN","PAYMENT_NOT_CLEARED","LIVE_BROWSER_NOT_RUN","CLOUDFLARE_PREVIEW_NOT_RUN"],customerDelivery:"HOLD",connectionState:"NEEDS_CONNECTION",paymentState:"NOT_CLEARED",live:false,externalAction:false};
+const manifest={schema:"NEWTON_PRIVATE_HANDOVER_BUNDLE_V1",synthetic:true,projectRef:a.projectRef,lifecycleEnquiryId:l.enquiryId,lifecycleDecision:l.decision,commercialBasis:c.commercialBasis,result:"READY_FOR_OWNER_PRIVATE_HANDOVER_REVIEW",files,evidenceDigest,blockers:["OWNER_APPROVAL_NOT_GRANTED","DELIVERY_ROUTE_NOT_CONNECTED","CLIENT_ACCEPTANCE_NOT_RUN","PAYMENT_NOT_CLEARED","LIVE_BROWSER_NOT_RUN","CLOUDFLARE_PREVIEW_NOT_RUN"],customerDelivery:"HOLD",connectionState:"NEEDS_CONNECTION",paymentState:"NOT_CLEARED",live:false,externalAction:false};
 const output=paths[5];
 try{const stat=lstatSync(output);if(stat.isSymbolicLink()||!stat.isFile())fail("output path is unsafe")}catch(error){if(error?.code!=="ENOENT")fail("output path is unsafe")}
 writeFileSync(output,JSON.stringify(manifest,null,2)+"\n",{mode:0o600});chmodSync(output,0o600);
