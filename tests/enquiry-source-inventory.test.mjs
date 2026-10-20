@@ -72,25 +72,39 @@ test("unreadable primary stores remain unknown instead of becoming zero",()=>{
 test("bounded Gmail searches remain partial even when every source is readable",()=>{
   const input=fixture();
   input.sources=input.sources.map(source=>
-    source.accessState==="READ_VERIFIED"?source:readable(source.sourceId));
+    source.accessState==="READ_VERIFIED"?source:readable(source.sourceId,{
+      coverage:source.sourceId==="CLOUDFLARE_KV"?"RETENTION_WINDOW":"COMPLETE",
+    }));
   const result=reconcileEnquirySourceInventory(input);
   assert.equal(result.classificationStatus,"PARTIAL_COVERAGE_DEDUPE_REQUIRED");
   assert.equal(result.genuineEnquiries,null);
   assert.deepEqual(result.unreadableSources,[]);
   assert.deepEqual(result.partialCoverageSources,[
-    "NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL",
+    "CLOUDFLARE_KV","NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL",
   ]);
+  assert.equal(result.historicalEnquiryCount,null);
+  assert.match(result.historicalCloudflareKvCoverage,/30_DAY_LEAD_TTL/);
   assert.equal(result.automaticBuyerPromotion,false);
 });
 
-test("all sources fully read still require cross-source deduplication",()=>{
+test("even an exhaustive currently retained KV snapshot is not historical proof",()=>{
   const input=fixture();
-  input.sources=input.sources.map(source=>readable(source.sourceId));
+  input.sources=input.sources.map(source=>readable(source.sourceId,{
+    coverage:source.sourceId==="CLOUDFLARE_KV"?"RETENTION_WINDOW":"COMPLETE",
+  }));
   const result=reconcileEnquirySourceInventory(input);
-  assert.equal(result.classificationStatus,"ALL_SOURCES_READ_DEDUPE_REQUIRED");
-  assert.deepEqual(result.partialCoverageSources,[]);
+  assert.equal(result.classificationStatus,"PARTIAL_COVERAGE_DEDUPE_REQUIRED");
+  assert.deepEqual(result.partialCoverageSources,["CLOUDFLARE_KV"]);
   assert.equal(result.genuineEnquiries,null);
+  assert.equal(result.historicalEnquiryCount,null);
   assert.equal(result.automaticBuyerPromotion,false);
+});
+
+test("Cloudflare KV may never claim complete history from expiring records",()=>{
+  const input=fixture();
+  input.sources[0]=readable("CLOUDFLARE_KV",{coverage:"COMPLETE"});
+  assert.throws(()=>reconcileEnquirySourceInventory(input),
+    /expiring Cloudflare KV cannot claim complete historical coverage/);
 });
 
 test("an unreadable source cannot smuggle zero counts or verification claims",()=>{
