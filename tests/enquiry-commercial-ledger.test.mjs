@@ -174,3 +174,16 @@ test("fails closed on altered CRM evidence metadata",()=>{
     /rows do not match batch evidence digest/,
   );
 });
+
+
+test("rejects source UUIDs incompatible with the PR29 commercial contract",()=>{
+  const original=exportFor();
+  const invalidVersion={
+    ...original.rows[0],
+    enquiry_ref:"00000000-0000-0000-0000-000000000000",
+  };
+  assert.throws(
+    ()=>buildOfflineCommercialLeadExport({...original,rows:[invalidVersion]},ledgerConfig()),
+    /canonical enquiry identifiers required/,
+  );
+});
