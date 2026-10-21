@@ -106,7 +106,8 @@ test("rejects live, PII-bearing or conflicting CRM events",()=>{
 
 
 test("rejects uppercase and non-RFC UUID aliases at the CRM export boundary",()=>{
-  const original=event();
+  // Use a UUID with a-f characters: uppercasing an all-numeric UUID is a no-op.
+  const original=event({id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"});
   const uppercase=original.enquiryRef.toUpperCase();
   assert.throws(
     ()=>buildOfflineCrmExport([{
