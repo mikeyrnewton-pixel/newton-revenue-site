@@ -87,28 +87,39 @@ export async function onRequestPost({ request, env, waitUntil }) {
     try {
       const receipt = await env.LEADS.get("receipt:" + submissionId);
       if (receipt) {
-        let parsed;
-        try {
-          parsed = JSON.parse(receipt);
-        } catch {
-          return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
+        // Production and PR43 used a plain UUID receipt; TASK011's new
+        // format uses a versioned digest. Preserve safe legacy retries during
+        // a separately approved rollout without treating any receipt as proof
+        // that the original lead still exists.
+        const legacyReference =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receipt)
+            ? receipt.toLowerCase() : null;
+        let parsed = null;
+        if (!legacyReference) {
+          try {
+            parsed = JSON.parse(receipt);
+          } catch {
+            return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
+          }
+          if (!parsed || parsed.version !== 1 ||
+              !/^[0-9a-f-]{36}$/i.test(parsed.reference || "") ||
+              !/^[0-9a-f]{64}$/.test(parsed.fingerprint || "")) {
+            return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
+          }
+          if (parsed.fingerprint !== fingerprint) {
+            return reply({ error: "Submission reference conflicts with different enquiry details." }, 409);
+          }
         }
-        if (!parsed || parsed.version !== 1 ||
-            !/^[0-9a-f-]{36}$/i.test(parsed.reference || "") ||
-            !/^[0-9a-f]{64}$/.test(parsed.fingerprint || "")) {
-          return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
-        }
-        if (parsed.fingerprint !== fingerprint) {
-          return reply({ error: "Submission reference conflicts with different enquiry details." }, 409);
-        }
+        const reference = legacyReference || parsed.reference;
         // PR43 compatibility: a receipt cannot acknowledge a lost, altered or
         // corrupted original lead. A digest alone cannot prove intact storage.
         // Reject without returning customer data or creating a second record.
-        const original = await env.LEADS.get("lead:" + parsed.reference, "json");
+        const original = await env.LEADS.get("lead:" + reference, "json");
         const originalValid = original && !Array.isArray(original) &&
           typeof original === "object" &&
-          original.id === parsed.reference &&
-          original.submissionId === submissionId &&
+          original.id === reference &&
+          (original.submissionId === submissionId ||
+            (legacyReference !== null && original.submissionId == null)) &&
           original.contactPermission === true &&
           typeof original.email === "string" &&
           original.name === p.name.trim() &&
@@ -120,7 +131,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
         if (!originalValid) {
           return reply({ error: "Could not validate the previous enquiry. Please email us." }, 503);
         }
-        return reply({ ok: true, received: true, reference: parsed.reference }, 200);
+        return reply({ ok: true, received: true, reference }, 200);
       }
     } catch {
       // If the duplicate check fails, do not silently claim it has been recorded.
