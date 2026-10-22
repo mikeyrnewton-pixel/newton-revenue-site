@@ -35,8 +35,12 @@ export async function onRequestPost({ request, env }) {
       const status = await deliverOwnerNotice(record, env);
       counts[status] = (counts[status] || 0) + 1;
     }
+    const nextCursor = page.list_complete ? null : page.cursor || null;
+    if (!requestedCursor) {
+      await env.LEADS.put('meta:notice-retry-cursor', nextCursor || '');
+    }
     return reply({ ok: true, counts, hasMore: !page.list_complete,
-      nextCursor: page.list_complete ? null : page.cursor || null });
+      nextCursor });
   } catch { return reply({ error: 'Retry incomplete. Pending notices retained.' }, 503); }
 }
 export async function onRequest() { return reply({ error: 'Method not allowed.' }, 405); }
