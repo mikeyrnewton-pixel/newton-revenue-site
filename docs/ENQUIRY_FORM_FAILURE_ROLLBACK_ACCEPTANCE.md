@@ -6,6 +6,17 @@ Data rule: fictional inputs only; never use a real name, email, company or enqui
 
 This is the release acceptance sheet for the Newton Revenue enquiry form. It does not authorise merge, production deployment, customer contact, data collection or a claim that an enquiry was received.
 
+## Exact-head Cloudflare preview evidence — 22 October 2026
+
+- Head before this evidence-only update: `63794c4b00f0673c5e29c106f17aa1c40828c421`.
+- Cloudflare Pages PR check **passed**, preview: `https://3aff53d0.newton-revenue-site.pages.dev/`.
+- Read-only GET on immutable preview `/` succeeded; public `/app.js` contained the edited-enquiry retry fingerprinting code.
+- Read-only GET on immutable preview `/api/leads` returned **HTTP 503**, **not 401**. The handler returns 503 if either the LEADS KV binding or the private ADMIN_TOKEN configuration is absent/invalid. This read cannot determine which condition applies.
+- Production `https://newton-revenue-site.pages.dev/api/leads` returned **401** without credentials. Do not infer any preview fault from production availability, or that the preview is safe to submit genuine data.
+- **Release gate: BLOCKED_PREVIEW_CONFIG.** A green Cloudflare build and green offline CI are insufficient for preview-runtime acceptance. Do not submit, load, copy, replay or synchronise any genuine customer enquiry in a preview.
+- To unblock, the owner must separately approve/configure an **isolated preview-only KV namespace and separate preview-only administrator secret** in Cloudflare securely, not in GitHub, chat, screenshots, workflow logs or URL parameters. Never bind production LEADS to a preview. Verify the unauthenticated preview lead API changes from 503 to 401; then obtain owner approval for exactly one fictitious `.invalid` enquiry, and inspect it only via private authenticated preview tooling. Record the final code SHA, binding environment (without identifiers/secrets), exact pass/fail, and tested rollback path. The owner's separate production merge/deploy approval remains required.
+- Until those checks pass, preserve the current production site and mark the PR **REVIEW_ONLY / NO_RELEASE**, even though the browser JavaScript and isolated Node tests are passing.
+
 ## Customer-safe failure contract
 
 | Scenario | Storage state | Required customer response | Required behaviour | Pass condition |
