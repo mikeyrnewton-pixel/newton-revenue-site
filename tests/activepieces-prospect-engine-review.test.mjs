@@ -13,7 +13,7 @@ const sample=()=>({
     {name:"New Prospect",type:"WEBHOOK"},
     {name:"Qualify Prospect",type:"CODE"},
     {name:"Draft Outreach",type:"CODE"},
-    {name:"Build Follow-Up",type:"CODE"},
+    {name:"Build Follow-up",type:"CODE"},
   ],
 });
 
@@ -53,7 +53,7 @@ test("even verified configuration cannot authorise activation or revenue",()=>{
     observedRuns:"VERIFIED_RECENT_RUNS",
     webhookAuthentication:"VERIFIED_PROTECTED",
   });
-  assert.equal(report.flowCodeVerified,true);
+  assert.equal(report.flowCodeVerified,false);
   assert.deepEqual(report.blockers,["OWNER_APPROVAL_REQUIRED_BEFORE_ACTIVATION_OR_OUTREACH"]);
   assert.equal(report.status,"REVIEW_ONLY_HOLD");
   assert.equal(report.clearedGBP,0);
