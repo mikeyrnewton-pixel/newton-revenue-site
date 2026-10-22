@@ -280,3 +280,26 @@ test("cross-batch consolidation rejects changed enquiry ownership",()=>{
     /rows do not match batch evidence digest/,
   );
 });
+
+test("cross-batch source evidence cannot be reused for different leads",()=>{
+  const first=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  const secondOriginal=buildOfflineCommercialLeadExport(exportFor({
+    id:"22222222-2222-4222-8222-222222222222",
+    submissionId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  }),ledgerConfig());
+  const aliasedRow={
+    ...secondOriginal.rows[0],
+    source_evidence_digest:first.rows[0].source_evidence_digest,
+  };
+  const second={
+    ...secondOriginal,
+    rows:[aliasedRow],
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify([aliasedRow])).digest("hex"),
+  };
+  assert.throws(
+    ()=>consolidateOfflineCommercialLeadExports([first,second]),
+    /one source evidence digest cannot prove multiple commercial leads/,
+    "a fresh batch digest cannot authorise cross-lead source evidence reuse",
+  );
+});
