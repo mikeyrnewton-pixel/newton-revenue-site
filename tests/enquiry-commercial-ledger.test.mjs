@@ -176,6 +176,22 @@ test("fails closed on altered CRM evidence metadata",()=>{
 });
 
 
+test("rejects malformed submission UUIDs at the final ledger boundary",()=>{
+  const original=exportFor();
+  const nil="00000000-0000-0000-0000-000000000000";
+  const malformed={
+    ...original.rows[0],
+    event_key:"crm:enquiry:"+nil,
+    handoff_id:"enquiry:"+nil,
+  };
+  assert.throws(
+    ()=>buildOfflineCommercialLeadExport({...original,rows:[malformed]},ledgerConfig()),
+    /canonical event key required/,
+    "a digest mismatch must not be the only protection against malformed submission IDs",
+  );
+});
+
+
 test("rejects source UUIDs incompatible with the PR29 commercial contract",()=>{
   const original=exportFor();
   const invalidVersion={
