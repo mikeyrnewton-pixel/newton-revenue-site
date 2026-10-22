@@ -313,3 +313,24 @@ test("one provider transaction cannot create multiple payment observations",()=>
     /duplicate payment observation ID/,
   );
 });
+
+test("one invoice event cannot create competing payment observations",()=>{
+  const first={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  };
+  const second={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      evidenceDigest:"f".repeat(64),
+    },
+    expectedBinding:binding(),
+  };
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch([first,second]),
+    /invoice event reused across payment observations/,
+  );
+});
