@@ -220,6 +220,18 @@ test("payment evidence cannot reuse source or invoice-stage evidence",()=>{
 });
 
 
+test("source and invoice evidence bindings must remain distinct",()=>{
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),
+      invoiceEvidenceDigest:binding().sourceEvidenceDigest,
+    }),
+    /source and invoice evidence digests must differ/,
+    "one artefact cannot prove both intake provenance and invoicing",
+  );
+});
+
+
 test("payment observation must follow its bound invoice event",()=>{
   assert.throws(
     ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
