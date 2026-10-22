@@ -107,6 +107,43 @@ test('retry returns bounded page progress without customer data', async () => {
   assert.deepEqual(await response.json(), { ok: true, counts: { delivered: 0, pending: 0, skipped: 1, expired: 0, deferred: 0 },
     hasMore: true, nextCursor: 'third-page' });
 });
+test('cursorless retry rotates through pages so later pending notices cannot starve', async () => {
+  const { env } = setup();
+  env.ADMIN_TOKEN = TOKEN;
+  let savedCursor = '';
+  const seen = [];
+  env.LEADS.get = async (key) => {
+    if (key === 'meta:notice-retry-cursor') return savedCursor;
+    return { ...fixture(), id: key.slice(5), notification: undefined };
+  };
+  env.LEADS.put = async (key, value) => {
+    assert.equal(key, 'meta:notice-retry-cursor');
+    savedCursor = value;
+  };
+  env.LEADS.list = async opts => {
+    seen.push(opts.cursor || null);
+    if (!opts.cursor) {
+      return { keys: Array.from({ length: 5 }, (_, i) => ({ name: 'lead:first-' + i })),
+        list_complete: false, cursor: 'second-page' };
+    }
+    assert.equal(opts.cursor, 'second-page');
+    return { keys: [{ name: 'lead:later-pending' }], list_complete: true };
+  };
+  const request = () => new Request('https://site.test/api/retry-owner-notices',
+    { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN } });
+
+  const first = await retry({ request: request(), env });
+  assert.equal(first.status, 200);
+  assert.equal((await first.json()).nextCursor, 'second-page');
+  assert.equal(savedCursor, 'second-page');
+
+  const second = await retry({ request: request(), env });
+  assert.equal(second.status, 200);
+  assert.equal((await second.json()).nextCursor, null);
+  assert.equal(savedCursor, '');
+  assert.deepEqual(seen, [null, 'second-page']);
+});
+
 test('stored enquiry succeeds even when owner notification fails', async () => {
   const { env, writes } = setup();
   const request = new Request('https://site.test/api/enquiry', { method: 'POST',
