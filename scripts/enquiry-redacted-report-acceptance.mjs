@@ -42,13 +42,24 @@ if(!exact(config,["schema","mode","reportAdapter","deliveryRoute","recipientRole
   config.schema!=="NEWTON_REDACTED_REPORT_CONNECT_LATER_V1"||config.mode!=="OFFLINE_REVIEW_ONLY"||
   config.reportAdapter!==""||config.deliveryRoute!==""||config.recipientRole!==""||config.ownerApproval!=="NOT_GRANTED"||config.liveEnabled!==false)
   fail("config must remain blank, disconnected, NOT_GRANTED and non-live");
+const requiredContracts=["PR11_QA","PR29_COMMERCIAL","PR30_ACQUISITION","PR43_LIFECYCLE"];
+const requiredCompatibilityBlockers=["HUMAN_REVIEW_NOT_RUN","CLIENT_ACCEPTANCE_NOT_RUN","PAYMENT_NOT_CLEARED","OWNER_CONNECTION_NOT_APPROVED","LIVE_BROWSER_NOT_RUN"];
+const exactArray=(value,expected)=>Array.isArray(value)&&value.length===expected.length&&value.every((item,index)=>item===expected[index]);
 if(!compat||compat.schema!=="NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1"||compat.synthetic!==true||
+  !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(compat.enquiryId||"")||
+  !exact(compat.commercialBasis,["priceGBP","vatTreatment","supplierAddressApproved","termsApproved"])||
+  compat.commercialBasis.priceGBP!==195||!["VAT_INCLUDED","VAT_EXCLUDED","OUTSIDE_SCOPE"].includes(compat.commercialBasis.vatTreatment)||
+  compat.commercialBasis.supplierAddressApproved!==true||compat.commercialBasis.termsApproved!==true||
+  !/^sha256:[a-f0-9]{64}$/.test(compat.evidenceDigest||"")||
+  !exactArray(compat.compatibleContracts,requiredContracts)||!exactArray(compat.blockers,requiredCompatibilityBlockers)||
   compat.result!=="READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN"||compat.customerDelivery!=="HOLD"||
   compat.paymentState!=="NOT_CLEARED"||compat.connectionState!=="NEEDS_CONNECTION"||compat.live!==false||compat.externalAction!==false)
-  fail("compatibility manifest is missing or promoted beyond offline HOLD");
+  fail("compatibility manifest is incomplete or promoted beyond offline HOLD");
 const reportSha=createHash("sha256").update(report).digest("hex");
 const receipt={
-  schema:"NEWTON_REDACTED_REPORT_ACCEPTANCE_V1",synthetic:true,projectRef:compat.projectRef,
+  schema:"NEWTON_REDACTED_REPORT_ACCEPTANCE_V1",synthetic:true,projectRef:compat.projectRef,enquiryId:compat.enquiryId,
+  commercialBasis:{...compat.commercialBasis},compatibleContracts:[...compat.compatibleContracts],
+  compatibilityBlockers:[...compat.blockers],
   result:"REDACTED_REPORT_ACCEPTED_FOR_PRIVATE_REVIEW",reportSha256:reportSha,
   compatibilityEvidenceDigest:compat.evidenceDigest,qaRowsHeldNotRun:12,
   blockers:["HUMAN_REVIEW_NOT_RUN","CLIENT_ACCEPTANCE_NOT_RUN","DELIVERY_ROUTE_NOT_CONNECTED","PAYMENT_NOT_CLEARED","LIVE_BROWSER_NOT_RUN"],
