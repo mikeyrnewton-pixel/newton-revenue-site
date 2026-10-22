@@ -4,7 +4,7 @@ import {createHash} from "node:crypto";
 import {toFictionalDeliveryHandoff} from "../lib/enquiry-handoff.js";
 import {toFictionalCrmEvent} from "../lib/enquiry-crm-adapter.js";
 import {buildOfflineCrmExport} from "../lib/enquiry-crm-export.js";
-import {buildOfflineCommercialLeadExport} from "../lib/enquiry-commercial-ledger.js";
+import {buildOfflineCommercialLeadExport,consolidateOfflineCommercialLeadExports} from "../lib/enquiry-commercial-ledger.js";
 
 const crmConfig=()=>({
   schema:"NEWTON_CRM_EXPORT_CONFIG_V1",
@@ -234,5 +234,49 @@ test("rejects source UUIDs incompatible with the PR29 commercial contract",()=>{
     ()=>buildOfflineCommercialLeadExport({...original,rows:[uppercaseAlias]},ledgerConfig()),
     /canonical enquiry identifiers required/,
     "uppercase UUID aliases must fail at the final ledger boundary",
+  );
+});
+
+
+test("cross-batch consolidation is idempotent and remains enquiry-only",()=>{
+  const batch=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  const result=consolidateOfflineCommercialLeadExports([batch,batch]);
+  assert.equal(result.state,"STAGED_OFFLINE_ONLY");
+  assert.equal(result.connectionState,"NEEDS_CONNECTION");
+  assert.equal(result.writeIntent,"NONE");
+  assert.equal(result.sourceBatchCount,2);
+  assert.equal(result.uniqueLeadCount,1);
+  assert.match(result.batchDigest,/^sha256:[0-9a-f]{64}$/);
+  assert.equal(result.commercialTruth,"ENQUIRIES_ONLY_NOT_REVENUE");
+  assert.equal(result.recordedPaymentEvidenceGBP,0);
+  assert.equal(result.clearedEvidenceGBP,0);
+  assert.equal(result.customerDelivery,"HOLD");
+});
+
+test("cross-batch consolidation rejects changed enquiry ownership",()=>{
+  const firstCrm=exportFor();
+  const first=buildOfflineCommercialLeadExport(firstCrm,ledgerConfig());
+  const changedRow={
+    ...firstCrm.rows[0],
+    event_key:"crm:enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    handoff_id:"enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  };
+  const changedCrm={
+    ...firstCrm,
+    rows:[changedRow],
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify([changedRow])).digest("hex"),
+  };
+  const second=buildOfflineCommercialLeadExport(changedCrm,ledgerConfig());
+  assert.throws(
+    ()=>consolidateOfflineCommercialLeadExports([first,second]),
+    /one enquiry reference cannot change CRM event ownership across batches/,
+    "separate valid batch digests cannot reassign an enquiry",
+  );
+  assert.throws(
+    ()=>consolidateOfflineCommercialLeadExports([{
+      ...first,batchDigest:"sha256:"+"0".repeat(64),
+    }]),
+    /rows do not match batch evidence digest/,
   );
 });
