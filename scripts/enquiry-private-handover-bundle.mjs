@@ -44,6 +44,15 @@ const requiredCompatibilityBlockers=["HUMAN_REVIEW_NOT_RUN","CLIENT_ACCEPTANCE_N
 const exactArray=(value,expected)=>Array.isArray(value)&&value.length===expected.length&&value.every((item,index)=>item===expected[index]);
 if(a?.schema!=="NEWTON_REDACTED_REPORT_ACCEPTANCE_V1"||a.synthetic!==true||a.result!=="REDACTED_REPORT_ACCEPTED_FOR_PRIVATE_REVIEW"||a.reportSha256!==reportSha||a.customerDelivery!=="HOLD"||a.paymentState!=="NOT_CLEARED"||a.connectionState!=="NEEDS_CONNECTION"||a.live!==false||a.externalAction!==false)fail("acceptance receipt is not checksum-bound offline HOLD evidence");
 if(c?.schema!=="NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1"||c.synthetic!==true||c.result!=="READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN"||c.projectRef!==a.projectRef||c.enquiryId!==l?.enquiryId||c.evidenceDigest!==a.compatibilityEvidenceDigest||!exact(c.commercialBasis,["priceGBP","vatTreatment","supplierAddressApproved","termsApproved"])||c.commercialBasis.priceGBP!==195||!["VAT_INCLUDED","VAT_EXCLUDED","OUTSIDE_SCOPE"].includes(c.commercialBasis.vatTreatment)||c.commercialBasis.supplierAddressApproved!==true||c.commercialBasis.termsApproved!==true||!exactArray(c.compatibleContracts,requiredContracts)||!exactArray(c.blockers,requiredCompatibilityBlockers)||c.customerDelivery!=="HOLD"||c.paymentState!=="NOT_CLEARED"||c.connectionState!=="NEEDS_CONNECTION"||c.live!==false||c.externalAction!==false)fail("compatibility manifest does not match the accepted report");
+if(a.enquiryId!==c.enquiryId||
+  !exact(a.commercialBasis,["priceGBP","vatTreatment","supplierAddressApproved","termsApproved"])||
+  a.commercialBasis.priceGBP!==c.commercialBasis.priceGBP||
+  a.commercialBasis.vatTreatment!==c.commercialBasis.vatTreatment||
+  a.commercialBasis.supplierAddressApproved!==c.commercialBasis.supplierAddressApproved||
+  a.commercialBasis.termsApproved!==c.commercialBasis.termsApproved||
+  !exactArray(a.compatibleContracts,c.compatibleContracts)||
+  !exactArray(a.compatibilityBlockers,c.blockers))
+  fail("acceptance receipt does not preserve the validated compatibility proof");
 if(l?.schemaVersion!==1||l.component!=="ENQUIRY_LIFECYCLE_REVIEW"||l.state!=="STAGED"||l.testMode!=="OFFLINE_SYNTHETIC_ONLY"||
   l.connectionStatus!=="NEEDS_CONNECTION"||l.live!==false||l.decision!=="RETAIN_UNTIL_POLICY_DATE"||
   l.emailClass!=="SYNTHETIC_EXAMPLE_INVALID_REDACTED"||l.ownerApproval!=="NOT_GRANTED"||l.storageConnected!==false||
