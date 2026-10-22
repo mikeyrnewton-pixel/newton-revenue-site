@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {assessSyntheticPaymentObservation,preparePaymentEvidenceConnector} from "../lib/payment-evidence-connector.js";
+import {assessSyntheticPaymentObservation,assessSyntheticPaymentObservationBatch,preparePaymentEvidenceConnector} from "../lib/payment-evidence-connector.js";
 
 const base=()=>({
   version:1,
@@ -262,5 +262,54 @@ test("payment observation must follow its bound invoice event",()=>{
       ...binding(),invoicedAt:"20 October 2026 10:59:59 UTC",
     }),
     /canonical UTC invoice timestamp/,
+  );
+});
+
+
+test("synthetic payment batch remains review-only and records no cash",()=>{
+  const result=assessSyntheticPaymentObservationBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }]);
+  assert.equal(result.state,"PAYMENT_BATCH_REVIEW");
+  assert.equal(result.observationCount,1);
+  assert.equal(result.candidates[0].state,"CLEARED_EVIDENCE_REVIEW");
+  assert.equal(result.automaticTransition,false);
+  assert.equal(result.networkCalled,false);
+  assert.equal(result.paymentRecorded,false);
+  assert.equal(result.clearedEvidenceGBP,0);
+  assert.equal(result.commercialTruth,"SYNTHETIC_BATCH_NOT_REVENUE");
+  assert.equal(result.customerDelivery,"HOLD");
+});
+
+test("one provider transaction cannot create multiple payment observations",()=>{
+  const first={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  };
+  const second={
+    providerTransactionDigest:first.providerTransactionDigest,
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      evidenceDigest:"e".repeat(64),
+    },
+    expectedBinding:binding(),
+  };
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch([first,second]),
+    /provider transaction reused across payment observations/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch([{
+      ...first,providerTransactionDigest:first.observation.evidenceDigest,
+    }]),
+    /distinct evidence boundary/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch([first,{...first}]),
+    /duplicate payment observation ID/,
   );
 });
