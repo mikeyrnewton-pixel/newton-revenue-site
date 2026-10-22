@@ -70,7 +70,7 @@ jobs:
           status=$?
           set -e
           if [ "$status" -eq 2 ]; then
-            echo '::warning::Preview KV binding verified, but independent Preview ADMIN_TOKEN still required; not release-ready.'
-            exit 0
+            echo '::error::Preview KV binding verified, but the separate Preview ADMIN_TOKEN is still missing or unavailable; release blocked.'
+            exit 2
           fi
           exit "$status"
