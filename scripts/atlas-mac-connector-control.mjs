@@ -75,6 +75,7 @@ export async function readMacStatus({
   run=safeRun,
   fetcher=fetch,
   stat=lstatSync,
+  exists=existsSync,
   now=Date.now(),
   uid=process.getuid?.()??null,
 }={}){
@@ -100,7 +101,7 @@ export async function readMacStatus({
     noWritesPerformed:true,
   };
   if(platform!=="darwin")return state;
-  const docker=DOCKER_LOCATIONS.find(p=>existsSync(p));
+  const docker=DOCKER_LOCATIONS.find(p=>exists(p));
   if(docker){
     const ps=run(docker,["ps","--format","{{.Names}}|{{.Status}}"]);
     if(ps.ok){
