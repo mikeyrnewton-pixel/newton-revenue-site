@@ -157,6 +157,8 @@ test("rejects unsafe key paths", () => {
     "/private/atlas/../runtime_key",
     "/private/atlas/runtime_key/",
     "/private/atlas/runtime_key\nleak",
+    "/private/atlas/runtime_key,readonly=false",
+    "/private/atlas/runtime_key,dst=/tmp/exposed",
   ]) {
     assert.throws(
       () => buildTunnelDockerPlan(validInput({ runtimeKeyFile })),
