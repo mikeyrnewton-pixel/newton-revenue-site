@@ -334,3 +334,30 @@ test("one invoice event cannot create competing payment observations",()=>{
     /invoice event reused across payment observations/,
   );
 });
+
+test("one source record cannot create competing payment observations",()=>{
+  const first={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  };
+  const replacementInvoiceId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const second={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      invoiceEventId:replacementInvoiceId,
+      evidenceDigest:"f".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      invoiceEventId:replacementInvoiceId,
+      invoiceEvidenceDigest:"1".repeat(64),
+    },
+  };
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch([first,second]),
+    /source record reused across payment observations/,
+  );
+});
