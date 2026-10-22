@@ -459,3 +459,36 @@ test("Case-only changes in the same consented email remain a valid retry", async
   assert.equal((await replay.json()).reference, reference);
   assert.equal([...kv.data.keys()].filter(key => key.startsWith("lead:")).length, 1);
 });
+
+test("legacy plain-UUID receipt preserves old user retry only if stored lead matches", async () => {
+  const kv = new MemoryKV();
+  const first = await submit({request: request(), env: {LEADS: kv}});
+  assert.equal(first.status, 201);
+  const {reference} = await first.json();
+  // Model the previous public handler's 24-hour KV receipt and stored record.
+  const oldRecord = await kv.get("lead:" + reference, "json");
+  delete oldRecord.submissionId;
+  delete oldRecord.contactPermissionCapturedAt;
+  kv.data.set("lead:" + reference, JSON.stringify(oldRecord));
+  kv.data.set("receipt:" + SUBMISSION_ID, reference);
+  const unchanged = await submit({request: request(), env: {LEADS: kv}});
+  assert.equal(unchanged.status, 200);
+  assert.equal((await unchanged.json()).reference, reference);
+  const different = await submit({
+    request: request({problem: "CHANGED request, same legacy UUID"}), env: {LEADS: kv},
+  });
+  assert.equal(different.status, 503);
+  assert.equal((await different.json()).received, undefined);
+  assert.equal([...kv.data.keys()].filter(key => key.startsWith("lead:")).length, 1);
+});
+
+test("legacy plain-UUID receipt without original record fails closed", async () => {
+  const kv = new MemoryKV();
+  const first = await submit({request: request(), env: {LEADS: kv}});
+  const {reference} = await first.json();
+  kv.data.set("receipt:" + SUBMISSION_ID, reference);
+  kv.data.delete("lead:" + reference);
+  const replay = await submit({request: request(), env: {LEADS: kv}});
+  assert.equal(replay.status, 503);
+  assert.equal((await replay.json()).received, undefined);
+});
