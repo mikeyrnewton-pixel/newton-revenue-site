@@ -56,6 +56,7 @@ test("runs lifecycle through compatibility and report acceptance into handover",
   assert.deepEqual(receipt.compatibleContracts,["PR11_QA","PR29_COMMERCIAL","PR30_ACQUISITION","PR43_LIFECYCLE"]);
   assert.equal(receipt.customerDelivery,"HOLD");assert.equal(receipt.paymentState,"NOT_CLEARED");assert.equal(receipt.live,false);
 });
+test("rejects correlated relabelling of synthetic proof as client work",()=>{const p=setup();for(const path of [p.acceptance,p.compatibility])mutate(path,v=>{v.projectRef="CLIENT-REAL-001"});const r=run(p);assert.equal(r.status,2);assert.match(r.stderr,/compatibility manifest does not match/)});
 test("rejects correlated non-UUID identity tampering across every receipt",()=>{const p=setup();for(const path of [p.acceptance,p.compatibility,p.lifecycle])mutate(path,v=>{v.enquiryId="shared-non-uuid"});const r=run(p);assert.equal(r.status,2);assert.match(r.stderr,/compatibility manifest does not match/)});
 test("rejects reduced QA coverage or removed acceptance HOLD blockers",()=>{for(const edit of [
   v=>{v.qaRowsHeldNotRun=11},
