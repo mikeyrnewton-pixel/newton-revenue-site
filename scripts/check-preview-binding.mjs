@@ -29,7 +29,10 @@ try {
   console.log('Preview homepage HTTP:', home);
   console.log('Non-writing invalid enquiry HTTP:', intake, '(415 = KV binding active; 503 = missing binding)');
   console.log('Unauthenticated owner route HTTP:', admin, '(401 = protected; 503 = Preview ADMIN_TOKEN/binding unavailable)');
-  if (home !== 200 || intake !== 415) {
+  if (home === 403 || intake === 403 || admin === 403) {
+    console.error('BLOCKED: Cloudflare Access / edge rules or request-network policy returned 403. This is NOT evidence the Pages Function ran.');
+    process.exitCode = 1;
+  } else if (home !== 200 || intake !== 415) {
     console.error('FAIL: Preview is not ready. Check the exact deployment, binding and Pages Functions.');
     process.exitCode = 1;
   } else if (admin === 503) {
