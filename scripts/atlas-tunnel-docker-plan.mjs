@@ -40,6 +40,11 @@ function validateRuntimeKeyPath(value) {
   if (value.includes("\0") || /[\r\n]/u.test(value)) {
     fail("runtimeKeyFile contains control characters");
   }
+  // Docker's --mount value is comma-delimited. A comma in the source path
+  // would be interpreted as a new mount option, not as part of the filename.
+  if (value.includes(",")) {
+    fail("runtimeKeyFile cannot be safely encoded in Docker mount syntax");
+  }
 
   const segments = value.split("/");
   if (value === "/" || segments.includes("..") || path.normalize(value) !== value) {
