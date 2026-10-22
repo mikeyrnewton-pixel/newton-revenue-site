@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {assessSyntheticPaymentObservation,assessSyntheticPaymentObservationBatch,preparePaymentEvidenceConnector} from "../lib/payment-evidence-connector.js";
+import {assessSyntheticPaymentObservation,assessSyntheticPaymentObservationBatch,emptySyntheticPaymentEvidenceCursor,preparePaymentEvidenceConnector} from "../lib/payment-evidence-connector.js";
 
-const base=()=>({
+const assessBatch=(items,prior=emptySyntheticPaymentEvidenceCursor())=>\n  assessSyntheticPaymentObservationBatch(items,prior);\n\nconst base=()=>({
   version:1,
   provider:"UNSET",
   credentialEnv:"NEWTON_PAYMENT_READ_TOKEN",
@@ -267,7 +267,7 @@ test("payment observation must follow its bound invoice event",()=>{
 
 
 test("synthetic payment batch remains review-only and records no cash",()=>{
-  const result=assessSyntheticPaymentObservationBatch([{
+  const result=assessBatch([{
     providerTransactionDigest:"d".repeat(64),
     observation:observation("SETTLED"),
     expectedBinding:binding(),
@@ -299,17 +299,17 @@ test("one provider transaction cannot create multiple payment observations",()=>
     expectedBinding:binding(),
   };
   assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch([first,second]),
+    ()=>assessBatch([first,second]),
     /provider transaction reused across payment observations/,
   );
   assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch([{
+    ()=>assessBatch([{
       ...first,providerTransactionDigest:first.observation.evidenceDigest,
     }]),
     /distinct evidence boundary/,
   );
   assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch([first,{...first}]),
+    ()=>assessBatch([first,{...first}]),
     /duplicate payment observation ID/,
   );
 });
@@ -330,7 +330,7 @@ test("one invoice event cannot create competing payment observations",()=>{
     expectedBinding:binding(),
   };
   assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch([first,second]),
+    ()=>assessBatch([first,second]),
     /invoice event reused across payment observations/,
   );
 });
@@ -357,7 +357,103 @@ test("one source record cannot create competing payment observations",()=>{
     },
   };
   assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch([first,second]),
+    ()=>assessBatch([first,second]),
     /source record reused across payment observations/,
   );
 });
+
+test("payment batch emits a frozen cumulative replay cursor",()=>{
+  const result=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }]);
+  assert.deepEqual(result.reconciliationCursor,{
+    version:1,
+    synthetic:true,
+    observationIds:[observation("SETTLED").observationId],
+    evidenceDigests:[observation("SETTLED").evidenceDigest],
+  });
+  assert.ok(Object.isFrozen(result.reconciliationCursor));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.observationIds));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.evidenceDigests));
+});
+
+test("prior reconciliation cursor blocks cross-batch observation replay",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:observation("PENDING"),
+      expectedBinding:binding(),
+    }],first.reconciliationCursor),
+    /observation ID already reconciled/,
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      },
+      expectedBinding:binding(),
+    }],first.reconciliationCursor),
+    /evidence digest already reconciled/,
+  );
+});
+
+test("new evidence can update a prior provider transaction without replay",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const second=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"e".repeat(64),
+    },
+    expectedBinding:binding(),
+  }],first.reconciliationCursor);
+  assert.equal(second.candidates[0].state,"CLEARED_EVIDENCE_REVIEW");
+  assert.equal(second.reconciliationCursor.observationIds.length,2);
+  assert.equal(second.reconciliationCursor.evidenceDigests.length,2);
+  assert.equal(second.clearedEvidenceGBP,0);
+});
+
+test("malformed or omitted prior cursor fails closed",()=>{
+  const item=[{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }];
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch(item),
+    /prior payment evidence cursor/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      observationIds:[
+        "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      ],
+    }),
+    /sorted unique prior observation IDs/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservationBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      evidenceDigests:["A".repeat(64)],
+    }),
+    /canonical prior evidence digests/,
+  );
+});
+
