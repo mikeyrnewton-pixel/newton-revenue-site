@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {toFictionalDeliveryHandoff} from "../lib/enquiry-handoff.js";
 import {toFictionalCrmEvent} from "../lib/enquiry-crm-adapter.js";
 import {buildOfflineCrmExport} from "../lib/enquiry-crm-export.js";
@@ -172,6 +173,29 @@ test("fails closed on altered CRM evidence metadata",()=>{
       rows:[{...original.rows[0],owner_notice_status:"delivered"}],
     },ledgerConfig()),
     /rows do not match batch evidence digest/,
+  );
+});
+
+
+test("final ledger rejects two event keys claiming one enquiry reference",()=>{
+  const original=exportFor();
+  const secondRow={
+    ...original.rows[0],
+    event_key:"crm:enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    handoff_id:"enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  };
+  const rows=[original.rows[0],secondRow];
+  const forged={
+    ...original,
+    rowCount:rows.length,
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify(rows)).digest("hex"),
+    rows,
+  };
+  assert.throws(
+    ()=>buildOfflineCommercialLeadExport(forged,ledgerConfig()),
+    /one enquiry reference cannot map to multiple CRM event keys/,
+    "a valid batch digest cannot override canonical enquiry ownership",
   );
 });
 
