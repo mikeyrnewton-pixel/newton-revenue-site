@@ -34,6 +34,11 @@ test("accepts the redacted report only for private review",()=>{
     assert.equal(out.receipt.paymentState,"NOT_CLEARED");
     assert.equal(out.receipt.connectionState,"NEEDS_CONNECTION");
     assert.equal(out.receipt.live,false);
+    assert.equal(out.receipt.enquiryId,"11111111-1111-4111-8111-111111111111");
+    assert.deepEqual(out.receipt.commercialBasis,{priceGBP:195,vatTreatment:"OUTSIDE_SCOPE",supplierAddressApproved:true,termsApproved:true});
+    assert.deepEqual(out.receipt.compatibleContracts,["PR11_QA","PR29_COMMERCIAL","PR30_ACQUISITION","PR43_LIFECYCLE"]);
+    assert.deepEqual(out.receipt.compatibilityBlockers,["HUMAN_REVIEW_NOT_RUN","CLIENT_ACCEPTANCE_NOT_RUN","PAYMENT_NOT_CLEARED","OWNER_CONNECTION_NOT_APPROVED","LIVE_BROWSER_NOT_RUN"]);
+    assert.match(out.receipt.compatibilityEvidenceDigest,/^sha256:[a-f0-9]{64}$/);
     assert.match(out.receipt.reportSha256,/^[a-f0-9]{64}$/);
     assert.equal(lstatSync(out.output).mode&0o077,0);
   }finally{rmSync(dir,{recursive:true,force:true});}
@@ -58,10 +63,19 @@ test("false release, delivery, acceptance or payment claims fail closed",()=>{
   }
 });
 
-test("promoted compatibility manifest fails closed",()=>{
-  for(const edit of [m=>m.customerDelivery="RELEASE",m=>m.paymentState="CLEARED",m=>m.live=true]){
+test("incomplete or promoted compatibility manifest fails closed",()=>{
+  for(const edit of [
+    m=>delete m.enquiryId,
+    m=>m.commercialBasis.priceGBP=194,
+    m=>m.compatibleContracts.splice(1,1),
+    m=>m.blockers.splice(3,1),
+    m=>m.evidenceDigest="sha256:invalid",
+    m=>m.customerDelivery="RELEASE",
+    m=>m.paymentState="CLEARED",
+    m=>m.live=true
+  ]){
     const m=JSON.parse(readFileSync(compat,"utf8"));edit(m);const r=reject(readFileSync(fixture,"utf8"),m);
-    assert.equal(r.status,2);assert.match(r.stderr,/promoted beyond offline HOLD/);
+    assert.equal(r.status,2);assert.match(r.stderr,/incomplete or promoted beyond offline HOLD/);
   }
 });
 
