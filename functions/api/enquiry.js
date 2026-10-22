@@ -17,6 +17,27 @@ function reply(body, status = 200) {
 function validText(value, max) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
 }
+function normalisedSource(value) {
+  return ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(value)
+    ? value : "newton-revenue-site";
+}
+function normalisedChannel(value) {
+  return ["facebook", "instagram", "youtube", "search", "partner"].includes(value)
+    ? value : "direct";
+}
+async function submissionFingerprint(p, email) {
+  const canonical = JSON.stringify({
+    name: p.name.trim(),
+    company: p.company.trim(),
+    email: email.toLowerCase(),
+    problem: p.problem.trim(),
+    contactPermission: true,
+    source: normalisedSource(p.source),
+    channel: normalisedChannel(p.channel),
+  });
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
 export async function onRequestPost({ request, env, waitUntil }) {
   if (!env.LEADS || typeof env.LEADS.put !== "function") {
     return reply({ error: "Lead intake is not configured. Please email us instead." }, 503);
@@ -56,51 +77,75 @@ export async function onRequestPost({ request, env, waitUntil }) {
       !validText(p.problem, 2000) || p.contactPermission !== true) {
     return reply({ error: "Please complete all required fields and agree to enquiry contact." }, 400);
   }
-  // Canonicalise source/channel before evaluating the idempotency receipt,
-  // so a reused ID cannot silently acknowledge a different enquiry.
-  const source = ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(p.source)
-    ? p.source : "newton-revenue-site";
-  const channel = ["facebook", "instagram", "youtube", "search", "partner"].includes(p.channel)
-    ? p.channel : "direct";
   // Retry protection: client reuses a random 36-character ID when a network reply is lost.
   // Cloudflare KV is eventually consistent; this is best-effort, not a transaction lock.
   const submissionId = typeof p.submissionId === "string" &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.submissionId)
     ? p.submissionId.toLowerCase() : null;
+  const fingerprint = submissionId ? await submissionFingerprint(p, email) : null;
   if (submissionId && typeof env.LEADS.get === "function") {
     try {
       const receipt = await env.LEADS.get("receipt:" + submissionId);
       if (receipt) {
-        // Receipts are only an acknowledgement of the SAME enquiry.
-        // KV stores the real lead for 30 days but receipt IDs for 24 hours.
-        // A damaged, missing or mismatching original must fail closed.
-        const previous = await env.LEADS.get("lead:" + receipt, "json");
-        if (!previous || typeof previous !== "object") {
+        // Production and PR43 used a plain UUID receipt; TASK011's new
+        // format uses a versioned digest. Preserve safe legacy retries during
+        // a separately approved rollout without treating any receipt as proof
+        // that the original lead still exists.
+        const legacyReference =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(receipt)
+            ? receipt.toLowerCase() : null;
+        let parsed = null;
+        if (!legacyReference) {
+          try {
+            parsed = JSON.parse(receipt);
+          } catch {
+            return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
+          }
+          if (!parsed || parsed.version !== 1 ||
+              !/^[0-9a-f-]{36}$/i.test(parsed.reference || "") ||
+              !/^[0-9a-f]{64}$/.test(parsed.fingerprint || "")) {
+            return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
+          }
+          if (parsed.fingerprint !== fingerprint) {
+            return reply({ error: "Submission reference conflicts with different enquiry details." }, 409);
+          }
+        }
+        const reference = legacyReference || parsed.reference;
+        // PR43 compatibility: a receipt cannot acknowledge a lost, altered or
+        // corrupted original lead. A digest alone cannot prove intact storage.
+        // Reject without returning customer data or creating a second record.
+        const original = await env.LEADS.get("lead:" + reference, "json");
+        const originalValid = original && !Array.isArray(original) &&
+          typeof original === "object" &&
+          original.id === reference &&
+          (original.submissionId === submissionId ||
+            (legacyReference !== null && original.submissionId == null)) &&
+          original.contactPermission === true &&
+          typeof original.email === "string" &&
+          original.name === p.name.trim() &&
+          original.company === p.company.trim() &&
+          original.email.toLowerCase() === email.toLowerCase() &&
+          original.problem === p.problem.trim() &&
+          original.source === normalisedSource(p.source) &&
+          original.channel === normalisedChannel(p.channel);
+        if (!originalValid) {
           return reply({ error: "Could not validate the previous enquiry. Please email us." }, 503);
         }
-        const unchanged =
-          previous.name === p.name.trim() &&
-          previous.company === p.company.trim() &&
-          previous.email === email &&
-          previous.problem === p.problem.trim() &&
-          previous.source === source &&
-          previous.channel === channel &&
-          previous.contactPermission === true;
-        if (!unchanged) {
-          return reply({ error: "This submission ID already belongs to a different enquiry. Refresh and submit again." }, 409);
-        }
-        return reply({ ok: true, received: true, reference: receipt }, 200);
+        return reply({ ok: true, received: true, reference }, 200);
       }
     } catch {
       // If the duplicate check fails, do not silently claim it has been recorded.
       return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
     }
   }
+  const createdAt = new Date().toISOString();
   const record = {
     id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    source,
-    channel,
+    createdAt,
+    submissionId,
+    contactPermissionCapturedAt: createdAt,
+    source: normalisedSource(p.source),
+    channel: normalisedChannel(p.channel),
     name: p.name.trim(),
     company: p.company.trim(),
     email,
@@ -116,7 +161,11 @@ export async function onRequestPost({ request, env, waitUntil }) {
     });
     if (submissionId) {
       try {
-        await env.LEADS.put("receipt:" + submissionId, record.id, { expirationTtl: 24 * 60 * 60 });
+        await env.LEADS.put("receipt:" + submissionId, JSON.stringify({
+          version: 1,
+          reference: record.id,
+          fingerprint,
+        }), { expirationTtl: 24 * 60 * 60 });
       } catch {
         // The lead is already stored. Do not tell the customer their enquiry failed.
       }
