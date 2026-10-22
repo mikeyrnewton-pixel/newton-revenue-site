@@ -414,3 +414,48 @@ test("rejects uppercase UUID aliases before canonical handoff", () => {
     /submission ID required for canonical dedupe/,
   );
 });
+
+test("A retry receipt with missing original lead cannot claim success", async () => {
+  const kv = new MemoryKV();
+  const first = await submit({request: request(), env: {LEADS: kv}});
+  assert.equal(first.status, 201);
+  const {reference} = await first.json();
+  kv.data.delete("lead:" + reference); // synthetic simulation of missing/expired KV record
+  const replay = await submit({request: request(), env: {LEADS: kv}});
+  assert.equal(replay.status, 503);
+  const body = await replay.json();
+  assert.equal(body.received, undefined);
+  assert.match(body.error, /Could not validate the previous enquiry/);
+  assert.equal([...kv.data.keys()].filter(key => key.startsWith("lead:")).length, 0);
+});
+
+test("A retry receipt cannot acknowledge a corrupted original lead", async () => {
+  const kv = new MemoryKV();
+  const first = await submit({request: request(), env: {LEADS: kv}});
+  assert.equal(first.status, 201);
+  const {reference} = await first.json();
+  const original = await kv.get("lead:" + reference, "json");
+  // Same submission UUID and valid old receipt, but the original data is different.
+  kv.data.set("lead:" + reference, JSON.stringify({...original, email: "other@example.invalid"}));
+  const replay = await submit({request: request(), env: {LEADS: kv}});
+  assert.equal(replay.status, 503);
+  const body = await replay.json();
+  assert.equal(body.received, undefined);
+  assert.equal(JSON.stringify(body).includes("other@example.invalid"), false);
+  assert.equal([...kv.data.keys()].filter(key => key.startsWith("lead:")).length, 1);
+});
+
+test("Case-only changes in the same consented email remain a valid retry", async () => {
+  const kv = new MemoryKV();
+  const first = await submit({
+    request: request({email: "TASK011@EXAMPLE.INVALID"}), env: {LEADS: kv},
+  });
+  assert.equal(first.status, 201);
+  const {reference} = await first.json();
+  const replay = await submit({
+    request: request({email: "task011@example.invalid"}), env: {LEADS: kv},
+  });
+  assert.equal(replay.status, 200);
+  assert.equal((await replay.json()).reference, reference);
+  assert.equal([...kv.data.keys()].filter(key => key.startsWith("lead:")).length, 1);
+});
