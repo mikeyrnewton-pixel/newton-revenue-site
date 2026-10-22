@@ -128,6 +128,18 @@ test("rejects divergent retries sharing a CRM event key", () => {
   );
 });
 
+test("rejects multiple CRM event keys claiming one enquiry reference", () => {
+  const first = toFictionalDeliveryHandoff(fictionalRecord());
+  const reassigned = {
+    ...first,
+    handoffId: "enquiry:22222222-2222-4222-8222-222222222222",
+  };
+  assert.throws(
+    () => buildFictionalCrmEvents([first, reassigned]),
+    /one enquiry reference cannot map to multiple CRM event keys/,
+  );
+});
+
 test("preserves owner-notice integrity across pending, delivered and dead-letter states", () => {
   const pending = toFictionalDeliveryHandoff(fictionalRecord());
   const delivered = toFictionalDeliveryHandoff(fictionalRecord({
