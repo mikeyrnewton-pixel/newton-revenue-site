@@ -45,7 +45,7 @@ export async function onRequestPost({ request, env }) {
     }
     const nextCursor = page.list_complete ? null : page.cursor || null;
     if (!requestedCursor) {
-      await env.LEADS.put('meta:notice-retry-cursor', nextCursor || '');
+      await env.LEADS.put('meta:notice-retry-cursor', nextCursor || '', { expirationTtl: 7 * 24 * 60 * 60 });
     }
     return reply({ ok: true, counts, hasMore: !page.list_complete,
       nextCursor });
