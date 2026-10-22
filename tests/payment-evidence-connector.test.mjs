@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {assessSyntheticPaymentObservation,assessSyntheticPaymentObservationBatch,emptySyntheticPaymentEvidenceCursor,preparePaymentEvidenceConnector} from "../lib/payment-evidence-connector.js";
 
-const assessBatch=(items,prior=emptySyntheticPaymentEvidenceCursor())=>\n  assessSyntheticPaymentObservationBatch(items,prior);\n\nconst base=()=>({
+const assessBatch=(items,prior=emptySyntheticPaymentEvidenceCursor())=>
+  assessSyntheticPaymentObservationBatch(items,prior);
+
+const base=()=>({
   version:1,
   provider:"UNSET",
   credentialEnv:"NEWTON_PAYMENT_READ_TOKEN",
