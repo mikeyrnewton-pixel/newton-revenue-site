@@ -99,6 +99,7 @@ const binding=()=>({
   invoiceEventId:"ccccccec-cccc-4ccc-8ccc-cccccccccccc",
   invoiceEvidenceDigest:"c".repeat(64),
   invoicedAt:"2026-10-20T10:59:59.000Z",
+  provider:"OWNER_SELECTED_PROVIDER",
 });
 
 test("pending evidence is review-only and cannot become cleared",()=>{
@@ -199,6 +200,23 @@ test("payment observation cannot be reused across leads or invoices",()=>{
   );
 });
 
+
+test("payment observation cannot switch the selected provider",()=>{
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation({
+      ...observation("SETTLED"),
+      provider:"OTHER_PROVIDER",
+    },binding()),
+    /provider mismatch/,
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),
+      provider:"UNSET",
+    }),
+    /named expected provider/,
+  );
+});
 
 test("payment evidence cannot reuse source or invoice-stage evidence",()=>{
   for(const key of ["sourceEvidenceDigest","invoiceEvidenceDigest"]){
