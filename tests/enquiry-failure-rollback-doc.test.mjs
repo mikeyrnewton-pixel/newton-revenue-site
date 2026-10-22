@@ -43,3 +43,11 @@ test("state labels prevent PREPARED from being misreported as deployed", () => {
   for (const state of ["PREPARED", "TESTED", "VERIFIED", "DEPLOYED"])
     assert.ok(text.includes("“" + state + "”"), "missing state definition: " + state);
 });
+
+test("preview config remains a release HOLD until isolated runtime verification", () => {
+  assert.match(text, /BLOCKED_PREVIEW_CONFIG/);
+  assert.match(text, /\/api\/leads` returned \*\*HTTP 503\*\*/);
+  assert.match(text, /an \*\*isolated preview-only KV namespace and separate preview-only administrator secret\*\*/);
+  assert.match(text, /Never bind production LEADS to a preview/);
+  assert.match(text, /separate production merge\/deploy approval/);
+});
