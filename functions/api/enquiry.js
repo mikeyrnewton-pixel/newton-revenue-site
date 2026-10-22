@@ -101,6 +101,25 @@ export async function onRequestPost({ request, env, waitUntil }) {
         if (parsed.fingerprint !== fingerprint) {
           return reply({ error: "Submission reference conflicts with different enquiry details." }, 409);
         }
+        // PR43 compatibility: a receipt cannot acknowledge a lost, altered or
+        // corrupted original lead. A digest alone cannot prove intact storage.
+        // Reject without returning customer data or creating a second record.
+        const original = await env.LEADS.get("lead:" + parsed.reference, "json");
+        const originalValid = original && !Array.isArray(original) &&
+          typeof original === "object" &&
+          original.id === parsed.reference &&
+          original.submissionId === submissionId &&
+          original.contactPermission === true &&
+          typeof original.email === "string" &&
+          original.name === p.name.trim() &&
+          original.company === p.company.trim() &&
+          original.email.toLowerCase() === email.toLowerCase() &&
+          original.problem === p.problem.trim() &&
+          original.source === normalisedSource(p.source) &&
+          original.channel === normalisedChannel(p.channel);
+        if (!originalValid) {
+          return reply({ error: "Could not validate the previous enquiry. Please email us." }, 503);
+        }
         return reply({ ok: true, received: true, reference: parsed.reference }, 200);
       }
     } catch {
