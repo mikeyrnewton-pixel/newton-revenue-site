@@ -25,7 +25,7 @@ const KNOWN_CONTAINERS=Object.freeze([
   ["activepieces-worker-1","activepiecesWorker"],
   ["activepieces-postgres-1","postgres"],
   ["activepieces-redis-1","redis"],
-  ["atlas-tunnel-client","tunnelClient"],
+  ["atlas-tunnel-client-canary","tunnelClient"],
 ]);
 const safeRun=(bin,args,timeout=3500)=>{
   try {
