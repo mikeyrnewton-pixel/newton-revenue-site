@@ -372,6 +372,43 @@ test("oversized streaming bodies fail fast without waiting for upload completion
   }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
 });
 
+test("HTTP discovery methods reject smuggled parameters without snapshot access", async () => {
+  let reads = 0;
+  await withServer(async port => {
+    for (const method of ["ping", "tools/list"]) {
+      for (const valid of [
+        {jsonrpc: "2.0", id: 1, method},
+        {jsonrpc: "2.0", id: 2, method, params: {}},
+      ]) {
+        const response = await http(port, {body: valid});
+        assert.equal(response.status, 200);
+        assert.equal(response.json.error, undefined);
+        assert.equal(response.headers["cache-control"], "no-store");
+      }
+
+      for (const params of [
+        {command: "whoami"},
+        {path: "/etc/passwd"},
+        {url: "http://127.0.0.1:8080"},
+        {_meta: {injected: "sk-DO-NOT-REFLECT"}},
+        null,
+        [],
+      ]) {
+        const response = await http(port, {body: {
+          jsonrpc: "2.0", id: 3, method, params,
+        }});
+        assert.equal(response.status, 200);
+        assert.equal(response.json.error.code, -32602);
+        assert.equal(response.raw.includes("sk-DO-NOT-REFLECT"), false);
+        assert.equal(response.raw.includes("/etc/passwd"), false);
+        assert.equal(response.raw.includes("127.0.0.1:8080"), false);
+        assert.equal(response.headers["cache-control"], "no-store");
+      }
+    }
+    assert.equal(reads, 0);
+  }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
+});
+
 test("CLI cannot enable unsafe commands or start listeners without --serve", () => {
   const script = new URL("../scripts/atlas-mcp-observer.mjs", import.meta.url).pathname;
   for (const arg of ["--shell", "--deploy", "--write", "--public", "--trade"]) {
