@@ -443,3 +443,27 @@ test("tool descriptors cannot be mutated into unauthorized snapshot routes", () 
   );
   assert.equal(reads,0);
 });
+
+
+test("protocol discovery methods reject parameter smuggling without snapshot access", () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const injected = [
+    {command: "whoami"},
+    {path: "/etc/passwd"},
+    {url: "http://127.0.0.1:8080"},
+    {_meta: {injected: "sk-DO-NOT-REFLECT"}},
+    null,
+    [],
+  ];
+
+  for (const method of ["ping", "tools/list"]) {
+    assert.equal(call(method, {}, 1, deps).error, undefined);
+    for (const params of injected) {
+      const result = call(method, params, 2, deps);
+      assert.equal(result.error.code, -32602);
+      assert.equal(JSON.stringify(result).includes("sk-DO-NOT-REFLECT"), false);
+    }
+  }
+  assert.equal(reads, 0);
+});
