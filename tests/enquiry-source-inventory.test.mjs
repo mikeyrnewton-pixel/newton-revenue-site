@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {reconcileEnquirySourceInventory} from "../lib/enquiry-source-inventory.js";
 
 const zeroCounts=()=>({
@@ -20,7 +21,7 @@ const readable=(sourceId,overrides={})=>({
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
   observedCounts:zeroCounts(),
   verifiedAt:"2026-10-20T12:14:00.000Z",
-  evidenceDigest:"a".repeat(64),
+  evidenceDigest:createHash("sha256").update(sourceId).digest("hex"),
   ...overrides,
 });
 const unreadable=sourceId=>({
