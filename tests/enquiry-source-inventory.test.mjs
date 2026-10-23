@@ -103,6 +103,19 @@ test("bounded Gmail searches remain partial even when every source is readable",
   assert.equal(result.automaticBuyerPromotion,false);
 });
 
+test("bounded Gmail evidence cannot claim complete historical coverage",()=>{
+  for(const sourceId of ["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"]){
+    const input=fixture();
+    const index=input.sources.findIndex(source=>source.sourceId===sourceId);
+    input.sources[index]={...input.sources[index],coverage:"COMPLETE"};
+    assert.throws(
+      ()=>reconcileEnquirySourceInventory(input),
+      /bounded Gmail evidence must remain a search window/,
+      sourceId+" must not turn a bounded query into a historical zero",
+    );
+  }
+});
+
 test("even an exhaustive currently retained KV snapshot is not historical proof",()=>{
   const input=fixture();
   input.sources=input.sources.map(source=>readable(source.sourceId,{
