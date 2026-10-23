@@ -12,18 +12,34 @@ const zeroCounts=()=>({
   OUTBOUND_REPLY:0,
   UNKNOWN:0,
 });
-const readable=(sourceId,overrides={})=>({
-  sourceId,
-  accessState:"READ_VERIFIED",
-  coverage:"COMPLETE",
-  coverageStartedAt:"2026-10-01T00:00:00.000Z",
-  coverageEndedAt:"2026-10-20T12:13:59.000Z",
-  evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
-  observedCounts:zeroCounts(),
-  verifiedAt:"2026-10-20T12:14:00.000Z",
-  evidenceDigest:createHash("sha256").update(sourceId).digest("hex"),
-  ...overrides,
-});
+const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
+  sourceId:source.sourceId,
+  accessState:source.accessState,
+  coverage:source.coverage,
+  coverageStartedAt:source.coverageStartedAt,
+  coverageEndedAt:source.coverageEndedAt,
+  evidenceLocator:source.evidenceLocator,
+  observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
+    key,source.observedCounts[key],
+  ])),
+  verifiedAt:source.verifiedAt,
+})).digest("hex");
+const readable=(sourceId,overrides={})=>{
+  const source={
+    sourceId,
+    accessState:"READ_VERIFIED",
+    coverage:"COMPLETE",
+    coverageStartedAt:"2026-10-01T00:00:00.000Z",
+    coverageEndedAt:"2026-10-20T12:13:59.000Z",
+    evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
+    observedCounts:zeroCounts(),
+    verifiedAt:"2026-10-20T12:14:00.000Z",
+    ...overrides,
+  };
+  source.evidenceDigest=Object.hasOwn(overrides,"evidenceDigest")?
+    overrides.evidenceDigest:evidenceDigestFor(source);
+  return source;
+};
 const unreadable=sourceId=>({
   sourceId,
   accessState:"UNKNOWN_UNREADABLE",
@@ -95,6 +111,7 @@ test("readable candidate and unknown rows remain explicit unresolved classificat
     }));
   const salesDesk=input.sources.find(source=>source.sourceId==="SALES_DESK");
   salesDesk.observedCounts={...zeroCounts(),CANDIDATE:1,UNKNOWN:2};
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
   const result=reconcileEnquirySourceInventory(input);
   assert.equal(result.classificationStatus,"UNKNOWN_CLASSIFICATION_REVIEW");
   assert.equal(result.accessibleCandidateObservations,1);
@@ -108,6 +125,7 @@ test("unreadable stores cannot hide readable classification review",()=>{
   const input=fixture();
   const salesDesk=input.sources.find(source=>source.sourceId==="SALES_DESK");
   salesDesk.observedCounts={...zeroCounts(),CANDIDATE:1,UNKNOWN:2};
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
   const result=reconcileEnquirySourceInventory(input);
   assert.equal(
     result.classificationStatus,
@@ -319,3 +337,22 @@ test("one evidence snapshot cannot be counted under multiple primary sources",()
 });
 
 
+
+test("readable source digest binds counts and timestamps to the exact observation",()=>{
+  const changedCount=fixture();
+  changedCount.sources[1].observedCounts.GENUINE=1;
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(changedCount),
+    /evidence digest does not bind the exact source observation/,
+    "changing a count without re-attesting the snapshot must fail closed",
+  );
+
+  const changedVerification=fixture();
+  changedVerification.reconciledAt="2026-10-20T12:15:00.000Z";
+  changedVerification.sources[1].verifiedAt="2026-10-20T12:14:01.000Z";
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(changedVerification),
+    /evidence digest does not bind the exact source observation/,
+    "changing evidence time without re-attesting the snapshot must fail closed",
+  );
+});
