@@ -3,7 +3,8 @@ import path from "node:path";
 export const OFFICIAL_TUNNEL_IMAGE =
   "ghcr.io/openai/tunnel-client:v0.0.17";
 export const CANARY_CONTAINER_NAME = "atlas-tunnel-readonly-canary";
-export const CANARY_MCP_URL = "http://host.docker.internal:18787/mcp";
+export const CANARY_RUNTIME_CONTAINER_NAME = "atlas-mcp-readonly-canary";
+export const CANARY_MCP_URL = "http://127.0.0.1:18787/mcp";
 export const CONTAINER_KEY_PATH = "/run/secrets/openai_runtime_key";
 export const TUNNEL_ID_ENV = "CONTROL_PLANE_TUNNEL_ID";
 export const HEALTH_LISTEN_ADDR = "127.0.0.1:18080";
@@ -112,6 +113,13 @@ export function buildTunnelDockerPlan(input) {
       "--format",
       "{{.Id}} {{.Architecture}}",
     ],
+    canaryPrerequisite: {
+      requiredContainer: CANARY_RUNTIME_CONTAINER_NAME,
+      requiredServer: "atlas-mcp-tunnel-canary.mjs",
+      requiredNetworkMode: `container:${CANARY_RUNTIME_CONTAINER_NAME}`,
+      requiredHealthEndpoint: "http://127.0.0.1:18787/healthz",
+      onMissingOrUnhealthy: "HOLD_DO_NOT_START",
+    },
     runArgv: [
       "docker",
       "run",
@@ -122,6 +130,7 @@ export function buildTunnelDockerPlan(input) {
       OWNERSHIP_LABEL,
       "--pull=never",
       "--restart=no",
+      `--network=container:${CANARY_RUNTIME_CONTAINER_NAME}`,
       "--read-only",
       "--cap-drop=ALL",
       "--security-opt=no-new-privileges:true",
