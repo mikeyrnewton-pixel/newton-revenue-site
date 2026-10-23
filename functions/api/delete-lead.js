@@ -14,7 +14,7 @@ function reply(body, status = 200) {
 }
 
 export async function onRequestPost({ request, env }) {
-  if (!env.LEADS?.get || !env.LEADS?.delete ||
+  if (!env.LEADS?.get || !env.LEADS?.put || !env.LEADS?.delete ||
       typeof env.ADMIN_TOKEN !== 'string' || env.ADMIN_TOKEN.length < 24) {
     return reply({ error: 'Private erasure service is not configured.' }, 503);
   }
@@ -44,6 +44,11 @@ export async function onRequestPost({ request, env }) {
     }
     const submissionId = typeof record.submissionId === 'string' &&
       UUID.test(record.submissionId) ? record.submissionId : null;
+    // Non-PII tombstone closes the race with a notice already in flight.
+    // It expires with the original maximum personal-data retention window.
+    await env.LEADS.put('erased:' + leadId, JSON.stringify({
+      version: 1, erased: true, erasedAt: new Date().toISOString(),
+    }), { expirationTtl: 30 * 24 * 60 * 60 });
     // Lead remains available until ancillary deletions finish, making a
     // partial KV failure safely retryable without orphaning the receipt ID.
     if (submissionId) await env.LEADS.delete('receipt:' + submissionId);
