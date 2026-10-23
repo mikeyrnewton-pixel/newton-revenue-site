@@ -120,6 +120,32 @@ test("invalid observer clocks fail closed instead of marking a snapshot fresh", 
   }
 });
 
+test("invalid clocks stay bounded through MCP function and HTTP boundaries", async () => {
+  const positive = status({now: () => NOW});
+  assert.equal(positive.status, "FRESH");
+  assert.equal(positive.state.activepiecesHttp, "HTTP_200");
+
+  for (const invalidNow of [NaN, Infinity, -Infinity]) {
+    const observed = status({now: () => invalidNow});
+    assert.deepEqual(observed, {schema: SNAPSHOT_SCHEMA, status: "INVALID"});
+    assert.equal(Object.hasOwn(observed, "capturedAt"), false);
+    assert.equal(Object.hasOwn(observed, "state"), false);
+  }
+
+  await withServer(async port => {
+    const response = await http(port, {body: {
+      jsonrpc: "2.0", id: 77, method: "tools/call",
+      params: {name: "atlas_status", arguments: {}},
+    }});
+    assert.equal(response.status, 200);
+    const observed = JSON.parse(response.json.result.content[0].text);
+    assert.deepEqual(observed, {schema: SNAPSHOT_SCHEMA, status: "INVALID"});
+    assert.equal(response.raw.includes("capturedAt"), false);
+    assert.equal(response.raw.includes("RUNNING_HEALTHY"), false);
+    assert.equal(response.raw.includes("HTTP_200"), false);
+  }, {readSnapshot: snap, now: () => Infinity});
+});
+
 test("snapshot states are FRESH, STALE, CLOCK_SKEW, or INVALID as appropriate", () => {
   const s = snap();
   assert.equal(assessSnapshot(s,NOW).status,"FRESH");
