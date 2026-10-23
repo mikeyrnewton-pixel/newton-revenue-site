@@ -18,7 +18,11 @@ export const PING_REPLY = "ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS";
 const MAX_REQUEST_BYTES = 8192;
 const PROTOCOL = "2025-03-26";
 const SUPPORTED = new Set(["2024-11-05", PROTOCOL, "2025-06-18"]);
-const TOOL_SCHEMA = Object.freeze({type: "object", properties: {}, additionalProperties: false});
+const TOOL_SCHEMA = Object.freeze({
+  type: "object",
+  properties: Object.freeze({}),
+  additionalProperties: false,
+});
 const CAPABILITIES = Object.freeze({
   schema: "atlas.observer.capabilities.v1",
   mode: "READ_ONLY_SANITIZED_SNAPSHOT",
@@ -33,9 +37,9 @@ const CAPABILITIES = Object.freeze({
   writeActions: false,
 });
 const TOOLS = Object.freeze([
-  {name: "atlas_ping", description: "Returns a fixed harmless connectivity token; no Mac access.", inputSchema: TOOL_SCHEMA},
-  {name: "atlas_capabilities", description: "Returns the observer's fixed read-only scope and explicit denied capabilities. No snapshot or Mac access.", inputSchema: TOOL_SCHEMA},
-  {name: "atlas_status", description: "Reads only a pre-generated, freshness-checked, allowlisted Mac health snapshot. No commands, identifiers or customer data.", inputSchema: TOOL_SCHEMA},
+  Object.freeze({name: "atlas_ping", description: "Returns a fixed harmless connectivity token; no Mac access.", inputSchema: TOOL_SCHEMA}),
+  Object.freeze({name: "atlas_capabilities", description: "Returns the observer's fixed read-only scope and explicit denied capabilities. No snapshot or Mac access.", inputSchema: TOOL_SCHEMA}),
+  Object.freeze({name: "atlas_status", description: "Reads only a pre-generated, freshness-checked, allowlisted Mac health snapshot. No commands, identifiers or customer data.", inputSchema: TOOL_SCHEMA}),
 ]);
 const reply = (id, result) => ({jsonrpc: "2.0", id, result});
 const error = (id, code, message) => ({jsonrpc: "2.0", id, error: {code, message}});
