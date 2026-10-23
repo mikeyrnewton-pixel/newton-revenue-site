@@ -376,10 +376,20 @@ test("payment batch emits a frozen cumulative replay cursor",()=>{
     synthetic:true,
     observationIds:[observation("SETTLED").observationId],
     evidenceDigests:[observation("SETTLED").evidenceDigest],
+    providerTransactions:[{
+      providerTransactionDigest:"d".repeat(64),
+      sourceRecordId:observation("SETTLED").sourceRecordId,
+      invoiceEventId:observation("SETTLED").invoiceEventId,
+      provider:observation("SETTLED").provider,
+      observedAt:observation("SETTLED").observedAt,
+      status:"SETTLED",
+    }],
   });
   assert.ok(Object.isFrozen(result.reconciliationCursor));
   assert.ok(Object.isFrozen(result.reconciliationCursor.observationIds));
   assert.ok(Object.isFrozen(result.reconciliationCursor.evidenceDigests));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.providerTransactions));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.providerTransactions[0]));
 });
 
 test("prior reconciliation cursor blocks cross-batch observation replay",()=>{
@@ -428,7 +438,57 @@ test("new evidence can update a prior provider transaction without replay",()=>{
   assert.equal(second.candidates[0].state,"CLEARED_EVIDENCE_REVIEW");
   assert.equal(second.reconciliationCursor.observationIds.length,2);
   assert.equal(second.reconciliationCursor.evidenceDigests.length,2);
+  assert.equal(second.reconciliationCursor.providerTransactions.length,1);
+  assert.equal(second.reconciliationCursor.providerTransactions[0].status,"SETTLED");
   assert.equal(second.clearedEvidenceGBP,0);
+});
+
+test("provider transaction ownership and lifecycle persist across batches",()=>{
+  const settled=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }]);
+  const nextObservation={
+    ...observation("PENDING"),
+    observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    observedAt:"2026-10-20T11:05:00.000Z",
+    evidenceDigest:"e".repeat(64),
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:{
+        ...nextObservation,
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      },
+    }],settled.reconciliationCursor),
+    /ownership changed across batches/,
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:nextObservation,
+      expectedBinding:binding(),
+    }],settled.reconciliationCursor),
+    /status regressed across batches/,
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:{
+        ...nextObservation,
+        status:"REFUNDED",
+        observedAt:"2026-10-20T10:59:59.000Z",
+      },
+      expectedBinding:binding(),
+    }],settled.reconciliationCursor),
+    /timeline moved backwards across batches/,
+  );
 });
 
 test("malformed or omitted prior cursor fails closed",()=>{
@@ -470,6 +530,7 @@ test("cursor capacity fails closed before emitting an unusable next cursor",()=>
     synthetic:true,
     observationIds:[],
     evidenceDigests:fullEvidence,
+    providerTransactions:[],
   };
   assert.throws(
     ()=>assessBatch([{
