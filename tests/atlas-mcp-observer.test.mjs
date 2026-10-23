@@ -141,11 +141,17 @@ test("no caller may select a filesystem path; fixed size and fixed destination",
   assert.equal(readSnapshotFile(),null); // File does not exist in offline fixture.
 });
 
-test("only ping and atlas_status, both reject every parameter", () => {
+test("only fixed read-only tools are listed and every tool rejects parameters", () => {
   const names = call("tools/list").result.tools.map(t => t.name);
-  assert.deepEqual(names,["atlas_ping","atlas_status"]);
-  assert.deepEqual(call("tools/list").result.tools.map(t=>t.inputSchema.additionalProperties),[false,false]);
+  assert.deepEqual(names,["atlas_ping","atlas_capabilities","atlas_status"]);
+  assert.deepEqual(call("tools/list").result.tools.map(t=>t.inputSchema.additionalProperties),[false,false,false]);
   assert.equal(call("tools/call",{name:"atlas_ping"}).result.content[0].text,PING_REPLY);
+  const capabilities=JSON.parse(call("tools/call",{name:"atlas_capabilities"}).result.content[0].text);
+  assert.deepEqual(capabilities.tools,names);
+  assert.equal(capabilities.mode,"READ_ONLY_SANITIZED_SNAPSHOT");
+  assert.equal(capabilities.snapshotMaxAgeSeconds,300);
+  for(const denied of ["macShell","filesystemBrowse","dockerControl","activepiecesAccess",
+    "customerDataAccess","financialAccess","writeActions"]) assert.equal(capabilities[denied],false,denied);
   assert.equal(status().status,"FRESH");
   for (const args of [null,[],{command:"whoami"},{path:"/etc/passwd"}, {url:"http://localhost"}]) {
     assert.equal(call("tools/call",{name:"atlas_status",arguments:args}).error.code,-32602);
@@ -161,7 +167,9 @@ test("denied routes never read snapshot (including ping)", () => {
   for(const name of ["run_shell", "ap_delete_flow", "atlas_restart", "atlas_trade", "atlas_statusx"])
     assert.equal(call("tools/call",{name,arguments:{}},1,deps).error.code,-32602);
   assert.equal(call("tools/call",{name:"atlas_ping",arguments:{}},1,deps).result.content[0].text,PING_REPLY);
-  assert.equal(call("tools/list",{},1,deps).result.tools.length,2);
+  const capabilities=call("tools/call",{name:"atlas_capabilities",arguments:{}},1,deps);
+  assert.equal(JSON.parse(capabilities.result.content[0].text).writeActions,false);
+  assert.equal(call("tools/list",{},1,deps).result.tools.length,3);
   assert.equal(call("resources/list",{},1,deps).error.code,-32601);
   assert.equal(called,0);
 });
@@ -202,7 +210,7 @@ test("server is restricted to private loopback and a fixed port", () => {
 test("HTTP live server safely returns tool list and sanitized status", async () => {
   await withServer(async port => {
     const list=await http(port,{body:{jsonrpc:"2.0",id:1,method:"tools/list",params:{}}});
-    assert.deepEqual(list.json.result.tools.map(t=>t.name),["atlas_ping","atlas_status"]);
+    assert.deepEqual(list.json.result.tools.map(t=>t.name),["atlas_ping","atlas_capabilities","atlas_status"]);
     const result=await http(port,{body:{jsonrpc:"2.0",id:2,method:"tools/call",params:{name:"atlas_status",arguments:{}}}});
     assert.equal(result.status,200);
     const parsed=JSON.parse(result.json.result.content[0].text);
