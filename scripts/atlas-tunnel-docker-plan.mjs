@@ -7,6 +7,7 @@ export const CANARY_MCP_URL = "http://host.docker.internal:18787/mcp";
 export const CONTAINER_KEY_PATH = "/run/secrets/openai_runtime_key";
 export const TUNNEL_ID_ENV = "CONTROL_PLANE_TUNNEL_ID";
 export const HEALTH_LISTEN_ADDR = "127.0.0.1:18080";
+export const OWNERSHIP_LABEL = "com.newton.atlas.tunnel-canary=v1";
 
 const REQUIRED_KEYS = Object.freeze([
   "version",
@@ -57,7 +58,8 @@ function validateRuntimeKeyPath(value) {
 
 function deepFreezePlan(plan) {
   for (const value of Object.values(plan)) {
-    if (Array.isArray(value)) Object.freeze(value);
+    if (Array.isArray(value) ||
+        (value && typeof value === "object")) Object.freeze(value);
   }
   return Object.freeze(plan);
 }
@@ -116,6 +118,8 @@ export function buildTunnelDockerPlan(input) {
       "--rm",
       "--name",
       input.containerName,
+      "--label",
+      OWNERSHIP_LABEL,
       "--pull=never",
       "--restart=no",
       "--read-only",
@@ -133,6 +137,20 @@ export function buildTunnelDockerPlan(input) {
       `--mcp.server-url=${input.mcpServerUrl}`,
       `--health.listen-addr=${input.healthListenAddr}`,
     ],
+    stopInspectArgv: [
+      "docker",
+      "container",
+      "inspect",
+      input.containerName,
+      "--format",
+      "{{.Config.Image}} {{index .Config.Labels \"com.newton.atlas.tunnel-canary\"}}",
+    ],
+    stopGuard: {
+      requiredContainerName: input.containerName,
+      requiredImage: input.image,
+      requiredOwnershipLabel: OWNERSHIP_LABEL,
+      onMismatch: "HOLD_DO_NOT_STOP",
+    },
     stopArgv: [
       "docker",
       "stop",
