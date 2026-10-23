@@ -120,9 +120,9 @@ export function createCanaryServer(){
 export function startCanary({host=DEFAULT_HOST,port=DEFAULT_PORT}={}){
   if(!Number.isInteger(port)||port<1024||port>65535)
     throw Error("Unsafe port");
-  // Owner can use 0.0.0.0 only in a private Docker network or other verified
-  // network boundary; script CLI defaults to localhost.
-  if(!["127.0.0.1","0.0.0.0"].includes(host))
+  // Never widen the host process to all interfaces. Container reachability
+  // requires a separately reviewed private bridge or an in-container canary.
+  if(host!==DEFAULT_HOST)
     throw Error("Unapproved bind address");
   const server=createCanaryServer();
   server.listen(port,host,()=>{
