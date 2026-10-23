@@ -326,6 +326,17 @@ test("readable source evidence must be fresh at reconciliation time",()=>{
 });
 
 
+test("evidence locator must remain scoped to its declared source",()=>{
+  const input=fixture();
+  const personal=input.sources.find(source=>source.sourceId==="PERSONAL_GMAIL");
+  personal.evidenceLocator="private://newton-revenue-gmail/personal-window";
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /evidence locator must be scoped to its declared source/,
+  );
+});
+
 test("one evidence snapshot cannot be counted under multiple primary sources",()=>{
   const duplicateLocator=fixture();
   duplicateLocator.sources[2]={
