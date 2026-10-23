@@ -46,7 +46,9 @@ const exactKeys = (value, allowed) => validRecord(value) &&
 
 /** Denied methods and unauthorized tools never call readSnapshot. */
 export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now = Date.now} = {}) {
-  if (!validRecord(message)) return error(null, -32600, "Invalid request");
+  if (!validRecord(message) ||
+      !Object.keys(message).every(key => ["jsonrpc", "id", "method", "params"].includes(key)))
+    return error(null, -32600, "Invalid request");
   const hasId = Object.hasOwn(message, "id");
   const id = hasId ? message.id : null;
   const validId = !hasId || typeof id === "string" ||
