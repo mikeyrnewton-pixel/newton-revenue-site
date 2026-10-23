@@ -376,6 +376,8 @@ test("payment batch emits a frozen cumulative replay cursor",()=>{
     synthetic:true,
     observationIds:[observation("SETTLED").observationId],
     evidenceDigests:[observation("SETTLED").evidenceDigest],
+    sourceEvidenceDigests:[binding().sourceEvidenceDigest],
+    invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
     providerTransactions:[{
       providerTransactionDigest:"d".repeat(64),
       sourceRecordId:observation("SETTLED").sourceRecordId,
@@ -388,6 +390,8 @@ test("payment batch emits a frozen cumulative replay cursor",()=>{
   assert.ok(Object.isFrozen(result.reconciliationCursor));
   assert.ok(Object.isFrozen(result.reconciliationCursor.observationIds));
   assert.ok(Object.isFrozen(result.reconciliationCursor.evidenceDigests));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.sourceEvidenceDigests));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.invoiceEvidenceDigests));
   assert.ok(Object.isFrozen(result.reconciliationCursor.providerTransactions));
   assert.ok(Object.isFrozen(result.reconciliationCursor.providerTransactions[0]));
 });
@@ -640,6 +644,61 @@ test("payment and provider-transaction digest roles remain disjoint",()=>{
   );
 });
 
+test("commercial evidence roles remain disjoint across payment batches",()=>{
+  const firstItem={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  };
+  const first=assessBatch([firstItem]);
+  const sourceRecordId="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const invoiceEventId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const distinct={
+    providerTransactionDigest:"f".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      sourceRecordId,
+      invoiceEventId,
+      evidenceDigest:"3".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId,
+      invoiceEventId,
+      sourceEvidenceDigest:"1".repeat(64),
+      invoiceEvidenceDigest:"2".repeat(64),
+    },
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      ...distinct,
+      observation:{
+        ...distinct.observation,
+        evidenceDigest:firstItem.expectedBinding.sourceEvidenceDigest,
+      },
+    }],first.reconciliationCursor),
+    /payment evidence digest reused from commercial binding/,
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      ...distinct,
+      providerTransactionDigest:firstItem.expectedBinding.invoiceEvidenceDigest,
+    }],first.reconciliationCursor),
+    /provider transaction digest reused from commercial binding/,
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      ...distinct,
+      expectedBinding:{
+        ...distinct.expectedBinding,
+        sourceEvidenceDigest:firstItem.observation.evidenceDigest,
+      },
+    }],first.reconciliationCursor),
+    /source evidence digest reused from payment evidence/,
+  );
+});
+
 test("malformed or omitted prior cursor fails closed",()=>{
   const item=[{
     providerTransactionDigest:"d".repeat(64),
@@ -679,6 +738,8 @@ test("cursor capacity fails closed before emitting an unusable next cursor",()=>
     synthetic:true,
     observationIds:[],
     evidenceDigests:fullEvidence,
+    sourceEvidenceDigests:[],
+    invoiceEvidenceDigests:[],
     providerTransactions:[],
   };
   assert.throws(
