@@ -19,6 +19,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   coverageStartedAt:source.coverageStartedAt,
   coverageEndedAt:source.coverageEndedAt,
   evidenceLocator:source.evidenceLocator,
+  searchScope:source.searchScope,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
     key,source.observedCounts[key],
   ])),
@@ -32,6 +33,8 @@ const readable=(sourceId,overrides={})=>{
     coverageStartedAt:"2026-10-01T00:00:00.000Z",
     coverageEndedAt:"2026-10-20T12:13:59.000Z",
     evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
+    searchScope:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+      "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
     ...overrides,
@@ -47,6 +50,7 @@ const unreadable=sourceId=>({
   coverageStartedAt:null,
   coverageEndedAt:null,
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
+  searchScope:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
   evidenceDigest:null,
@@ -393,5 +397,26 @@ test("aggregate source counts cannot overflow the safe integer range",()=>{
     ()=>reconcileEnquirySourceInventory(input),
     /GENUINE aggregate count exceeds safe integer range/,
     "individually valid source counts must not produce a rounded aggregate",
+  );
+});
+
+
+test("bounded Gmail evidence cannot narrow the sender or category scope",()=>{
+  const narrowed=fixture();
+  narrowed.sources[1].searchScope="KNOWN_SENDERS_ONLY";
+  narrowed.sources[1].evidenceDigest=evidenceDigestFor(narrowed.sources[1]);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(narrowed),
+    /source search scope must be complete and allowlisted/,
+    "a filtered zero-result query cannot support a source-wide zero",
+  );
+
+  const nonGmailScope=fixture();
+  const salesDesk=nonGmailScope.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.searchScope="INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH";
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmailScope),
+    /source search scope must be complete and allowlisted/,
   );
 });
