@@ -116,14 +116,17 @@ test("bounded Gmail evidence cannot claim complete historical coverage",()=>{
   }
 });
 
-test("even an exhaustive currently retained KV snapshot is not historical proof",()=>{
+test("retained KV plus bounded Gmail still cannot prove complete history",()=>{
   const input=fixture();
-  input.sources=input.sources.map(source=>readable(source.sourceId,{
-    coverage:source.sourceId==="CLOUDFLARE_KV"?"RETENTION_WINDOW":"COMPLETE",
-  }));
+  input.sources=input.sources.map(source=>
+    source.accessState==="READ_VERIFIED"?source:readable(source.sourceId,{
+      coverage:source.sourceId==="CLOUDFLARE_KV"?"RETENTION_WINDOW":"COMPLETE",
+    }));
   const result=reconcileEnquirySourceInventory(input);
   assert.equal(result.classificationStatus,"PARTIAL_COVERAGE_DEDUPE_REQUIRED");
-  assert.deepEqual(result.partialCoverageSources,["CLOUDFLARE_KV"]);
+  assert.deepEqual(result.partialCoverageSources,[
+    "CLOUDFLARE_KV","NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL",
+  ]);
   assert.equal(result.genuineEnquiries,null);
   assert.equal(result.historicalEnquiryCount,null);
   assert.equal(result.automaticBuyerPromotion,false);
