@@ -40,6 +40,9 @@ const TOOLS = Object.freeze([
 const reply = (id, result) => ({jsonrpc: "2.0", id, result});
 const error = (id, code, message) => ({jsonrpc: "2.0", id, error: {code, message}});
 const validRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const exactKeys = (value, allowed) => validRecord(value) &&
+  Object.keys(value).every(key => allowed.includes(key)) &&
+  allowed.filter(key => Object.hasOwn(value, key)).length === Object.keys(value).length;
 
 /** Denied methods and unauthorized tools never call readSnapshot. */
 export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now = Date.now} = {}) {
@@ -63,7 +66,11 @@ export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now
   if (message.method === "ping") return reply(id, {});
   if (message.method === "tools/list") return reply(id, {tools: TOOLS});
   if (message.method !== "tools/call") return error(id, -32601, "Method not available");
-  if (!validRecord(message.params) ||
+  // Accept only the MCP tool name and optional zero-argument object. Ignoring
+  // extra command/path/URL/schema fields would create a fail-open boundary if
+  // future code ever started consuming them.
+  if (!exactKeys(message.params, ["name", "arguments"]) ||
+      typeof message.params.name !== "string" ||
       !TOOLS.some(tool => tool.name === message.params.name)) return error(id, -32602, "Tool not allowed");
   const args = message.params.arguments === undefined ? {} : message.params.arguments;
   if (!validRecord(args) || Object.keys(args).length !== 0)
