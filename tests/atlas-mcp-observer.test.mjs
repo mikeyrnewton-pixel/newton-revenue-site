@@ -324,3 +324,25 @@ test("CLI cannot enable unsafe commands or start listeners without --serve", () 
     assert.equal(p.stdout,"");
   }
 });
+
+
+test("tool descriptors cannot be mutated into unauthorized snapshot routes", () => {
+  let reads=0;
+  const deps={readSnapshot:()=>{reads++;return snap();},now:()=>NOW};
+  const listed=call("tools/list",{},1,deps).result.tools;
+  assert.equal(Object.isFrozen(listed),true);
+  assert.equal(Object.isFrozen(listed[0]),true);
+  assert.equal(Object.isFrozen(listed[0].inputSchema),true);
+  assert.equal(Object.isFrozen(listed[0].inputSchema.properties),true);
+  assert.throws(()=>{listed[0].name="run_shell";},TypeError);
+  assert.throws(()=>{listed[0].inputSchema.properties.command={type:"string"};},TypeError);
+  assert.deepEqual(
+    call("tools/list",{},1,deps).result.tools.map(tool=>tool.name),
+    ["atlas_ping","atlas_capabilities","atlas_status"],
+  );
+  assert.equal(
+    call("tools/call",{name:"run_shell",arguments:{}},1,deps).error.code,
+    -32602,
+  );
+  assert.equal(reads,0);
+});
