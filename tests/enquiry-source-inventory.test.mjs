@@ -199,7 +199,18 @@ test("readable counts require a canonical bounded evidence window",()=>{
     coverageEndedAt:"2026-10-01T00:00:00.000Z",
   };
   assert.throws(()=>reconcileEnquirySourceInventory(backwards),
-    /coverage window cannot move backwards/);
+    /coverage window must be non-empty and move forwards/);
+
+  const emptyWindow=fixture();
+  emptyWindow.sources[1]={
+    ...emptyWindow.sources[1],
+    coverageStartedAt:emptyWindow.sources[1].coverageEndedAt,
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(emptyWindow),
+    /coverage window must be non-empty and move forwards/,
+    "a zero-duration query cannot support a verified source count",
+  );
 
   const future=fixture();
   future.sources[1]={
