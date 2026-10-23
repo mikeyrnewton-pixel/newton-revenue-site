@@ -85,6 +85,23 @@ test("authenticated reply to prior outreach cannot become a genuine enquiry",()=
   assert.equal(result.automaticBuyerPromotion,false);
 });
 
+test("readable candidate and unknown rows remain explicit unresolved classifications",()=>{
+  const input=fixture();
+  input.sources=input.sources.map(source=>
+    source.accessState==="READ_VERIFIED"?source:readable(source.sourceId,{
+      coverage:source.sourceId==="CLOUDFLARE_KV"?"RETENTION_WINDOW":"COMPLETE",
+    }));
+  const salesDesk=input.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.observedCounts={...zeroCounts(),CANDIDATE:1,UNKNOWN:2};
+  const result=reconcileEnquirySourceInventory(input);
+  assert.equal(result.classificationStatus,"UNKNOWN_CLASSIFICATION_REVIEW");
+  assert.equal(result.accessibleCandidateObservations,1);
+  assert.equal(result.accessibleUnknownObservations,2);
+  assert.equal(result.unresolvedAccessibleClassifications,3);
+  assert.equal(result.genuineEnquiries,null);
+  assert.equal(result.automaticBuyerPromotion,false);
+});
+
 test("bounded Gmail searches remain partial even when every source is readable",()=>{
   const input=fixture();
   input.sources=input.sources.map(source=>
