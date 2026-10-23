@@ -18,8 +18,8 @@ The new scripts/atlas-mcp-tunnel-canary.mjs exposes one MCP tool, atlas_ping, re
 
 1. OWNER approves staging canary code on Mac and manual local process start, then separately approves official tunnel runtime and ChatGPT plugin attach. All existing live services stay unchanged.
 2. Stage reviewed source from a PINNED commit, verify integrity, no curl-to-shell. Do not transfer the key or tunnel credentials via chat, GitHub, or persistent Shortcut script text.
-3. Manually run the canary local-only, verify harmless health output on Mac, then verify the Docker tunnel client can privately reach the canary by host.docker.internal. Do not broaden network bind or open firewall merely to make it work; use an owner-reviewed isolated Docker network alternative if localhost cannot be reached from container.
-4. Use existing official ghcr.io/openai/tunnel-client:v0.0.17 image, no auto-restart. Mount the existing restricted key file READ-ONLY and use the officially documented control-plane.api-key=file: flag. No secrets in command arguments/environment, logs or screenshots; do not bind port 8080 because Activepieces already uses it.
+3. **Network correction:** Mac process loopback is not assumed reachable from Docker Desktop host.docker.internal. Start a separate read-only canary Docker container with **no published ports**. Keep the server bound to 127.0.0.1 inside the canary container. Later run the official tunnel client with `--network=container:atlas-mcp-readonly-canary` and `--mcp.server-url=http://127.0.0.1:18787/mcp` so both containers share the same private network namespace. Never widen the bind address or use host networking.
+4. Use existing official ghcr.io/openai/tunnel-client:v0.0.17 image, no auto-restart and no host ports, sharing only the owner-verified canary container network namespace. Mount the existing restricted key file READ-ONLY and use the officially documented control-plane.api-key=file: flag. No secrets in command arguments/environment, logs or screenshots; do not bind port 8080 because Activepieces already uses it.
 5. Attach EXISTING OpenAI tunnel in ChatGPT custom MCP plugin only after confirming it lists EXACTLY atlas_ping. Any other tools, especially write-capable actions, means STOP. First successful real ChatGPT tool call returning the fixed canary token and corroborated connection logs is first proof of LIVE_VERIFIED_CANARY.
 6. Separate future owner approval is required to expose any real Activepieces workflows, only after audit and enforcement of read-only MCP tools/authentication/consent. Canary is NOT Mac or business-workflow control.
 
@@ -35,3 +35,7 @@ Official docs:
 - https://github.com/openai/tunnel-client/blob/master/docs/permissions.md
 
 Draft review only. Keep PR unmerged until the owner approves a safe release.
+
+## 23 October network correction
+
+The old `http://host.docker.internal:18787/mcp` assumed that a Mac-only loopback listener could be reached from Docker Desktop and is NOT established. New offline review code uses only `http://127.0.0.1:18787/mcp` in the tunnel client **after sharing the verified canary container network namespace**. The canary container must have no published host ports, must run a verified read-only script without secrets, and must be privately healthy before any owner-approved tunnel activation. Do not claim connection from source/CI evidence; only a real authenticated ChatGPT tool call proves it.
