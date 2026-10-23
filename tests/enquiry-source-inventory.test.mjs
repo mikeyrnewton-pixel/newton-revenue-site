@@ -184,6 +184,17 @@ test("counts and evidence must be bounded and canonical",()=>{
   assert.throws(()=>reconcileEnquirySourceInventory(badDigest),
     /SHA-256 evidence digest/);
 
+  const uppercaseDigest=fixture();
+  uppercaseDigest.sources[1]={
+    ...uppercaseDigest.sources[1],
+    evidenceDigest:uppercaseDigest.sources[1].evidenceDigest.toUpperCase(),
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(uppercaseDigest),
+    /SHA-256 evidence digest/,
+    "uppercase digest aliases must fail at the source inventory boundary",
+  );
+
   const extra=fixture();
   extra.ownerEmail="person@example.com";
   assert.throws(()=>reconcileEnquirySourceInventory(extra),
