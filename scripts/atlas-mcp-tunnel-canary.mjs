@@ -84,7 +84,7 @@ export function handleMcp(message){
   return jsonError(id,-32601,"Method not available");
 }
 export function createCanaryServer(){
-  return createServer((req,res)=>{
+  const server=createServer((req,res)=>{
     // Even a health check is fixed text and never reads local state.
     if(req.method==="GET"&&req.url==="/healthz")
       return json(res,200,{status:"READY_FOR_LOCAL_TEST_ONLY"});
@@ -119,6 +119,13 @@ export function createCanaryServer(){
       return json(res,200,answer);
     });
   });
+  // Bound idle/slow clients before this localhost-only canary is ever tunnelled.
+  server.requestTimeout=5000;
+  server.headersTimeout=5000;
+  server.keepAliveTimeout=1000;
+  server.maxRequestsPerSocket=20;
+  server.maxHeadersCount=32;
+  return server;
 }
 export function startCanary({host=DEFAULT_HOST,port=DEFAULT_PORT}={}){
   if(!Number.isInteger(port)||port<1024||port>65535)
