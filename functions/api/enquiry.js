@@ -69,6 +69,12 @@ export async function onRequestPost({ request, env, waitUntil }) {
     ? p.submissionId.toLowerCase() : null;
   if (submissionId && typeof env.LEADS.get === "function") {
     try {
+      // A stale browser retry must not recreate an enquiry after an
+      // authorised erasure removed its receipt and personal-data record.
+      const erased = await env.LEADS.get("erased-submission:" + submissionId);
+      if (erased) {
+        return reply({ error: "This enquiry was erased. Refresh before submitting a new enquiry." }, 410);
+      }
       const receipt = await env.LEADS.get("receipt:" + submissionId);
       if (receipt) {
         // Receipts are only an acknowledgement of the SAME enquiry.
