@@ -47,6 +47,8 @@ const validRecord = value => value !== null && typeof value === "object" && !Arr
 const exactKeys = (value, allowed) => validRecord(value) &&
   Object.keys(value).every(key => allowed.includes(key)) &&
   allowed.filter(key => Object.hasOwn(value, key)).length === Object.keys(value).length;
+const emptyParams = value => value === undefined ||
+  (validRecord(value) && Object.keys(value).length === 0);
 
 /** Denied methods and unauthorized tools never call readSnapshot. */
 export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now = Date.now} = {}) {
@@ -69,8 +71,10 @@ export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now
       instructions: "Read-only snapshot prototype. No remote Mac control or workflow access.",
     });
   }
-  if (message.method === "ping") return reply(id, {});
-  if (message.method === "tools/list") return reply(id, {tools: TOOLS});
+  if (message.method === "ping")
+    return emptyParams(message.params) ? reply(id, {}) : error(id, -32602, "Parameters not allowed");
+  if (message.method === "tools/list")
+    return emptyParams(message.params) ? reply(id, {tools: TOOLS}) : error(id, -32602, "Parameters not allowed");
   if (message.method !== "tools/call") return error(id, -32601, "Method not available");
   // Accept only the MCP tool name and optional zero-argument object. Ignoring
   // extra command/path/URL/schema fields would create a fail-open boundary if
