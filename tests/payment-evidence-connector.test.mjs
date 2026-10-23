@@ -572,6 +572,74 @@ test("malformed cursor rejects historical duplicate invoice ownership",()=>{
   );
 });
 
+test("payment and provider-transaction digest roles remain disjoint",()=>{
+  const firstItem={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  };
+  const first=assessBatch([firstItem]);
+  const distinctItem={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"1".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      sourceEvidenceDigest:"2".repeat(64),
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      invoiceEvidenceDigest:"3".repeat(64),
+    },
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      ...distinctItem,
+      providerTransactionDigest:firstItem.observation.evidenceDigest,
+    }],first.reconciliationCursor),
+    /provider transaction digest reused from payment evidence/,
+    "later transaction identity cannot reuse earlier observation evidence",
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      ...distinctItem,
+      observation:{
+        ...distinctItem.observation,
+        evidenceDigest:firstItem.providerTransactionDigest,
+      },
+    }],first.reconciliationCursor),
+    /payment evidence digest reused as provider transaction/,
+    "later observation evidence cannot reuse earlier transaction identity",
+  );
+  assert.throws(
+    ()=>assessBatch([
+      firstItem,
+      {...distinctItem,providerTransactionDigest:firstItem.observation.evidenceDigest},
+    ]),
+    /provider transaction digest reused from payment evidence/,
+    "same-batch transaction identity cannot reuse earlier observation evidence",
+  );
+  assert.throws(
+    ()=>assessBatch([
+      firstItem,
+      {
+        ...distinctItem,
+        observation:{
+          ...distinctItem.observation,
+          evidenceDigest:firstItem.providerTransactionDigest,
+        },
+      },
+    ]),
+    /payment evidence digest reused as provider transaction/,
+    "same-batch observation evidence cannot reuse earlier transaction identity",
+  );
+});
+
 test("malformed or omitted prior cursor fails closed",()=>{
   const item=[{
     providerTransactionDigest:"d".repeat(64),
