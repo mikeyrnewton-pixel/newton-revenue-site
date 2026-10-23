@@ -99,6 +99,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const record = {
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
+    ...(submissionId ? { submissionId } : {}),
     source,
     channel,
     name: p.name.trim(),
