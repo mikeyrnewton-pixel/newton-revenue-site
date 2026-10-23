@@ -1072,3 +1072,46 @@ test("historical cursor rejects unowned commercial evidence digests",()=>{
   );
 });
 
+
+
+test("historical provider bindings are copied and frozen before cursor reuse",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const mutableHistoricalBinding={
+    ...first.reconciliationCursor.providerTransactions[0],
+  };
+  const prior={
+    ...first.reconciliationCursor,
+    providerTransactions:[mutableHistoricalBinding],
+  };
+  const sourceRecordId="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const invoiceEventId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const next=assessBatch([{
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      sourceRecordId,
+      invoiceEventId,
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"1".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId,
+      sourceEvidenceDigest:"2".repeat(64),
+      invoiceEventId,
+      invoiceEvidenceDigest:"3".repeat(64),
+    },
+  }],prior);
+  const retained=next.reconciliationCursor.providerTransactions.find(
+    item=>item.providerTransactionDigest==="d".repeat(64),
+  );
+  assert.notStrictEqual(retained,mutableHistoricalBinding);
+  assert.equal(Object.isFrozen(retained),true);
+  mutableHistoricalBinding.sourceRecordId="11111111-1111-4111-8111-111111111111";
+  assert.equal(retained.sourceRecordId,observation("PENDING").sourceRecordId);
+});
