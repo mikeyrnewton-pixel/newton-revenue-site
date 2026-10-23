@@ -57,6 +57,7 @@ export function makeSnapshot(raw, capturedAt = new Date().toISOString()) {
 
 /** Refuse stale / future / malformed / foreign snapshots and never echo input. */
 export function assessSnapshot(value, now = Date.now()) {
+  if (!Number.isFinite(now)) return fail("INVALID");
   if (!isRecord(value) || value.schema !== SNAPSHOT_SCHEMA ||
       typeof value.capturedAt !== "string" ||
       !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value.capturedAt) ||
