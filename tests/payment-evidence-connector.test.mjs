@@ -988,4 +988,87 @@ test("cursor capacity fails closed before emitting an unusable next cursor",()=>
   );
 });
 
+test("source evidence digest ownership persists across payment transactions",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const sourceRecordId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const invoiceEventId="ffffffff-ffff-4fff-8fff-ffffffffffff";
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"e".repeat(64),
+      observation:{
+        ...observation("PENDING"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        sourceRecordId,
+        invoiceEventId,
+        observedAt:"2026-10-20T11:05:00.000Z",
+        evidenceDigest:"1".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId,
+        sourceEvidenceDigest:binding().sourceEvidenceDigest,
+        invoiceEventId,
+        invoiceEvidenceDigest:"2".repeat(64),
+      },
+    }],first.reconciliationCursor),
+    /source evidence digest already bound to another source record/,
+  );
+});
+
+test("invoice evidence digest ownership persists across payment transactions",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const sourceRecordId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const invoiceEventId="ffffffff-ffff-4fff-8fff-ffffffffffff";
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"e".repeat(64),
+      observation:{
+        ...observation("PENDING"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        sourceRecordId,
+        invoiceEventId,
+        observedAt:"2026-10-20T11:05:00.000Z",
+        evidenceDigest:"1".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId,
+        sourceEvidenceDigest:"2".repeat(64),
+        invoiceEventId,
+        invoiceEvidenceDigest:binding().invoiceEvidenceDigest,
+      },
+    }],first.reconciliationCursor),
+    /invoice evidence digest already bound to another invoice event/,
+  );
+});
+
+test("historical cursor rejects unowned commercial evidence digests",()=>{
+  const item=[{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }];
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      sourceEvidenceDigests:["1".repeat(64)],
+    }),
+    /commercial evidence digest lacks transaction ownership/,
+  );
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      invoiceEvidenceDigests:["2".repeat(64)],
+    }),
+    /commercial evidence digest lacks transaction ownership/,
+  );
+});
 
