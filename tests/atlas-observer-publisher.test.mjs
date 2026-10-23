@@ -82,6 +82,8 @@ test("refuses existing symlink directory without overwriting target",async()=>{
 test("refuses existing shared directory and does not create snapshot",async()=>{
   await withTemp(async(home,dir,dest)=>{
     await fs.mkdir(dir,{mode:0o755});
+    // Explicitly set unsafe permissions: the runner may inherit umask 077.
+    await fs.chmod(dir,0o755);
     await assert.rejects(publishSnapshot(opts(home)),/not private/);
     await assert.rejects(fs.stat(dest),{code:"ENOENT"});
   });
@@ -109,6 +111,7 @@ test("refuses replacing hardlinked and broadly readable files",async()=>{
     assert.equal(await fs.readFile(victim,"utf8"),"keep me");
     await fs.unlink(dest);
     await fs.writeFile(dest,"keep me",{mode:0o644});
+    await fs.chmod(dest,0o644);
     await assert.rejects(publishSnapshot(opts(home)),/not a private regular/);
   });
 });
