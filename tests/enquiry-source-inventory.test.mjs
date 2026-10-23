@@ -369,3 +369,18 @@ test("readable source digest binds counts and timestamps to the exact observatio
     "changing evidence time without re-attesting the snapshot must fail closed",
   );
 });
+
+
+test("aggregate source counts cannot overflow the safe integer range",()=>{
+  const input=fixture();
+  for(const sourceId of ["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"]){
+    const source=input.sources.find(item=>item.sourceId===sourceId);
+    source.observedCounts={...zeroCounts(),GENUINE:Number.MAX_SAFE_INTEGER};
+    source.evidenceDigest=evidenceDigestFor(source);
+  }
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /GENUINE aggregate count exceeds safe integer range/,
+    "individually valid source counts must not produce a rounded aggregate",
+  );
+});
