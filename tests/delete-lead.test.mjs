@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequestPost as submit } from '../functions/api/enquiry.js';
 import { onRequestPost as erase, onRequest as other } from '../functions/api/delete-lead.js';
+import { deliverOwnerNotice } from '../lib/owner-notifications.js';
 
 const TOKEN = 'synthetic-owner-token-at-least-24-characters';
 const SUBMISSION = '11111111-2222-4333-8444-555555555555';
@@ -93,4 +94,46 @@ test('erasure validates identity and rejects other methods', async () => {
     LEADS: kv, ADMIN_TOKEN: TOKEN,
   } })).status, 400);
   assert.equal((await other()).status, 405);
+});
+
+
+test('erasure tombstone prevents an in-flight owner notice from recreating metadata', async () => {
+  const kv = new MemoryKV();
+  const leadId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+  const record = {
+    id: leadId,
+    submissionId: SUBMISSION,
+    createdAt: new Date().toISOString(),
+    source: 'enquiry-check',
+    notification: { version: 1, status: 'pending', attempts: 0 },
+  };
+  kv.values.set('lead:' + leadId, JSON.stringify(record));
+  kv.values.set('receipt:' + SUBMISSION, leadId);
+
+  let fetchStarted;
+  const started = new Promise(resolve => { fetchStarted = resolve; });
+  let releaseFetch;
+  const release = new Promise(resolve => { releaseFetch = resolve; });
+  const delivery = deliverOwnerNotice(record, {
+    LEADS: kv,
+    OWNER_NOTICE_URL: 'https://script.google.com/macros/s/synthetic-erasure-race/exec',
+    OWNER_NOTICE_TOKEN: 'synthetic-notice-token-at-least-32-characters',
+  }, async () => {
+    fetchStarted();
+    await release;
+    return Response.json({ ok: true, leadId });
+  });
+
+  await started;
+  const deleted = await erase({ request: deletionRequest(leadId), env: {
+    LEADS: kv, ADMIN_TOKEN: TOKEN,
+  } });
+  assert.equal(deleted.status, 200);
+  releaseFetch();
+  assert.equal(await delivery, 'erased');
+  assert.equal(kv.values.has('notice:' + leadId), false);
+  assert.equal(kv.values.has('lead:' + leadId), false);
+  const tombstone = await kv.get('erased:' + leadId, 'json');
+  assert.equal(tombstone.erased, true);
+  assert.deepEqual(Object.keys(tombstone).sort(), ['erased', 'erasedAt', 'version']);
 });
