@@ -37,6 +37,15 @@ if (form) form.addEventListener("submit", async (event) => {
       body: JSON.stringify(payload),
     });
     const result = await response.json();
+    if (response.status === 410) {
+      // The earlier retry identity was lawfully erased. Keep the form values
+      // for review, but ensure the next deliberate submit is a new enquiry.
+      pendingSubmissionId = null;
+      pendingSubmissionFingerprint = null;
+      status.className = "status error";
+      status.textContent = "This earlier enquiry was erased. Review the form, then submit again to create a new enquiry.";
+      return;
+    }
     if (!response.ok || !result.received) throw new Error("Server did not confirm storage");
     form.reset();
     pendingSubmissionId = null;
