@@ -7,6 +7,7 @@ import {
   CONTAINER_KEY_PATH,
   HEALTH_LISTEN_ADDR,
   OFFICIAL_TUNNEL_IMAGE,
+  OWNERSHIP_LABEL,
   TUNNEL_ID_ENV,
   buildTunnelDockerPlan,
   defaultTunnelDockerPlan,
@@ -108,6 +109,30 @@ test("routes only to the fixed read-only canary", () => {
 
   assert.ok(runArgv.includes(`--mcp.server-url=${CANARY_MCP_URL}`));
   assert.ok(!runArgv.some((value) => /activepieces|prospect/iu.test(value)));
+});
+
+test("labels the owned container and guards stop with image and label proof", () => {
+  const plan = defaultTunnelDockerPlan(PRIVATE_KEY_PATH);
+  const labelIndex = plan.runArgv.indexOf("--label");
+
+  assert.notEqual(labelIndex, -1);
+  assert.equal(plan.runArgv[labelIndex + 1], OWNERSHIP_LABEL);
+  assert.deepEqual(plan.stopInspectArgv, [
+    "docker",
+    "container",
+    "inspect",
+    CANARY_CONTAINER_NAME,
+    "--format",
+    "{{.Config.Image}} {{index .Config.Labels \"com.newton.atlas.tunnel-canary\"}}",
+  ]);
+  assert.deepEqual(plan.stopGuard, {
+    requiredContainerName: CANARY_CONTAINER_NAME,
+    requiredImage: OFFICIAL_TUNNEL_IMAGE,
+    requiredOwnershipLabel: OWNERSHIP_LABEL,
+    onMismatch: "HOLD_DO_NOT_STOP",
+  });
+  assert.ok(Object.isFrozen(plan.stopInspectArgv));
+  assert.ok(Object.isFrozen(plan.stopGuard));
 });
 
 test("builds an explicit, bounded stop command", () => {
