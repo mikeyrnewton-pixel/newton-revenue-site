@@ -228,6 +228,7 @@ test("missing, duplicate, PII-bearing and public-locator inventories fail closed
 test("counts and evidence must be bounded and canonical",()=>{
   const negative=fixture();
   negative.sources[1].observedCounts.GENUINE=-1;
+  negative.sources[1].evidenceDigest=evidenceDigestFor(negative.sources[1]);
   assert.throws(()=>reconcileEnquirySourceInventory(negative),
     /GENUINE count must be a non-negative integer/);
 
@@ -332,7 +333,8 @@ test("one evidence snapshot cannot be counted under multiple primary sources",()
   };
   assert.throws(
     ()=>reconcileEnquirySourceInventory(duplicateDigest),
-    /evidence digest cannot be reused across sources/,
+    /evidence digest does not bind the exact source observation/,
+    "copying another source's digest must fail before it can support counts",
   );
 });
 
