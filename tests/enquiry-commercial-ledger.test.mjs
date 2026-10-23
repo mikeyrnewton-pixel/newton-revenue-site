@@ -381,3 +381,32 @@ test("cumulative cursor rejects source evidence reuse by a later lead",()=>{
     /one source evidence digest cannot prove multiple commercial leads/,
   );
 });
+
+
+test("cumulative cursor fails closed before exceeding its validated capacity",()=>{
+  const seed=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig()).rows[0];
+  const rows=Array.from({length:1000},(_,index)=>{
+    const suffix=index.toString(16).padStart(12,"0");
+    const eventId=`30000000-0000-4000-8000-${suffix}`;
+    const enquiryId=`40000000-0000-4000-8000-${suffix}`;
+    return Object.freeze({
+      ...seed,
+      lead_key:"commercial:enquiry:"+eventId,
+      source_event_key:"crm:enquiry:"+eventId,
+      enquiry_ref:enquiryId,
+      source_record_id:enquiryId,
+      source_evidence_digest:index.toString(16).padStart(64,"0"),
+    });
+  });
+  const fullCursor=Object.freeze({
+    version:1,
+    synthetic:true,
+    rows:Object.freeze(rows),
+  });
+  const next=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  assert.throws(
+    ()=>consolidate([next],fullCursor),
+    /commercial lead cursor capacity exceeded/,
+    "a valid full cursor must not emit an oversized cursor rejected on the next run",
+  );
+});
