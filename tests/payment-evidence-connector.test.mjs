@@ -469,6 +469,49 @@ test("new evidence can update a prior provider transaction without replay",()=>{
   assert.equal(second.clearedEvidenceGBP,0);
 });
 
+test("status changes require strictly newer provider evidence",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        evidenceDigest:"e".repeat(64),
+      },
+      expectedBinding:binding(),
+    }],first.reconciliationCursor),
+    /status changed without newer evidence/,
+  );
+});
+
+test("same-status polling evidence may retain provider timestamp",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const second=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:{
+      ...observation("PENDING"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      evidenceDigest:"e".repeat(64),
+    },
+    expectedBinding:binding(),
+  }],first.reconciliationCursor);
+  assert.equal(second.reconciliationCursor.providerTransactions[0].status,"PENDING");
+  assert.equal(
+    second.reconciliationCursor.providerTransactions[0].observedAt,
+    observation("PENDING").observedAt,
+  );
+  assert.equal(second.clearedEvidenceGBP,0);
+});
+
 test("provider transaction ownership and lifecycle persist across batches",()=>{
   const settled=assessBatch([{
     providerTransactionDigest:"d".repeat(64),
