@@ -192,6 +192,28 @@ test("tool parameter and schema smuggling fails closed without reading status", 
   assert.equal(reads,0);
 });
 
+test("top-level JSON-RPC envelope smuggling fails before snapshot access", () => {
+  let reads=0;
+  const deps={readSnapshot:()=>{reads++;return snap();},now:()=>NOW};
+  for(const extra of [
+    {command:"whoami"},
+    {path:"/etc/passwd"},
+    {url:"http://127.0.0.1:8080"},
+    {_meta:{injected:"sk-DO-NOT-REFLECT"}},
+    {result:{write:true}},
+    {error:{code:0}},
+  ]){
+    const request={
+      jsonrpc:"2.0",id:1,method:"tools/call",
+      params:{name:"atlas_status",arguments:{}},...extra,
+    };
+    const result=handleObserverMcp(request,deps);
+    assert.equal(result.error.code,-32600);
+    assert.equal(JSON.stringify(result).includes("sk-DO-NOT-REFLECT"),false);
+  }
+  assert.equal(reads,0);
+});
+
 test("snapshot reader failure is bounded and redacted", () => {
   const result = status({readSnapshot: ()=>{throw Error("sk-key-192.0.2.24 /etc/passwd")}});
   assert.deepEqual(result,{schema:SNAPSHOT_SCHEMA,status:"UNAVAILABLE"});
