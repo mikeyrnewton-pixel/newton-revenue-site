@@ -174,6 +174,24 @@ test("denied routes never read snapshot (including ping)", () => {
   assert.equal(called,0);
 });
 
+test("tool parameter and schema smuggling fails closed without reading status", () => {
+  let reads=0;
+  const deps={readSnapshot:()=>{reads++;return snap();},now:()=>NOW};
+  const attempts=[
+    {name:"atlas_status",arguments:{},command:"whoami"},
+    {name:"atlas_status",arguments:{},path:"/etc/passwd"},
+    {name:"atlas_status",arguments:{},url:"http://127.0.0.1:8080"},
+    {name:"atlas_status",arguments:{},inputSchema:{additionalProperties:true}},
+    {name:"atlas_status",arguments:{},_meta:{injected:"sk-DO-NOT-REFLECT"}},
+  ];
+  for(const params of attempts){
+    const result=call("tools/call",params,1,deps);
+    assert.equal(result.error.code,-32602);
+    assert.equal(JSON.stringify(result).includes("sk-DO-NOT-REFLECT"),false);
+  }
+  assert.equal(reads,0);
+});
+
 test("snapshot reader failure is bounded and redacted", () => {
   const result = status({readSnapshot: ()=>{throw Error("sk-key-192.0.2.24 /etc/passwd")}});
   assert.deepEqual(result,{schema:SNAPSHOT_SCHEMA,status:"UNAVAILABLE"});
