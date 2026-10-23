@@ -173,3 +173,18 @@ test("CLI status prints fixed labels and does not leak untrusted Docker names",a
   assert.equal(proc.status,0,proc.stderr);
   assert.equal(JSON.parse(proc.stdout).newSpend,false);
 });
+
+test("owner-verified tunnel canary Docker name is recognized, not falsely marked stopped",async()=>{
+  const {deps}=macFixture({
+    run:(bin)=>{
+      if(bin.includes("/docker"))
+        return {ok:true,output:appContainer()+"atlas-tunnel-client-canary|Up 7 minutes (healthy)\\n".replace(/\\n/g,"\n")};
+      return {ok:true,output:"private launchctl output"};
+    },
+  });
+  const state=await readMacStatus(deps);
+  assert.equal(state.containers.tunnelClient,"RUNNING_HEALTHY");
+  assert.equal(state.noWritesPerformed,true);
+  assert.equal(state.secureTunnel,"NOT_CONNECTED_BY_THIS_CHECK");
+  assert.equal(formatStatus(state).includes("private launchctl output"),false);
+});
