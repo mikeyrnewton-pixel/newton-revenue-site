@@ -198,3 +198,26 @@ test("readable counts require a canonical bounded evidence window",()=>{
   assert.throws(()=>reconcileEnquirySourceInventory(unreadableWindow),
     /unreadable source cannot claim a coverage window/);
 });
+
+
+test("one evidence snapshot cannot be counted under multiple primary sources",()=>{
+  const duplicateLocator=fixture();
+  duplicateLocator.sources[2]={
+    ...duplicateLocator.sources[2],
+    evidenceLocator:duplicateLocator.sources[1].evidenceLocator,
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(duplicateLocator),
+    /evidence locator cannot be reused across sources/,
+  );
+
+  const duplicateDigest=fixture();
+  duplicateDigest.sources[2]={
+    ...duplicateDigest.sources[2],
+    evidenceDigest:duplicateDigest.sources[1].evidenceDigest.toUpperCase(),
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(duplicateDigest),
+    /evidence digest cannot be reused across sources/,
+  );
+});
