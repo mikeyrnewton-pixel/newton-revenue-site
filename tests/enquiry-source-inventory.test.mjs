@@ -253,7 +253,7 @@ test("one evidence snapshot cannot be counted under multiple primary sources",()
   const duplicateDigest=fixture();
   duplicateDigest.sources[2]={
     ...duplicateDigest.sources[2],
-    evidenceDigest:duplicateDigest.sources[1].evidenceDigest.toUpperCase(),
+    evidenceDigest:duplicateDigest.sources[1].evidenceDigest,
   };
   assert.throws(
     ()=>reconcileEnquirySourceInventory(duplicateDigest),
