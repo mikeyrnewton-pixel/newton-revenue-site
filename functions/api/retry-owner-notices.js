@@ -36,7 +36,7 @@ export async function onRequestPost({ request, env }) {
       await env.LEADS.get('meta:notice-retry-cursor');
     const cursor = requestedCursor || (safeCursor(storedCursor) ? storedCursor : null);
     const page = await env.LEADS.list({ prefix: 'lead:', limit: 5, ...(cursor ? { cursor } : {}) });
-    const counts = { delivered: 0, pending: 0, skipped: 0, expired: 0, deferred: 0 };
+    const counts = { delivered: 0, pending: 0, skipped: 0, expired: 0, deferred: 0, erased: 0 };
     for (const key of page.keys) {
       const record = await env.LEADS.get(key.name, 'json');
       if (!record) { counts.skipped++; continue; }
