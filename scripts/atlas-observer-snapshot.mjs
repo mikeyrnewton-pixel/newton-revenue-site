@@ -77,13 +77,21 @@ export function assessSnapshot(value, now = Date.now()) {
   return {schema: SNAPSHOT_SCHEMA, status: "FRESH", capturedAt: new Date(Date.parse(value.capturedAt)).toISOString(), state};
 }
 
-/** Read exactly one fixed file. No path argument, symlinks or oversized contents. */
+/** Refuse non-regular, shared, non-private or out-of-bounds mounted files. */
+export function safeSnapshotFileStat(st) {
+  return Boolean(st && typeof st.isFile === "function" && st.isFile() &&
+    Number.isSafeInteger(st.size) && st.size > 0 && st.size <= SNAPSHOT_MAX_BYTES &&
+    Number.isSafeInteger(st.mode) && (st.mode & 0o077) === 0 &&
+    Number.isSafeInteger(st.nlink) && st.nlink === 1);
+}
+
+/** Read exactly one fixed private file. No path argument, symlinks or oversized contents. */
 export function readSnapshotFile() {
   let fd;
   try {
     fd = openSync(SNAPSHOT_PATH, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
     const st = fstatSync(fd);
-    if (!st.isFile() || st.size <= 0 || st.size > SNAPSHOT_MAX_BYTES) return null;
+    if (!safeSnapshotFileStat(st)) return null;
     const b = Buffer.alloc(st.size);
     let done = 0;
     while (done < st.size) {
