@@ -39,3 +39,16 @@ This new `scripts/atlas-observer-publisher.mjs` is the missing **local, private 
 5. Only after the above may other agents rely on Mac status snapshots; scheduled automation tool exposure must be independently checked at each run.
 
 **Current truth:** Connection `LIVE_VERIFIED_CANARY`; watchdog last owner-confirmed loaded and heartbeat fresh at earlier diagnostic, **current heartbeat unknown**; publisher `TESTED_OFFLINE`, **NOT INSTALLED**; periodic refresh **NOT CONFIGURED**; `atlas_status` **NOT YET AVAILABLE** in ChatGPT; no real trading or newly cleared revenue evidenced. Budget £0. No customer communications, charges, live trades, production merges or Mac/service modifications were authorised by creating this review source.
+
+## New 60-second LaunchAgent preview — reviewed source, not installed
+
+**Source:** `scripts/atlas-observer-launchd-plan.mjs`, whose sole executable CLI output is `--emit` (an XML plist **printed to stdout**). This is not an installer. It has no write/install/load/start/enable/restart functionality. A separate owner-approved on-Mac deployment procedure would later need to verify paths and explicitly create/install the plist; this code never performs those actions.
+
+- Fixed **distinct** label: `uk.newton.atlas-observer-snapshot` (the existing watchdog remains `uk.newton.atlas-watchdog`).
+- Fixed interval: `StartInterval = 60` seconds, no dynamic interval or arguments; `RunAtLoad = false`, `KeepAlive = false`, `ProcessType = Background`.
+- `ProgramArguments` is a **three-element array**, not a shell command: resolved absolute Node binary, resolved adjacent `atlas-observer-publisher.mjs` path, `--publish`. The generator rejects relative paths, unexpected executable/script names and control characters; it escapes XML metacharacters.
+- No customer details, passwords, remote URLs, arbitrary environment variables, secrets, Docker socket mounts, stdout logging or network access in the plist. stdout and stderr are redirected to `/dev/null`; observability is through the snapshot status and age, not raw logs.
+- launchd's per-user `StartInterval` is **not guaranteed to run while the Mac sleeps**; after sleep, the status may become STALE. That is correct and safer than misreporting an old heartbeat as live.
+- Manual verification **before approval**: `node --test tests/atlas-observer-launchd-plan.test.mjs`, plus inspect the generated plist with an XML/plist parser. Mac-local `--emit` must run only after the user approves fetching/staging the reviewed source; neither this document nor GitHub CI authorizes doing so.
+
+**Release gates unchanged:** no new LaunchAgent has been installed or activated; no observer container has been started; no tunnel target or custom plugin permissions changed. Independent security QA is still required, followed by the owner's *specific* on-device approval. The existing `atlas_ping` remains the only proven remote tool. Do not claim the watchdog's current heartbeat is known from this software preview.
