@@ -123,6 +123,26 @@ test("local-only MCP is reachable only through shared isolated canary namespace"
   assert.ok(!plan.runArgv.includes("--publish"));
 });
 
+test("existing tunnel plan cannot be repointed at the unapproved Observer", () => {
+  for (const mcpServerUrl of [
+    "http://127.0.0.1:18788/mcp",
+    "http://atlas-observer:18788/mcp",
+    "http://host.docker.internal:18788/mcp",
+    "http://127.0.0.1:8080/mcp",
+  ]) {
+    assert.throws(
+      () => buildTunnelDockerPlan(validInput({mcpServerUrl})),
+      /read-only canary/u,
+    );
+  }
+  const {runArgv}=defaultTunnelDockerPlan(PRIVATE_KEY_PATH);
+  assert.ok(runArgv.includes("--mcp.server-url=http://127.0.0.1:18787/mcp"));
+  assert.ok(!runArgv.some(value=>value.includes("18788")));
+  assert.ok(!runArgv.includes("--network=host"));
+  assert.ok(!runArgv.includes("--publish"));
+  assert.ok(!runArgv.includes("-p"));
+});
+
 test("routes only to the fixed read-only canary", () => {
   const { runArgv } = defaultTunnelDockerPlan(PRIVATE_KEY_PATH);
 
