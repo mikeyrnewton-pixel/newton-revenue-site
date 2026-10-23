@@ -50,9 +50,10 @@ export function handleMcp(message){
     return jsonError(null,-32600,"Invalid JSON-RPC request");
   const hasId=Object.prototype.hasOwnProperty.call(message,"id");
   const id=hasId?message.id:null;
-  if(message.jsonrpc!=="2.0"||typeof message.method!=="string"||
-     (hasId&&!["string","number"].includes(typeof id)))
-    return jsonError(id,-32600,"Invalid JSON-RPC request");
+  const validId=!hasId||typeof id==="string"||
+    (typeof id==="number"&&Number.isFinite(id));
+  if(message.jsonrpc!=="2.0"||typeof message.method!=="string"||!validId)
+    return jsonError(validId?id:null,-32600,"Invalid JSON-RPC request");
   // Notifications never elicit a response.
   if(!hasId)return null;
   if(message.method==="initialize"){
