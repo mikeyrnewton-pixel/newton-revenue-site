@@ -5,7 +5,8 @@ import {request} from "node:http";
 import {spawnSync} from "node:child_process";
 import {
   SNAPSHOT_SCHEMA, SNAPSHOT_MAX_BYTES, SNAPSHOT_PATH,
-  makeSnapshot, safeMacStatus, assessSnapshot, captureSnapshot, readSnapshotFile,
+  makeSnapshot, safeMacStatus, safeSnapshotFileStat,
+  assessSnapshot, captureSnapshot, readSnapshotFile,
 } from "../scripts/atlas-observer-snapshot.mjs";
 import {
   PING_REPLY, OBSERVER_HOST, OBSERVER_PORT,
@@ -167,6 +168,24 @@ test("no secrets are reflected in invalid, stale or malicious snapshots", () => 
   assert.equal(observed.state.containers.postgres,"NOT_VERIFIED");
   assert.equal(observed.state.containers.redis,"RUNNING_HEALTHY");
   for (const str of ["sk-secret", "bank account", "token"]) assert.equal(JSON.stringify(observed).includes(str),false);
+});
+
+test("mounted snapshot metadata must be private, regular, single-link and bounded", () => {
+  const privateFile = {isFile: () => true, size: 512, mode: 0o100600, nlink: 1};
+  assert.equal(safeSnapshotFileStat(privateFile), true);
+
+  for (const unsafe of [
+    {...privateFile, mode: 0o100640},
+    {...privateFile, mode: 0o100604},
+    {...privateFile, mode: 0o100666},
+    {...privateFile, nlink: 2},
+    {...privateFile, size: 0},
+    {...privateFile, size: SNAPSHOT_MAX_BYTES + 1},
+    {...privateFile, isFile: () => false},
+    {...privateFile, mode: NaN},
+    {...privateFile, nlink: NaN},
+    null,
+  ]) assert.equal(safeSnapshotFileStat(unsafe), false);
 });
 
 test("no caller may select a filesystem path; fixed size and fixed destination", () => {
