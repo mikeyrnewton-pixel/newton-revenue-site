@@ -111,6 +111,15 @@ test("refuses non-Mac, non-read-only, malformed status, and invalid clock", asyn
   assert.throws(() => makeSnapshot(fixture(), "not-a-date"),/rejected/);
 });
 
+test("invalid observer clocks fail closed instead of marking a snapshot fresh", () => {
+  for (const invalidNow of [NaN, Infinity, -Infinity]) {
+    assert.deepEqual(
+      assessSnapshot(snap(), invalidNow),
+      {schema: SNAPSHOT_SCHEMA, status: "INVALID"},
+    );
+  }
+});
+
 test("snapshot states are FRESH, STALE, CLOCK_SKEW, or INVALID as appropriate", () => {
   const s = snap();
   assert.equal(assessSnapshot(s,NOW).status,"FRESH");
