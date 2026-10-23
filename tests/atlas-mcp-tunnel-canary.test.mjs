@@ -138,6 +138,8 @@ test("HTTP requests are bounded; unknown tools and methods explicitly blocked",a
 test("defaults prohibit public network exposure by default",()=>{
   assert.equal(DEFAULT_HOST,"127.0.0.1");
   assert.equal(DEFAULT_PORT,18787);
+  assert.throws(()=>startCanary({host:"0.0.0.0"}),/Unapproved bind address/);
+  assert.throws(()=>startCanary({host:"::"}),/Unapproved bind address/);
   assert.throws(()=>startCanary({host:"192.168.1.1"}),/Unapproved bind address/);
   assert.throws(()=>startCanary({port:80}),/Unsafe port/);
   assert.throws(()=>startCanary({port:65536}),/Unsafe port/);
