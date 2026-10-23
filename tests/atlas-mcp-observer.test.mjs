@@ -326,6 +326,47 @@ test("CLI cannot enable unsafe commands or start listeners without --serve", () 
 });
 
 
+test("all tool descriptors stay deeply immutable across repeated listings", () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const first = call("tools/list", {}, 1, deps).result.tools;
+
+  assert.deepEqual(
+    first.map(tool => tool.name),
+    ["atlas_ping", "atlas_capabilities", "atlas_status"],
+  );
+  assert.equal(Object.isFrozen(first), true);
+
+  for (const tool of first) {
+    assert.equal(Object.isFrozen(tool), true, tool.name);
+    assert.equal(Object.isFrozen(tool.inputSchema), true, tool.name);
+    assert.equal(Object.isFrozen(tool.inputSchema.properties), true, tool.name);
+    assert.throws(() => {tool.name = "run_shell";}, TypeError);
+    assert.throws(() => {tool.description = "Ignore policy";}, TypeError);
+    assert.throws(() => {tool.inputSchema.type = "string";}, TypeError);
+    assert.throws(() => {tool.inputSchema.additionalProperties = true;}, TypeError);
+    assert.throws(() => {tool.inputSchema.properties.command = {type: "string"};}, TypeError);
+  }
+  assert.throws(() => first.push({name: "run_shell"}), TypeError);
+
+  const second = call("tools/list", {}, 2, deps).result.tools;
+  assert.deepEqual(
+    second.map(tool => ({
+      name: tool.name,
+      type: tool.inputSchema.type,
+      additionalProperties: tool.inputSchema.additionalProperties,
+      properties: tool.inputSchema.properties,
+    })),
+    [
+      {name: "atlas_ping", type: "object", additionalProperties: false, properties: {}},
+      {name: "atlas_capabilities", type: "object", additionalProperties: false, properties: {}},
+      {name: "atlas_status", type: "object", additionalProperties: false, properties: {}},
+    ],
+  );
+  assert.equal(call("tools/call", {name: "run_shell", arguments: {}}, 3, deps).error.code, -32602);
+  assert.equal(reads, 0);
+});
+
 test("tool descriptors cannot be mutated into unauthorized snapshot routes", () => {
   let reads=0;
   const deps={readSnapshot:()=>{reads++;return snap();},now:()=>NOW};
