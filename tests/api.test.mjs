@@ -37,7 +37,7 @@ test("valid form is stored once with distinct 30-day retention", async () => {
   const record = [...kv.data.values()][0];
   assert.equal(record.marketingConsent, false);
   assert.equal(record.email, "alex@example.com");
-  assert.match(record.createdAt, /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/);
+  assert.match(record.createdAt, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   assert.equal(record.contactPermissionCapturedAt, record.createdAt);
   assert.ok(Date.parse(record.contactPermissionCapturedAt) <= Date.parse(record.createdAt));
   assert.equal(record.status, "new");
