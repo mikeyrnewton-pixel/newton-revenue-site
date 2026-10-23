@@ -102,6 +102,21 @@ test("readable candidate and unknown rows remain explicit unresolved classificat
   assert.equal(result.automaticBuyerPromotion,false);
 });
 
+test("unreadable stores cannot hide readable classification review",()=>{
+  const input=fixture();
+  const salesDesk=input.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.observedCounts={...zeroCounts(),CANDIDATE:1,UNKNOWN:2};
+  const result=reconcileEnquirySourceInventory(input);
+  assert.equal(
+    result.classificationStatus,
+    "UNKNOWN_UNREADABLE_AND_CLASSIFICATION_REVIEW",
+  );
+  assert.equal(result.unresolvedAccessibleClassifications,3);
+  assert.ok(result.unreadableSources.length>0);
+  assert.equal(result.genuineEnquiries,null);
+  assert.equal(result.automaticBuyerPromotion,false);
+});
+
 test("bounded Gmail searches remain partial even when every source is readable",()=>{
   const input=fixture();
   input.sources=input.sources.map(source=>
@@ -277,3 +292,4 @@ test("one evidence snapshot cannot be counted under multiple primary sources",()
     /evidence digest cannot be reused across sources/,
   );
 });
+
