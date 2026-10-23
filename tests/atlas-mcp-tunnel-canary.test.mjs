@@ -84,6 +84,21 @@ test("invalid messages fail with no effect",()=>{
   }])assert.ok(handleMcp(v).error);
   assert.equal(call("unknown").error.code,-32601);
 });
+test("non-finite and structured request IDs fail with a deterministic null ID",async()=>{
+  for(const id of [NaN,Infinity,-Infinity,{},[]]){
+    const result=handleMcp({jsonrpc:"2.0",id,method:"ping"});
+    assert.equal(result.error.code,-32600);
+    assert.equal(result.id,null);
+  }
+  await withServer(async port=>{
+    const response=await http(port,{
+      body:'{"jsonrpc":"2.0","id":1e400,"method":"ping"}',
+    });
+    assert.equal(response.status,200);
+    assert.equal(response.data.error.code,-32600);
+    assert.equal(response.data.id,null);
+  });
+});
 test("readiness route is constant and the only GET route",async()=>{
   await withServer(async port=>{
     const ok=await http(port,{method:"GET",url:"/healthz"});
