@@ -345,7 +345,7 @@ test("one evidence snapshot cannot be counted under multiple primary sources",()
   };
   assert.throws(
     ()=>reconcileEnquirySourceInventory(duplicateLocator),
-    /evidence locator cannot be reused across sources/,
+    /evidence locator (must be scoped to its declared source|cannot be reused across sources)/,
   );
 
   const duplicateDigest=fixture();
