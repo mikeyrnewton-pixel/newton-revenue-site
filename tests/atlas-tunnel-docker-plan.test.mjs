@@ -123,28 +123,32 @@ test("labels the owned container and guards stop with image and label proof", ()
     "inspect",
     CANARY_CONTAINER_NAME,
     "--format",
-    "{{.Config.Image}} {{index .Config.Labels \"com.newton.atlas.tunnel-canary\"}}",
+    "{{.Id}} {{.Config.Image}} {{index .Config.Labels \"com.newton.atlas.tunnel-canary\"}}",
   ]);
   assert.deepEqual(plan.stopGuard, {
     requiredContainerName: CANARY_CONTAINER_NAME,
+    requiredContainerIdSource: "INSPECT_RESULT_ID",
     requiredImage: OFFICIAL_TUNNEL_IMAGE,
     requiredOwnershipLabel: OWNERSHIP_LABEL,
+    stopTarget: "INSPECTED_CONTAINER_ID_ONLY",
     onMismatch: "HOLD_DO_NOT_STOP",
   });
   assert.ok(Object.isFrozen(plan.stopInspectArgv));
   assert.ok(Object.isFrozen(plan.stopGuard));
 });
 
-test("builds an explicit, bounded stop command", () => {
-  const { stopArgv } = defaultTunnelDockerPlan(PRIVATE_KEY_PATH);
+test("builds an explicit stop template that requires the inspected immutable ID", () => {
+  const { stopArgvTemplate } = defaultTunnelDockerPlan(PRIVATE_KEY_PATH);
 
-  assert.deepEqual(stopArgv, [
+  assert.deepEqual(stopArgvTemplate, [
     "docker",
     "stop",
     "--time",
     "10",
-    CANARY_CONTAINER_NAME,
+    "<INSPECTED_CONTAINER_ID>",
   ]);
+  assert.ok(!stopArgvTemplate.includes(CANARY_CONTAINER_NAME));
+  assert.ok(Object.isFrozen(stopArgvTemplate));
 });
 
 test("rejects unpinned or non-official images", () => {
