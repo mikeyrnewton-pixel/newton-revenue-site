@@ -335,6 +335,43 @@ test("malformed, oversized and non-JSON HTTP bodies fail closed",async()=>{
   },{readSnapshot:()=>{reads++;return snap();},now:()=>NOW});
 });
 
+test("oversized streaming bodies fail fast without waiting for upload completion", async () => {
+  let reads = 0;
+  await withServer(async port => {
+    const result = await new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (!settled) reject(new Error("oversized request was not rejected before upload completion"));
+      }, 1000);
+      const req = request({
+        hostname: "127.0.0.1", port, path: "/mcp", method: "POST",
+        headers: {"content-type": "application/json"},
+      }, res => {
+        const chunks = [];
+        res.on("data", chunk => chunks.push(chunk));
+        res.on("end", () => {
+          settled = true;
+          clearTimeout(timer);
+          const raw = Buffer.concat(chunks).toString("utf8");
+          req.destroy();
+          resolve({status: res.statusCode, raw, headers: res.headers});
+        });
+      });
+      req.on("error", error => {
+        if (!settled) {
+          clearTimeout(timer);
+          reject(error);
+        }
+      });
+      req.write(" ".repeat(8193));
+    });
+    assert.equal(result.status, 413);
+    assert.deepEqual(JSON.parse(result.raw), {error: "Request too large"});
+    assert.equal(result.headers["cache-control"], "no-store");
+    assert.equal(reads, 0);
+  }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
+});
+
 test("CLI cannot enable unsafe commands or start listeners without --serve", () => {
   const script = new URL("../scripts/atlas-mcp-observer.mjs", import.meta.url).pathname;
   for (const arg of ["--shell", "--deploy", "--write", "--public", "--trade"]) {
