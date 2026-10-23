@@ -99,6 +99,15 @@ test("non-finite and structured request IDs fail with a deterministic null ID",a
     assert.equal(response.data.id,null);
   });
 });
+test("HTTP server bounds slow and persistent clients",()=>{
+  const server=createCanaryServer();
+  assert.equal(server.requestTimeout,5000);
+  assert.equal(server.headersTimeout,5000);
+  assert.equal(server.keepAliveTimeout,1000);
+  assert.equal(server.maxRequestsPerSocket,20);
+  assert.equal(server.maxHeadersCount,32);
+});
+
 test("readiness route is constant and the only GET route",async()=>{
   await withServer(async port=>{
     const ok=await http(port,{method:"GET",url:"/healthz"});
