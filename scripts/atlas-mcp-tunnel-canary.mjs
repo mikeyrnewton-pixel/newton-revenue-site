@@ -70,7 +70,8 @@ export function handleMcp(message){
   if(message.method==="tools/call"){
     if(message.params?.name!==CANARY_TOOL)
       return jsonError(id,-32602,"Tool not allowed");
-    const args=message.params?.arguments??{};
+    const suppliedArgs=message.params?.arguments;
+    const args=suppliedArgs===undefined?{}:suppliedArgs;
     if(!args||typeof args!=="object"||Array.isArray(args)||
        Object.keys(args).length!==0)
       return jsonError(id,-32602,"Arguments not allowed");
@@ -92,7 +93,8 @@ export function createCanaryServer(){
       return json(res,405,{error:"Method not allowed"});
     }
     const ctype=(req.headers["content-type"]??"").toLowerCase();
-    if(!ctype.startsWith("application/json"))
+    const mediaType=ctype.split(";",1)[0].trim();
+    if(mediaType!=="application/json")
       return json(res,415,{error:"JSON required"});
     const chunks=[];
     let length=0;
