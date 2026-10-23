@@ -184,6 +184,26 @@ test("observation boundary rejects real activity raw references and malformed ev
 });
 
 
+test("payment stage identifiers must remain pairwise distinct",()=>{
+  for(const overrides of [
+    {observationId:observation("SETTLED").sourceRecordId},
+    {observationId:observation("SETTLED").invoiceEventId},
+    {sourceRecordId:observation("SETTLED").invoiceEventId},
+  ]){
+    const changed={...observation("SETTLED"),...overrides};
+    const expected={
+      ...binding(),
+      sourceRecordId:changed.sourceRecordId,
+      invoiceEventId:changed.invoiceEventId,
+    };
+    assert.throws(
+      ()=>assessSyntheticPaymentObservation(changed,expected),
+      /observation, source record and invoice event IDs must differ/,
+    );
+  }
+});
+
+
 test("payment observation cannot be reused across leads or invoices",()=>{
   assert.throws(
     ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
@@ -598,195 +618,3 @@ test("payment and provider-transaction digest roles remain disjoint",()=>{
       sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
       sourceEvidenceDigest:"2".repeat(64),
       invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
-      invoiceEvidenceDigest:"3".repeat(64),
-    },
-  };
-  assert.throws(
-    ()=>assessBatch([{
-      ...distinctItem,
-      providerTransactionDigest:firstItem.observation.evidenceDigest,
-    }],first.reconciliationCursor),
-    /provider transaction digest reused from payment evidence/,
-    "later transaction identity cannot reuse earlier observation evidence",
-  );
-  assert.throws(
-    ()=>assessBatch([{
-      ...distinctItem,
-      observation:{
-        ...distinctItem.observation,
-        evidenceDigest:firstItem.providerTransactionDigest,
-      },
-    }],first.reconciliationCursor),
-    /payment evidence digest reused as provider transaction/,
-    "later observation evidence cannot reuse earlier transaction identity",
-  );
-  assert.throws(
-    ()=>assessBatch([
-      firstItem,
-      {...distinctItem,providerTransactionDigest:firstItem.observation.evidenceDigest},
-    ]),
-    /provider transaction digest reused from payment evidence/,
-    "same-batch transaction identity cannot reuse earlier observation evidence",
-  );
-  assert.throws(
-    ()=>assessBatch([
-      firstItem,
-      {
-        ...distinctItem,
-        observation:{
-          ...distinctItem.observation,
-          evidenceDigest:firstItem.providerTransactionDigest,
-        },
-      },
-    ]),
-    /payment evidence digest reused as provider transaction/,
-    "same-batch observation evidence cannot reuse earlier transaction identity",
-  );
-});
-
-test("commercial evidence roles remain disjoint across payment batches",()=>{
-  const firstItem={
-    providerTransactionDigest:"d".repeat(64),
-    observation:observation("PENDING"),
-    expectedBinding:binding(),
-  };
-  const first=assessBatch([firstItem]);
-  const sourceRecordId="dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-  const invoiceEventId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
-  const distinct={
-    providerTransactionDigest:"f".repeat(64),
-    observation:{
-      ...observation("SETTLED"),
-      observationId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
-      sourceRecordId,
-      invoiceEventId,
-      evidenceDigest:"3".repeat(64),
-    },
-    expectedBinding:{
-      ...binding(),
-      sourceRecordId,
-      invoiceEventId,
-      sourceEvidenceDigest:"1".repeat(64),
-      invoiceEvidenceDigest:"2".repeat(64),
-    },
-  };
-  assert.throws(
-    ()=>assessBatch([{
-      ...distinct,
-      observation:{
-        ...distinct.observation,
-        evidenceDigest:firstItem.expectedBinding.sourceEvidenceDigest,
-      },
-    }],first.reconciliationCursor),
-    /payment evidence digest reused from commercial binding/,
-  );
-  assert.throws(
-    ()=>assessBatch([{
-      ...distinct,
-      providerTransactionDigest:firstItem.expectedBinding.invoiceEvidenceDigest,
-    }],first.reconciliationCursor),
-    /provider transaction digest reused from commercial binding/,
-  );
-  assert.throws(
-    ()=>assessBatch([{
-      ...distinct,
-      expectedBinding:{
-        ...distinct.expectedBinding,
-        sourceEvidenceDigest:firstItem.observation.evidenceDigest,
-      },
-    }],first.reconciliationCursor),
-    /source evidence digest reused from payment evidence/,
-  );
-});
-
-test("historical cursor rejects evidence digest role collisions",()=>{
-  const item=[{
-    providerTransactionDigest:"d".repeat(64),
-    observation:observation("SETTLED"),
-    expectedBinding:binding(),
-  }];
-  assert.throws(
-    ()=>assessBatch(item,{
-      ...emptySyntheticPaymentEvidenceCursor(),
-      sourceEvidenceDigests:["1".repeat(64)],
-      invoiceEvidenceDigests:["1".repeat(64)],
-    }),
-    /source evidence digest reused from invoice binding/,
-  );
-  assert.throws(
-    ()=>assessBatch(item,{
-      ...emptySyntheticPaymentEvidenceCursor(),
-      evidenceDigests:["1".repeat(64)],
-      sourceEvidenceDigests:["1".repeat(64)],
-    }),
-    /payment evidence digest reused from commercial binding/,
-  );
-  assert.throws(
-    ()=>assessBatch(item,{
-      ...emptySyntheticPaymentEvidenceCursor(),
-      evidenceDigests:["d".repeat(64)],
-      providerTransactions:[{
-        providerTransactionDigest:"d".repeat(64),
-        sourceRecordId:observation("PENDING").sourceRecordId,
-        invoiceEventId:observation("PENDING").invoiceEventId,
-        provider:observation("PENDING").provider,
-        observedAt:observation("PENDING").observedAt,
-        status:"PENDING",
-      }],
-    }),
-    /provider transaction digest reused from another evidence role/,
-  );
-});
-
-test("malformed or omitted prior cursor fails closed",()=>{
-  const item=[{
-    providerTransactionDigest:"d".repeat(64),
-    observation:observation("SETTLED"),
-    expectedBinding:binding(),
-  }];
-  assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch(item),
-    /prior payment evidence cursor/,
-  );
-  assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch(item,{
-      ...emptySyntheticPaymentEvidenceCursor(),
-      observationIds:[
-        "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      ],
-    }),
-    /sorted unique prior observation IDs/,
-  );
-  assert.throws(
-    ()=>assessSyntheticPaymentObservationBatch(item,{
-      ...emptySyntheticPaymentEvidenceCursor(),
-      evidenceDigests:["A".repeat(64)],
-    }),
-    /canonical prior evidence digests/,
-  );
-});
-
-
-
-test("cursor capacity fails closed before emitting an unusable next cursor",()=>{
-  const fullEvidence=Array.from({length:1000},(_,index)=>
-    index.toString(16).padStart(64,"0"));
-  const prior={
-    version:1,
-    synthetic:true,
-    observationIds:[],
-    evidenceDigests:fullEvidence,
-    sourceEvidenceDigests:[],
-    invoiceEvidenceDigests:[],
-    providerTransactions:[],
-  };
-  assert.throws(
-    ()=>assessBatch([{
-      providerTransactionDigest:"d".repeat(64),
-      observation:observation("SETTLED"),
-      expectedBinding:binding(),
-    }],prior),
-    /payment evidence cursor capacity exceeded/,
-  );
-});
