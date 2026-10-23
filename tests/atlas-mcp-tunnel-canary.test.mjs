@@ -67,7 +67,8 @@ test("single allowlisted MCP tool has fixed response and no parameters",()=>{
   assert.equal(call("tools/call",{name:"run_shell"}).error.code,-32602);
   assert.equal(call("tools/call",{name:CANARY_TOOL,arguments:{command:"id"}}).error.code,-32602);
   assert.equal(call("tools/call",{name:CANARY_TOOL,arguments:[]}).error.code,-32602);
-  assert.equal(call("tools/call",{name:CANARY_TOOL,arguments:null}).result.content[0].text,CANARY_REPLY);
+  assert.equal(call("tools/call",{name:CANARY_TOOL,arguments:null}).error.code,-32602);
+  assert.equal(call("tools/call",{name:CANARY_TOOL}).result.content[0].text,CANARY_REPLY);
   assert.equal(call("resources/list").error.code,-32601);
   assert.equal(call("prompts/list").error.code,-32601);
   assert.equal(call("tools/uninstall").error.code,-32601);
@@ -127,6 +128,14 @@ test("HTTP requests are bounded; unknown tools and methods explicitly blocked",a
       body:"arbitrary",
       headers:{"content-type":"text/plain"},
     })).status,415);
+    assert.equal((await http(port,{
+      body:{jsonrpc:"2.0",id:4,method:"ping"},
+      headers:{"content-type":"application/jsonp"},
+    })).status,415);
+    assert.equal((await http(port,{
+      body:{jsonrpc:"2.0",id:5,method:"ping"},
+      headers:{"content-type":"application/json; charset=utf-8"},
+    })).status,200);
     const denied=await http(port,{body:{
       jsonrpc:"2.0",id:2,method:"tools/call",
       params:{name:"ap_delete_flow",arguments:{}},
