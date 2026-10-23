@@ -19,8 +19,22 @@ const MAX_REQUEST_BYTES = 8192;
 const PROTOCOL = "2025-03-26";
 const SUPPORTED = new Set(["2024-11-05", PROTOCOL, "2025-06-18"]);
 const TOOL_SCHEMA = Object.freeze({type: "object", properties: {}, additionalProperties: false});
+const CAPABILITIES = Object.freeze({
+  schema: "atlas.observer.capabilities.v1",
+  mode: "READ_ONLY_SANITIZED_SNAPSHOT",
+  tools: Object.freeze(["atlas_ping", "atlas_capabilities", "atlas_status"]),
+  snapshotMaxAgeSeconds: 300,
+  macShell: false,
+  filesystemBrowse: false,
+  dockerControl: false,
+  activepiecesAccess: false,
+  customerDataAccess: false,
+  financialAccess: false,
+  writeActions: false,
+});
 const TOOLS = Object.freeze([
   {name: "atlas_ping", description: "Returns a fixed harmless connectivity token; no Mac access.", inputSchema: TOOL_SCHEMA},
+  {name: "atlas_capabilities", description: "Returns the observer's fixed read-only scope and explicit denied capabilities. No snapshot or Mac access.", inputSchema: TOOL_SCHEMA},
   {name: "atlas_status", description: "Reads only a pre-generated, freshness-checked, allowlisted Mac health snapshot. No commands, identifiers or customer data.", inputSchema: TOOL_SCHEMA},
 ]);
 const reply = (id, result) => ({jsonrpc: "2.0", id, result});
@@ -55,6 +69,8 @@ export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now
   if (!validRecord(args) || Object.keys(args).length !== 0)
     return error(id, -32602, "Arguments not allowed");
   if (message.params.name === "atlas_ping") return reply(id, {content: [{type: "text", text: PING_REPLY}], isError: false});
+  if (message.params.name === "atlas_capabilities")
+    return reply(id, {content: [{type: "text", text: JSON.stringify(CAPABILITIES)}], isError: false});
   let result;
   try { result = assessSnapshot(readSnapshot(), now()); }
   catch { result = {schema: "atlas.observer.snapshot.v1", status: "UNAVAILABLE"}; }
