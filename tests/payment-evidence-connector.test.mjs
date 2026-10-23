@@ -401,7 +401,9 @@ test("payment batch emits a frozen cumulative replay cursor",()=>{
     providerTransactions:[{
       providerTransactionDigest:"d".repeat(64),
       sourceRecordId:observation("SETTLED").sourceRecordId,
+      sourceEvidenceDigest:binding().sourceEvidenceDigest,
       invoiceEventId:observation("SETTLED").invoiceEventId,
+      invoiceEvidenceDigest:binding().invoiceEvidenceDigest,
       provider:observation("SETTLED").provider,
       observedAt:observation("SETTLED").observedAt,
       status:"SETTLED",
@@ -515,6 +517,42 @@ test("provider transaction ownership and lifecycle persist across batches",()=>{
   );
 });
 
+test("provider transaction commercial evidence binding persists across batches",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const laterObservation={
+    ...observation("SETTLED"),
+    observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    observedAt:"2026-10-20T11:05:00.000Z",
+    evidenceDigest:"e".repeat(64),
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:laterObservation,
+      expectedBinding:{
+        ...binding(),
+        sourceEvidenceDigest:"1".repeat(64),
+      },
+    }],first.reconciliationCursor),
+    /evidence binding changed across batches/,
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:laterObservation,
+      expectedBinding:{
+        ...binding(),
+        invoiceEvidenceDigest:"2".repeat(64),
+      },
+    }],first.reconciliationCursor),
+    /evidence binding changed across batches/,
+  );
+});
+
 test("invoice and source ownership persist across provider transactions",()=>{
   const first=assessBatch([{
     providerTransactionDigest:"d".repeat(64),
@@ -556,11 +594,15 @@ test("invoice and source ownership persist across provider transactions",()=>{
 test("malformed cursor rejects historical duplicate invoice ownership",()=>{
   const prior={
     ...emptySyntheticPaymentEvidenceCursor(),
+    sourceEvidenceDigests:[binding().sourceEvidenceDigest],
+    invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
     providerTransactions:[
       {
         providerTransactionDigest:"d".repeat(64),
         sourceRecordId:observation("PENDING").sourceRecordId,
+        sourceEvidenceDigest:binding().sourceEvidenceDigest,
         invoiceEventId:observation("PENDING").invoiceEventId,
+        invoiceEvidenceDigest:binding().invoiceEvidenceDigest,
         provider:observation("PENDING").provider,
         observedAt:observation("PENDING").observedAt,
         status:"PENDING",
@@ -568,7 +610,9 @@ test("malformed cursor rejects historical duplicate invoice ownership",()=>{
       {
         providerTransactionDigest:"e".repeat(64),
         sourceRecordId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        sourceEvidenceDigest:binding().sourceEvidenceDigest,
         invoiceEventId:observation("PENDING").invoiceEventId,
+        invoiceEvidenceDigest:binding().invoiceEvidenceDigest,
         provider:observation("PENDING").provider,
         observedAt:observation("PENDING").observedAt,
         status:"PENDING",
@@ -748,7 +792,9 @@ test("historical cursor rejects evidence digest role collisions",()=>{
       providerTransactions:[{
         providerTransactionDigest:"d".repeat(64),
         sourceRecordId:observation("PENDING").sourceRecordId,
+        sourceEvidenceDigest:binding().sourceEvidenceDigest,
         invoiceEventId:observation("PENDING").invoiceEventId,
+        invoiceEvidenceDigest:binding().invoiceEvidenceDigest,
         provider:observation("PENDING").provider,
         observedAt:observation("PENDING").observedAt,
         status:"PENDING",
@@ -872,10 +918,14 @@ test("historical cursor rejects identifier role collisions",()=>{
     ()=>assessBatch(item,{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:[observation("PENDING").sourceRecordId],
+      sourceEvidenceDigests:[binding().sourceEvidenceDigest],
+      invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
       providerTransactions:[{
         providerTransactionDigest:"d".repeat(64),
         sourceRecordId:observation("PENDING").sourceRecordId,
+        sourceEvidenceDigest:binding().sourceEvidenceDigest,
         invoiceEventId:observation("PENDING").invoiceEventId,
+        invoiceEvidenceDigest:binding().invoiceEvidenceDigest,
         provider:observation("PENDING").provider,
         observedAt:observation("PENDING").observedAt,
         status:"PENDING",
