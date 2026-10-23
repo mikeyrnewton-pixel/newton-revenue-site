@@ -38,6 +38,7 @@ const unreadable=sourceId=>({
 const fixture=()=>({
   version:1,
   claimedEnquiries:30,
+  reconciledAt:"2026-10-20T12:14:00.000Z",
   sources:[
     unreadable("CLOUDFLARE_KV"),
     readable("NEWTON_REVENUE_GMAIL",{coverage:"SEARCH_WINDOW"}),
@@ -57,6 +58,7 @@ const fixture=()=>({
 test("unreadable primary stores remain unknown instead of becoming zero",()=>{
   const result=reconcileEnquirySourceInventory(fixture());
   assert.equal(result.classificationStatus,"UNKNOWN_UNREADABLE");
+  assert.equal(result.reconciledAt,"2026-10-20T12:14:00.000Z");
   assert.equal(result.genuineEnquiries,null);
   assert.equal(result.accessibleGenuineObservations,0);
   assert.deepEqual(result.unreadableSources,[
@@ -270,6 +272,29 @@ test("readable counts require a canonical bounded evidence window",()=>{
     /unreadable source cannot claim a coverage window/);
 });
 
+test("readable source evidence must be fresh at reconciliation time",()=>{
+  const stale=fixture();
+  stale.reconciledAt="2026-10-20T12:30:01.000Z";
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(stale),
+    /readable source evidence is stale for this reconciliation/,
+  );
+
+  const future=fixture();
+  future.reconciledAt="2026-10-20T12:13:59.000Z";
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(future),
+    /source verification cannot be in the reconciliation future/,
+  );
+
+  const malformed=fixture();
+  malformed.reconciledAt="20 October 2026 12:14 UTC";
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(malformed),
+    /canonical inventory reconciliation timestamp required/,
+  );
+});
+
 
 test("one evidence snapshot cannot be counted under multiple primary sources",()=>{
   const duplicateLocator=fixture();
@@ -292,4 +317,5 @@ test("one evidence snapshot cannot be counted under multiple primary sources",()
     /evidence digest cannot be reused across sources/,
   );
 });
+
 
