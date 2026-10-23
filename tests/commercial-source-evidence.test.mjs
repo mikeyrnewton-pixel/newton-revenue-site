@@ -8,6 +8,8 @@ import {
 const record=(overrides={})=>({
   version:1,
   recordId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  createdAt:"2026-10-23T05:30:00.000Z",
+  contactPermissionCapturedAt:"2026-10-23T05:30:00.000Z",
   sourceKind:"ORIGINAL_INBOX",
   direction:"INBOUND",
   synthetic:false,
@@ -27,6 +29,16 @@ test("only reviewed consented original inbound evidence is genuine",()=>{
   assert.equal(result.clearedEvidenceGBP,0);
   assert.equal(result.automaticCommercialTransition,false);
   assert.equal(result.customerDelivery,"HOLD");
+});
+
+test("contact permission requires canonical creation-time evidence",()=>{
+  for(const [overrides, message] of [
+    [{createdAt:"23 October 2026 05:30 UTC"}, /canonical UTC record creation/],
+    [{contactPermissionCapturedAt:"23 October 2026 05:30 UTC"}, /canonical UTC contact-permission/],
+    [{contactPermissionCapturedAt:"2026-10-23T05:30:01.000Z"}, /captured with record creation/],
+  ]) {
+    assert.throws(()=>classifyCommercialSourceRecord(record(overrides)),message);
+  }
 });
 
 test("unreviewed or unconsented inbound interest remains candidate",()=>{
