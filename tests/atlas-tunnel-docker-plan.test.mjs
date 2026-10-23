@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   CANARY_CONTAINER_NAME,
+  CANARY_RUNTIME_CONTAINER_NAME,
   CANARY_MCP_URL,
   CONTAINER_KEY_PATH,
   HEALTH_LISTEN_ADDR,
@@ -54,6 +55,7 @@ test("pins the official image and never pulls at start", () => {
   ]);
   assert.ok(runArgv.includes(OFFICIAL_TUNNEL_IMAGE));
   assert.ok(runArgv.includes("--pull=never"));
+  assert.ok(runArgv.includes(`--network=container:${CANARY_RUNTIME_CONTAINER_NAME}`));
   assert.ok(!runArgv.some((value) => value.includes(":latest")));
 });
 
@@ -102,6 +104,23 @@ test("hardens the container and exposes no host port", () => {
   assert.ok(
     runArgv.includes(`--health.listen-addr=${HEALTH_LISTEN_ADDR}`),
   );
+});
+
+test("local-only MCP is reachable only through shared isolated canary namespace", () => {
+  const plan=defaultTunnelDockerPlan(PRIVATE_KEY_PATH);
+  assert.equal(CANARY_MCP_URL, "http://127.0.0.1:18787/mcp");
+  assert.deepEqual(plan.canaryPrerequisite, {
+    requiredContainer: CANARY_RUNTIME_CONTAINER_NAME,
+    requiredServer: "atlas-mcp-tunnel-canary.mjs",
+    requiredNetworkMode: `container:${CANARY_RUNTIME_CONTAINER_NAME}`,
+    requiredHealthEndpoint: "http://127.0.0.1:18787/healthz",
+    onMissingOrUnhealthy: "HOLD_DO_NOT_START",
+  });
+  assert.ok(plan.runArgv.includes(`--network=container:${CANARY_RUNTIME_CONTAINER_NAME}`));
+  assert.ok(!plan.runArgv.includes("--network=host"));
+  assert.ok(!plan.runArgv.includes("--net=host"));
+  assert.ok(!plan.runArgv.includes("-p"));
+  assert.ok(!plan.runArgv.includes("--publish"));
 });
 
 test("routes only to the fixed read-only canary", () => {
@@ -165,6 +184,11 @@ test("rejects unpinned or non-official images", () => {
 });
 
 test("rejects non-canary destinations and public health listeners", () => {
+  assert.throws(
+    () => buildTunnelDockerPlan(validInput({
+      mcpServerUrl: "http://host.docker.internal:18787/mcp",
+    })), /read-only canary/u,
+  );
   assert.throws(
     () => buildTunnelDockerPlan(validInput({
       mcpServerUrl: "http://host.docker.internal:8080/api/v1/mcp",
