@@ -699,6 +699,45 @@ test("commercial evidence roles remain disjoint across payment batches",()=>{
   );
 });
 
+test("historical cursor rejects evidence digest role collisions",()=>{
+  const item=[{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }];
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      sourceEvidenceDigests:["1".repeat(64)],
+      invoiceEvidenceDigests:["1".repeat(64)],
+    }),
+    /source evidence digest reused from invoice binding/,
+  );
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      evidenceDigests:["1".repeat(64)],
+      sourceEvidenceDigests:["1".repeat(64)],
+    }),
+    /payment evidence digest reused from commercial binding/,
+  );
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      evidenceDigests:["d".repeat(64)],
+      providerTransactions:[{
+        providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
+        provider:observation("PENDING").provider,
+        observedAt:observation("PENDING").observedAt,
+        status:"PENDING",
+      }],
+    }),
+    /provider transaction digest reused from another evidence role/,
+  );
+});
+
 test("malformed or omitted prior cursor fails closed",()=>{
   const item=[{
     providerTransactionDigest:"d".repeat(64),
