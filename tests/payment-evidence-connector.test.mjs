@@ -491,6 +491,87 @@ test("provider transaction ownership and lifecycle persist across batches",()=>{
   );
 });
 
+test("invoice and source ownership persist across provider transactions",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const replacement={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"f".repeat(64),
+    },
+    expectedBinding:binding(),
+  };
+  assert.throws(
+    ()=>assessBatch([replacement],first.reconciliationCursor),
+    /invoice event already bound to another provider transaction/,
+  );
+  const replacementInvoiceId="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  assert.throws(
+    ()=>assessBatch([{
+      ...replacement,
+      observation:{
+        ...replacement.observation,
+        invoiceEventId:replacementInvoiceId,
+      },
+      expectedBinding:{
+        ...binding(),
+        invoiceEventId:replacementInvoiceId,
+        invoiceEvidenceDigest:"1".repeat(64),
+      },
+    }],first.reconciliationCursor),
+    /source record already bound to another provider transaction/,
+  );
+});
+
+test("malformed cursor rejects historical duplicate invoice ownership",()=>{
+  const prior={
+    ...emptySyntheticPaymentEvidenceCursor(),
+    providerTransactions:[
+      {
+        providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
+        provider:observation("PENDING").provider,
+        observedAt:observation("PENDING").observedAt,
+        status:"PENDING",
+      },
+      {
+        providerTransactionDigest:"e".repeat(64),
+        sourceRecordId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        invoiceEventId:observation("PENDING").invoiceEventId,
+        provider:observation("PENDING").provider,
+        observedAt:observation("PENDING").observedAt,
+        status:"PENDING",
+      },
+    ],
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"f".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        sourceRecordId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        invoiceEventId:"11111111-1111-4111-8111-111111111111",
+        evidenceDigest:"2".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        invoiceEventId:"11111111-1111-4111-8111-111111111111",
+        invoiceEvidenceDigest:"3".repeat(64),
+      },
+    }],prior),
+    /prior invoice event bound to multiple provider transactions/,
+  );
+});
+
 test("malformed or omitted prior cursor fails closed",()=>{
   const item=[{
     providerTransactionDigest:"d".repeat(64),
