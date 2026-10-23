@@ -1,0 +1,32 @@
+{
+  "schema": "NEWTON_FULFILMENT_COMPATIBILITY_MANIFEST_V1",
+  "synthetic": true,
+  "projectRef": "DEMO-DIAG-001",
+  "enquiryId": "11111111-1111-4111-8111-111111111111",
+  "commercialBasis": {
+    "priceGBP": 195,
+    "vatTreatment": "OUTSIDE_SCOPE",
+    "supplierAddressApproved": true,
+    "termsApproved": true
+  },
+  "result": "READY_FOR_HUMAN_ASSISTED_PRIVATE_DRY_RUN",
+  "evidenceDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "compatibleContracts": [
+    "PR11_QA",
+    "PR29_COMMERCIAL",
+    "PR30_ACQUISITION",
+    "PR43_LIFECYCLE"
+  ],
+  "blockers": [
+    "HUMAN_REVIEW_NOT_RUN",
+    "CLIENT_ACCEPTANCE_NOT_RUN",
+    "PAYMENT_NOT_CLEARED",
+    "OWNER_CONNECTION_NOT_APPROVED",
+    "LIVE_BROWSER_NOT_RUN"
+  ],
+  "customerDelivery": "HOLD",
+  "paymentState": "NOT_CLEARED",
+  "connectionState": "NEEDS_CONNECTION",
+  "live": false,
+  "externalAction": false
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "NEWTON_PRIVATE_HANDOVER_CONNECT_LATER_V1",
+  "mode": "OFFLINE_PRIVATE_REVIEW_ONLY",
+  "storageAdapter": "",
+  "deliveryRoute": "",
+  "recipientRole": "",
+  "ownerApproval": "NOT_GRANTED",
+  "rollbackApproval": "NOT_GRANTED",
+  "liveEnabled": false
+}

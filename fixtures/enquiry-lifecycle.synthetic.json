@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "enquiryId": "synthetic-enquiry-001",
+  "email": "qa@example.invalid",
+  "createdAt": "2026-10-01T09:00:00.000Z",
+  "syntheticOnly": true,
+  "personalData": false,
+  "deletionRequested": false
+}

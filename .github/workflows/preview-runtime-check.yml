@@ -1,0 +1,76 @@
+name: Preview runtime binding safety
+on:
+  pull_request:
+    paths:
+      - 'functions/**'
+      - 'lib/**'
+      - 'public/**'
+      - 'scripts/check-preview-binding.mjs'
+      - '.github/workflows/preview-runtime-check.yml'
+permissions:
+  contents: read
+  checks: read
+jobs:
+  preview-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Find successful Cloudflare Preview for this exact PR commit
+        id: locate
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          const { GH_REPO, GH_SHA, GH_TOKEN, GITHUB_OUTPUT } = process.env;
+          let url;
+          for (let attempt = 0; attempt < 18; attempt++) {
+            const target = 'https://api.github.com/repos/' + GH_REPO + '/commits/' + GH_SHA + '/check-runs?per_page=100';
+            const response = await fetch(target, {
+              headers: {
+                Authorization: 'Bearer ' + GH_TOKEN,
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+              },
+              signal: AbortSignal.timeout(15000),
+            });
+            if (!response.ok) throw new Error('GitHub check read returned HTTP ' + response.status);
+            const body = await response.json();
+            const cf = body.check_runs?.find(check => check.name === 'Cloudflare Pages');
+            if (cf?.status === 'completed' && cf.conclusion !== 'success') {
+              throw new Error('Cloudflare Pages check completed as ' + cf.conclusion);
+            }
+            if (cf?.conclusion === 'success') {
+              const summary = cf.output?.summary || '';
+              const preview = summary.match(/<a href=['"](https:\/\/[a-z0-9-]+\.newton-revenue-site\.pages\.dev)['"]>/i);
+              if (!preview) throw new Error('Successful Cloudflare check did not expose a safe Preview URL');
+              url = preview[1];
+              break;
+            }
+            await new Promise(resolve => setTimeout(resolve, 10000));
+          }
+          if (!url) throw new Error('Cloudflare Preview check did not succeed within bounded poll');
+          console.log('Verified exact-commit Preview hostname:', new URL(url).hostname);
+          appendFileSync(GITHUB_OUTPUT, 'url=' + url + '\n');
+          NODE
+      - name: Verify Preview route, binding and owner-only gate without customer data
+        env:
+          PREVIEW_URL: ${{ steps.locate.outputs.url }}
+        shell: bash
+        run: |
+          set +e
+          node scripts/check-preview-binding.mjs "$PREVIEW_URL/"
+          status=$?
+          set -e
+          if [ "$status" -eq 2 ]; then
+            echo '::error::Preview KV binding verified, but the separate Preview ADMIN_TOKEN is still missing or unavailable; release blocked.'
+            exit 2
+          fi
+          exit "$status"
