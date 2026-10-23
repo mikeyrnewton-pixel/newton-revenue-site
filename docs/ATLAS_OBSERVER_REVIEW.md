@@ -1,6 +1,6 @@
 # ATLAS Observer v0.1 — read-only MCP preview (NOT INSTALLED)
 
-**23 October 2026. REVIEW_BRANCH / TESTED_OFFLINE only.** Keep the proven OpenAI secure tunnel and the verified `atlas_ping` canary running **unchanged**. This is a candidate incremental capability, not proof that ChatGPT can inspect the Mac.
+**23 October 2026. Cloud MCP service remains REVIEW_BRANCH / TESTED_OFFLINE only.** The Mac-side sanitized snapshot publisher and dedicated 60-second LaunchAgent were separately installed by the owner and have verified multiple local runs **while Mac stayed awake**. Keep the proven secure tunnel and existing `atlas_ping` canary **unchanged**. Neither the PR nor the Mac-local snapshot proves that ChatGPT can inspect the Mac.
 
 ## Baseline
 
@@ -11,8 +11,8 @@ On 23 Oct the owner manually started the isolated `atlas-mcp-readonly-canary` an
 Three separate trust boundaries, none automatically connected by GitHub source updates:
 
 1. **Local Mac snapshot producer** — `scripts/atlas-observer-snapshot.mjs --capture` calls the **already existing, reviewed** `readMacStatus` diagnostic and writes a filtered JSON object to **stdout only**. It does not create files, schedule jobs, start containers, read secrets, expose raw names or write to Activepieces. The old diagnostic uses fixed allowlisted `docker ps`, `launchctl print`, loopback-only Activepieces HTTP response status, and heartbeat file metadata. No free-form shell execution or arbitrary user input.
-2. **Owner-managed snapshot file** — a *future separately approved* local job must atomically publish a **non-secret, filtered** JSON snapshot, with least-privilege file ownership, then mount a copy into the observer container **read-only** at the fixed path `/run/atlas-observer/status.json`. This job is **not implemented or enabled** in this PR. Until it exists, `atlas_status` cannot return fresh real Mac information. No credential file, Docker socket, host root or Activepieces data directory may be mounted.
-3. **Isolated MCP observer service** — `scripts/atlas-mcp-observer.mjs --serve` is an *alternative service*, **not a patch to the running verified canary**. It listens only `127.0.0.1:18788` inside an independently isolated Docker namespace and returns **exactly** `atlas_ping` and `atlas_status`. The former returns a constant. The latter has **zero parameters** and reads only the fixed snapshot path. It launches no shell/Docker/HTTP/Mac commands and returns only fixed enum labels, no input text or raw diagnostic output. Bind to the private loopback and expose **no published host ports**. The tunnel's current target is still `127.0.0.1:18787/mcp`; rerouting it to port 18788 requires separate owner consent after QA.
+2. **Owner-managed snapshot file** — on 23 Oct the owner verified the pinned publisher and 18 offline tests on the Mac, then published a filtered local `~/.atlas-observer/status.json` with owner-only folder/file modes 0700/0600. The owner separately approved/installed fixed-label `uk.newton.atlas-observer-snapshot` (StartInterval=60s, no KeepAlive): first run passed; later while an explicitly time-bounded 20-minute AC-only `caffeinate -s -t 1200` assertion was active, run count rose to **9**, exit code **0**, and snapshot age was **35s** at 19:43 BST. This is **local evidence only**. macOS sleep events made the snapshot stale (>300s) without the assertion. No permanent Mac uptime remedy has been approved. The **read-only Docker mount** at `/run/atlas-observer/status.json` is **not installed** and must remain a separate review/approval gate. No credential file, Docker socket, host root or Activepieces data directory may be mounted.
+3. **Isolated MCP observer service** — `scripts/atlas-mcp-observer.mjs --serve` is an *alternative service*, **not a patch to the running verified canary**. It is designed to listen only on `127.0.0.1:18788` inside an independently isolated Docker namespace and exposes **exactly** `atlas_ping`, `atlas_capabilities` and `atlas_status`. The former returns a constant. The latter has **zero parameters** and reads only the fixed snapshot path. It launches no shell/Docker/HTTP/Mac commands and returns only fixed enum labels, no input text or raw diagnostic output. Bind to the private loopback and expose **no published host ports**. The tunnel's current target is still `127.0.0.1:18787/mcp`; rerouting it to port 18788 requires separate owner consent after QA.
 
 ### Allowed output
 
@@ -34,7 +34,8 @@ No `run_shell`, arbitrary Docker/API access, HTTP client, filesystem browse, ins
 
 - OpenAI private MCP transport / `atlas_ping`: **LIVE_VERIFIED_CANARY**.
 - Observer source + synthetic tests: **TESTED_OFFLINE** once GitHub CI confirms.
-- Mac status snapshot publisher / read-only mount / client reconfiguration: **NOT DEPLOYED**.
+- Mac-local sanitized publisher / 60-second snapshot LaunchAgent: **OWNER-INSTALLED, REPEATED LOCAL REFRESH VERIFIED WHILE AWAKE** (sleep interruption unresolved).
+- Observer MCP runtime, Docker read-only mount, private tunnel reconfiguration and new plugin scope: **NOT DEPLOYED**.
 - ChatGPT remote `atlas_status`: **NOT VERIFIED**.
 - Real cash, real trades, Activepieces remote tool access: **NOT VERIFIED**.
 
