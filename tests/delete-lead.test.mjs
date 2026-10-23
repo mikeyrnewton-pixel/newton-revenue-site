@@ -86,6 +86,26 @@ test('private erasure removes receipt, notice and lead in retry-safe order', asy
     'receipt:' + SUBMISSION, 'notice:' + reference,
     'receipt:' + SUBMISSION, 'notice:' + reference, 'lead:' + reference,
   ]);
+  const submissionTombstone = await kv.get('erased-submission:' + SUBMISSION, 'json');
+  assert.equal(submissionTombstone.erased, true);
+
+  const staleRetry = new Request(ORIGIN + '/api/enquiry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: ORIGIN },
+    body: JSON.stringify({
+      submissionId: SUBMISSION,
+      name: 'FICTIONAL PERSON',
+      company: 'EXAMPLE INVALID',
+      email: 'delete-test@example.invalid',
+      problem: 'Synthetic erasure acceptance case only',
+      contactPermission: true,
+    }),
+  });
+  const blocked = await submit({ request: staleRetry, env: { LEADS: kv } });
+  assert.equal(blocked.status, 410);
+  assert.equal((await blocked.json()).error,
+    'This enquiry was erased. Refresh before submitting a new enquiry.');
+  assert.equal([...kv.values.keys()].filter(key => key.startsWith('lead:')).length, 0);
 });
 
 test('erasure validates identity and rejects other methods', async () => {
