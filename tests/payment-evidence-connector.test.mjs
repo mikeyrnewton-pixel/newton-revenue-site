@@ -758,6 +758,133 @@ test("historical cursor rejects evidence digest role collisions",()=>{
   );
 });
 
+test("identifier roles remain immutable across payment batches",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const nextBase={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"1".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      sourceEvidenceDigest:"2".repeat(64),
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      invoiceEvidenceDigest:"3".repeat(64),
+    },
+  };
+  for(const mutation of [
+    item=>({
+      ...item,
+      observation:{
+        ...item.observation,
+        observationId:observation("PENDING").sourceRecordId,
+      },
+    }),
+    item=>({
+      ...item,
+      observation:{
+        ...item.observation,
+        sourceRecordId:observation("PENDING").observationId,
+      },
+      expectedBinding:{
+        ...item.expectedBinding,
+        sourceRecordId:observation("PENDING").observationId,
+      },
+    }),
+    item=>({
+      ...item,
+      observation:{
+        ...item.observation,
+        invoiceEventId:observation("PENDING").sourceRecordId,
+      },
+      expectedBinding:{
+        ...item.expectedBinding,
+        invoiceEventId:observation("PENDING").sourceRecordId,
+      },
+    }),
+  ]){
+    assert.throws(
+      ()=>assessBatch([mutation(nextBase)],first.reconciliationCursor),
+      /identifier reused across payment roles/,
+    );
+  }
+});
+
+test("same-batch identifiers cannot change roles between observations",()=>{
+  const first={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  };
+  const second={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:first.observation.sourceRecordId,
+      sourceRecordId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      invoiceEventId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"1".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      sourceEvidenceDigest:"2".repeat(64),
+      invoiceEventId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      invoiceEvidenceDigest:"3".repeat(64),
+    },
+  };
+  assert.throws(
+    ()=>assessBatch([first,second]),
+    /identifier reused across payment roles/,
+  );
+});
+
+test("historical cursor rejects identifier role collisions",()=>{
+  const item=[{
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("SETTLED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      evidenceDigest:"1".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      sourceEvidenceDigest:"2".repeat(64),
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      invoiceEvidenceDigest:"3".repeat(64),
+    },
+  }];
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      observationIds:[observation("PENDING").sourceRecordId],
+      providerTransactions:[{
+        providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
+        provider:observation("PENDING").provider,
+        observedAt:observation("PENDING").observedAt,
+        status:"PENDING",
+      }],
+    }),
+    /identifier reused across payment roles/,
+  );
+});
+
 test("malformed or omitted prior cursor fails closed",()=>{
   const item=[{
     providerTransactionDigest:"d".repeat(64),
@@ -810,4 +937,5 @@ test("cursor capacity fails closed before emitting an unusable next cursor",()=>
     /payment evidence cursor capacity exceeded/,
   );
 });
+
 
