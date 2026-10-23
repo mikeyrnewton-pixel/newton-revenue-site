@@ -83,6 +83,7 @@ test('persisted delivery state prevents resending without rewriting the lead', a
   const { env, writes } = setup();
   const lead = fixture();
   env.LEADS.get = async (key, format) => {
+    if (key === 'erased:' + lead.id) return null;
     assert.equal(key, 'notice:' + lead.id);
     assert.equal(format, 'json');
     return { version: 1, status: 'delivered', attempts: 1 };
@@ -99,12 +100,13 @@ test('retry returns bounded page progress without customer data', async () => {
     assert.equal(opts.cursor, 'second-page');
     return { keys: [{ name: 'lead:old-test' }], list_complete: false, cursor: 'third-page' };
   };
-  env.LEADS.get = async () => ({ ...fixture(), notification: undefined });
+  env.LEADS.get = async key => key.startsWith('erased:') ? null :
+    ({ ...fixture(), notification: undefined });
   const request = new Request('https://site.test/api/retry-owner-notices?cursor=second-page',
     { method: 'POST', headers: { Authorization: 'Bearer ' + TOKEN } });
   const response = await retry({ request, env });
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ok: true, counts: { delivered: 0, pending: 0, skipped: 1, expired: 0, deferred: 0 },
+  assert.deepEqual(await response.json(), { ok: true, counts: { delivered: 0, pending: 0, skipped: 1, expired: 0, deferred: 0, erased: 0 },
     hasMore: true, nextCursor: 'third-page' });
 });
 test('cursorless retry rotates through pages so later pending notices cannot starve', async () => {
@@ -114,6 +116,7 @@ test('cursorless retry rotates through pages so later pending notices cannot sta
   const seen = [];
   env.LEADS.get = async (key) => {
     if (key === 'meta:notice-retry-cursor') return savedCursor;
+    if (key.startsWith('erased:')) return null;
     return { ...fixture(), id: key.slice(5), notification: undefined };
   };
   env.LEADS.put = async (key, value) => {
