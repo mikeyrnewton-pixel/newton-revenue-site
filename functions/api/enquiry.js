@@ -102,9 +102,14 @@ export async function onRequestPost({ request, env, waitUntil }) {
       return reply({ error: "Could not validate submission. Please retry or email us." }, 503);
     }
   }
+  // One server timestamp is both creation evidence and the instant at which
+  // the accepted contact permission was captured. PR30's privacy-safe handoff
+  // requires this explicit evidence; deriving it later would be unverifiable.
+  const createdAt = new Date().toISOString();
   const record = {
     id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
+    createdAt,
+    contactPermissionCapturedAt: createdAt,
     ...(submissionId ? { submissionId } : {}),
     source,
     channel,
