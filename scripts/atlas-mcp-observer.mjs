@@ -116,8 +116,15 @@ export function createObserverServer(deps = {}) {
     let size = 0;
     let oversized = false;
     req.on("data", chunk => {
+      if (oversized) return;
       size += chunk.length;
-      if (size > MAX_REQUEST_BYTES) {oversized = true;return;}
+      if (size > MAX_REQUEST_BYTES) {
+        oversized = true;
+        chunks.length = 0;
+        json(res, 413, {error: "Request too large"});
+        req.resume();
+        return;
+      }
       chunks.push(chunk);
     });
     req.on("error", () => {if (!res.writableEnded) empty(res, 400);});
