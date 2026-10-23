@@ -460,3 +460,23 @@ test("malformed or omitted prior cursor fails closed",()=>{
   );
 });
 
+
+
+test("cursor capacity fails closed before emitting an unusable next cursor",()=>{
+  const fullEvidence=Array.from({length:1000},(_,index)=>
+    index.toString(16).padStart(64,"0"));
+  const prior={
+    version:1,
+    synthetic:true,
+    observationIds:[],
+    evidenceDigests:fullEvidence,
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:observation("SETTLED"),
+      expectedBinding:binding(),
+    }],prior),
+    /payment evidence cursor capacity exceeded/,
+  );
+});
