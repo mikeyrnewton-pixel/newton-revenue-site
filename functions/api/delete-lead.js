@@ -46,9 +46,15 @@ export async function onRequestPost({ request, env }) {
       UUID.test(record.submissionId) ? record.submissionId : null;
     // Non-PII tombstone closes the race with a notice already in flight.
     // It expires with the original maximum personal-data retention window.
+    const erasedAt = new Date().toISOString();
     await env.LEADS.put('erased:' + leadId, JSON.stringify({
-      version: 1, erased: true, erasedAt: new Date().toISOString(),
+      version: 1, erased: true, erasedAt,
     }), { expirationTtl: 30 * 24 * 60 * 60 });
+    if (submissionId) {
+      await env.LEADS.put('erased-submission:' + submissionId, JSON.stringify({
+        version: 1, erased: true, erasedAt,
+      }), { expirationTtl: 30 * 24 * 60 * 60 });
+    }
     // Lead remains available until ancillary deletions finish, making a
     // partial KV failure safely retryable without orphaning the receipt ID.
     if (submissionId) await env.LEADS.delete('receipt:' + submissionId);
