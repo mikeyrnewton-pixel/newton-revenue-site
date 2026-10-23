@@ -637,6 +637,11 @@ test("invoice and source ownership persist across provider transactions",()=>{
 test("malformed cursor rejects historical duplicate invoice ownership",()=>{
   const prior={
     ...emptySyntheticPaymentEvidenceCursor(),
+    observationIds:[
+      "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      "ffffffff-ffff-4fff-8fff-ffffffffffff",
+    ],
+    evidenceDigests:["4".repeat(64),"5".repeat(64)],
     sourceEvidenceDigests:[binding().sourceEvidenceDigest],
     invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
     providerTransactions:[
@@ -823,6 +828,7 @@ test("historical cursor rejects evidence digest role collisions",()=>{
   assert.throws(
     ()=>assessBatch(item,{
       ...emptySyntheticPaymentEvidenceCursor(),
+      observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
       evidenceDigests:["1".repeat(64)],
       sourceEvidenceDigests:["1".repeat(64)],
     }),
@@ -831,6 +837,7 @@ test("historical cursor rejects evidence digest role collisions",()=>{
   assert.throws(
     ()=>assessBatch(item,{
       ...emptySyntheticPaymentEvidenceCursor(),
+      observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
       evidenceDigests:["d".repeat(64)],
       providerTransactions:[{
         providerTransactionDigest:"d".repeat(64),
@@ -961,6 +968,7 @@ test("historical cursor rejects identifier role collisions",()=>{
     ()=>assessBatch(item,{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:[observation("PENDING").sourceRecordId],
+      evidenceDigests:["4".repeat(64)],
       sourceEvidenceDigests:[binding().sourceEvidenceDigest],
       invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
       providerTransactions:[{
@@ -1009,13 +1017,72 @@ test("malformed or omitted prior cursor fails closed",()=>{
 
 
 
+test("historical cursor rejects orphan observation IDs or evidence digests",()=>{
+  const item=[{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }];
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
+    }),
+    /one-to-one cardinality/,
+  );
+  assert.throws(
+    ()=>assessBatch(item,{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      evidenceDigests:["1".repeat(64)],
+    }),
+    /one-to-one cardinality/,
+  );
+});
+
+test("historical provider transaction requires observation evidence",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"e".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        evidenceDigest:"1".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        sourceEvidenceDigest:"2".repeat(64),
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        invoiceEvidenceDigest:"3".repeat(64),
+      },
+    }],{
+      ...first.reconciliationCursor,
+      observationIds:[],
+      evidenceDigests:[],
+    }),
+    /lacks payment observation evidence/,
+  );
+});
+
 test("cursor capacity fails closed before emitting an unusable next cursor",()=>{
   const fullEvidence=Array.from({length:1000},(_,index)=>
     index.toString(16).padStart(64,"0"));
+  const fullObservationIds=Array.from({length:1000},(_,index)=>{
+    const prefix=index.toString(16).padStart(8,"0");
+    const suffix=index.toString(16).padStart(12,"0");
+    return `${prefix}-0000-4000-8000-${suffix}`;
+  });
   const prior={
     version:1,
     synthetic:true,
-    observationIds:[],
+    observationIds:fullObservationIds,
     evidenceDigests:fullEvidence,
     sourceEvidenceDigests:[],
     invoiceEvidenceDigests:[],
