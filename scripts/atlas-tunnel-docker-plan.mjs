@@ -143,20 +143,22 @@ export function buildTunnelDockerPlan(input) {
       "inspect",
       input.containerName,
       "--format",
-      "{{.Config.Image}} {{index .Config.Labels \"com.newton.atlas.tunnel-canary\"}}",
+      "{{.Id}} {{.Config.Image}} {{index .Config.Labels \"com.newton.atlas.tunnel-canary\"}}",
     ],
     stopGuard: {
       requiredContainerName: input.containerName,
+      requiredContainerIdSource: "INSPECT_RESULT_ID",
       requiredImage: input.image,
       requiredOwnershipLabel: OWNERSHIP_LABEL,
+      stopTarget: "INSPECTED_CONTAINER_ID_ONLY",
       onMismatch: "HOLD_DO_NOT_STOP",
     },
-    stopArgv: [
+    stopArgvTemplate: [
       "docker",
       "stop",
       "--time",
       "10",
-      input.containerName,
+      "<INSPECTED_CONTAINER_ID>",
     ],
   });
 }
