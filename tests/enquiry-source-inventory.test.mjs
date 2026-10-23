@@ -291,6 +291,17 @@ test("readable counts require a canonical bounded evidence window",()=>{
     /unreadable source cannot claim a coverage window/);
 });
 
+test("fresh attestation cannot disguise an obsolete source coverage window",()=>{
+  const input=fixture();
+  input.sources[1].coverageEndedAt="2026-10-20T11:58:59.000Z";
+  input.sources[1].evidenceDigest=evidenceDigestFor(input.sources[1]);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /readable source coverage is stale at verification/,
+    "a newly attested old query window must not support current source truth",
+  );
+});
+
 test("readable source evidence must be fresh at reconciliation time",()=>{
   const stale=fixture();
   stale.reconciledAt="2026-10-20T12:30:01.000Z";
