@@ -48,7 +48,6 @@ mounts=$("$DOCKER" inspect -f '{{range .Mounts}}{{.Destination}}|{{.RW}};{{end}}
 forward='/opt/atlas-observer/scripts|false;/run/atlas-observer|false;'
 reverse='/run/atlas-observer|false;/opt/atlas-observer/scripts|false;'
 [ "$mounts" = "$forward" ] || [ "$mounts" = "$reverse" ] || hold MOUNTS_MISMATCH
-[ "$mounts" = "$expected" ] || hold MOUNTS_MISMATCH
 printf 'OBSERVER_CONTAINER=RUNNING_GUARDED\n'
 # Fixed local loopback only, within the review container. Does not call tunnel.
 if ! "$DOCKER" exec -i "$OBSERVER" node --input-type=module - <<'LOCAL_ONLY'
