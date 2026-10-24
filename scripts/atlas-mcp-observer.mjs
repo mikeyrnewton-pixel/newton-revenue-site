@@ -128,6 +128,14 @@ export function createObserverServer(deps = {}) {
     if (req.method !== "POST") return json(res, 405, {error: "Method not allowed"});
     if ((req.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json")
       return json(res, 415, {error: "JSON required"});
+    // The byte cap applies to the body received by this process. Refuse
+    // compression so an encoded request cannot expand beyond that reviewed
+    // bound or create decoder ambiguity at the Observer trust boundary.
+    const contentEncoding = req.headers["content-encoding"];
+    if (contentEncoding !== undefined &&
+        (typeof contentEncoding !== "string" ||
+         contentEncoding.trim().toLowerCase() !== "identity"))
+      return json(res, 415, {error: "Content encoding not allowed"});
     const chunks = [];
     let size = 0;
     let oversized = false;
