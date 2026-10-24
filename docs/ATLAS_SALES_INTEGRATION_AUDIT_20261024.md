@@ -22,3 +22,8 @@ At commit `9d5a1a0e7d86adf77dbd79ecaadbdf112f4cb324`, all three independent GitH
 - No public merge/deployment, provider connection, real buyer communications, changes to private customer records or charge until Michael explicitly approves the exact scope.
 
 **Execution state: BUILT / TESTED_OFFLINE / REVIEW_BRANCH. Real buyer and cleared revenue: NOT VERIFIED. New spend: £0.**
+
+
+## Follow-up: upstream payment branch hardened — 24 Oct 2026
+
+After confirming the integration-specific guarantees, the team **also applied the stricter combined controls back to the original review-only PR #29** (`task010-commercial-handoff-controls-20261017`). At exact commit `f32af19ef0ac520b0b7921125cfa7a59edd79693`, these four upstream files now match PR #45's stronger implementations/tests: `lib/commercial-readiness.js`, `tests/commercial-readiness.test.mjs`, `lib/commercial-source-evidence.js`, `tests/commercial-source-evidence.test.mjs`. Existing upstream payment connector/tests and mock quote/tests already match the PR #45 integrated versions after the reconciliation above. Thus the **eight commercial source/test paths now agree across PR #29 and PR #45** at the pinned snapshot. Both upstream PR #29 quality checks completed **SUCCESS** at this exact commit. No production code was merged or released. **The earlier source-vs-integration divergence detailed above is historical, not a remaining current discrepancy.** Future agent commits can introduce new drift, so repeat the checks before release.
