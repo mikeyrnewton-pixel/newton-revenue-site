@@ -137,3 +137,18 @@ Owner executed the approved **read-only preflight** through iPhone SSH and suppl
 The owner tried to download the previous `.sh` staging attachment on iPhone and received the platform's **“The file download failed. Please try again later.”** alert. **No evidence of Mac staging or any failed Mac command.** To avoid relying on platform attachment handling and two iCloud files, the draft-only `scripts/atlas-observer-local-stage-20261024.sh` was replaced with a pinned-source-fetch staging mode. This uses only public GitHub HTTPS GET to fetch three reviewed source/test files from immutable commit `1053f4251c7d092e9f1afbe709b89bcb27dea096`, verifies each against its exact Git blob SHA-1, then runs local Node syntax and offline regression tests. It makes no Docker, tunnel, plugin, power, LaunchAgent or production changes. No `curl|bash` and no credentials.
 
 **Owner SSH recovery bootstrap:** fetch the staging script itself from pinned commit `c5376b1a5cc3e9ef63422f15279c6c1fd8486664`, expected Git blob `5bec6ba702cb03532246b930cb470808577c866e`, verify before invoking `/bin/bash <local_temp_file> --stage-offline-only`. Guarded Mac-only, on AC, private new stage directory without overwriting old files. This requires Mac outbound HTTPS **only to public raw.githubusercontent.com** for immutable code retrieval; it does not send business data, tokens or secrets. The test suite then runs locally using Node with ephemeral loopback fixtures. Release gate unchanged: observer container must not be started and the canary/tunnel/plugin must not be touched without a separate explicit scope approval. Run the owner snippet supplied in chat; do not use the obsolete iCloud ZIP/script-file directions.
+
+
+## Owner-approved Stage 1 PASS — 24 Oct 2026 12:10 BST
+
+Owner authorised **offline Stage 1 only** by replying `Stage`. Initial iOS file-attachment download failed; the reviewed, immutable-source HTTPS staging recovery was prepared in PR #47 and executed via owner's existing iPhone SSH Shortcut. Owner screenshot at 12:10 BST confirms all three pinned Git source hashes passed integrity checks:
+
+- `SOURCE_VERIFIED=scripts/atlas-mcp-observer.mjs`;
+- `SOURCE_VERIFIED=scripts/atlas-observer-snapshot.mjs`;
+- `SOURCE_VERIFIED=tests/atlas-mcp-observer.test.mjs`.
+
+Actual owner Mac Node test receipt: **tests 34; pass 34; fail 0; cancelled 0; skipped 0; todo 0**; duration ~304 ms. Final marker: `ATLAS_OBSERVER_MCP=PINNED_OFFLINE_STAGE_TESTS_PASSED`.
+
+Explicit unchanged-state receipts: `OBSERVER_CONTAINER=NOT_STARTED`, `EXISTING_CANARY_AND_TUNNEL=UNCHANGED`, `CHATGPT_PLUGIN=UNCHANGED`, `SPEND_GBP=0`.
+
+**Truth boundary:** Mac-local source has passed offline tests and is staged in a new private review folder; *no new Observer service is running*, no container image/UID mapping or host mount has been verified, no private health snapshot has been read through MCP, no cutover to `atlas_status` occurred. This does **not** settle unattended Mac sleep, plugin auth scope, host-data exposure, Docker Desktop bind mount ownership, or 24/7 uptime. Before next owner authorisation: independently review the exact container image, verify Mac Docker Desktop can safely bind the **private snapshot directory** read-only without widening 0700/0600 permissions, require a frozen resource-limited container with no host-published ports and no socket/secret mounts, and preserve canary/tunnel. **Next milestone (separate approval): isolated Observer container start + local-only acceptance, NOT tunnel/plugin cutover.**
