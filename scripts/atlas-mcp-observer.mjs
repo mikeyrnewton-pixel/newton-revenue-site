@@ -49,6 +49,12 @@ const exactKeys = (value, allowed) => validRecord(value) &&
   allowed.filter(key => Object.hasOwn(value, key)).length === Object.keys(value).length;
 const emptyParams = value => value === undefined ||
   (validRecord(value) && Object.keys(value).length === 0);
+const validInitializeParams = value =>
+  exactKeys(value, ["protocolVersion", "capabilities", "clientInfo"]) &&
+  typeof value.protocolVersion === "string" &&
+  value.protocolVersion.length > 0 && value.protocolVersion.length <= 32 &&
+  (!Object.hasOwn(value, "capabilities") || validRecord(value.capabilities)) &&
+  (!Object.hasOwn(value, "clientInfo") || validRecord(value.clientInfo));
 
 /** Denied methods and unauthorized tools never call readSnapshot. */
 export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now = Date.now} = {}) {
@@ -63,7 +69,9 @@ export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now
     return error(validId ? id : null, -32600, "Invalid request");
   if (!hasId) return null;
   if (message.method === "initialize") {
-    const offered = message.params?.protocolVersion;
+    if (!validInitializeParams(message.params))
+      return error(id, -32602, "Invalid initialize parameters");
+    const offered = message.params.protocolVersion;
     return reply(id, {
       protocolVersion: SUPPORTED.has(offered) ? offered : PROTOCOL,
       capabilities: {tools: {listChanged: false}},
