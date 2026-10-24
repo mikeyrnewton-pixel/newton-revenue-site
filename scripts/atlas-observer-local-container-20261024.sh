@@ -59,6 +59,24 @@ for file in "$SCRIPTS/atlas-mcp-observer.mjs" \
     echo 'HOLD: nonprivate, linked or missing review file'; exit 2
   fi
 done
+# Both binds expose directories, not individual files: atomic snapshot renames
+# require the directory mount to observe the latest status.json inode.
+# Fail closed if private folders contain anything outside the exact reviewed
+# code files and the sanitized snapshot. A publisher temp file can exist for
+# milliseconds during a scheduled refresh; if so, retry later, never broaden.
+shopt -s nullglob dotglob
+for entry in "$SCRIPTS"/*; do
+  case "$entry" in
+    "$SCRIPTS/atlas-mcp-observer.mjs"|"$SCRIPTS/atlas-observer-snapshot.mjs") ;;
+    *) echo 'HOLD: unexpected item in mounted source directory'; exit 2 ;;
+  esac
+done
+for entry in "$SNAPDIR"/*; do
+  if [ "$entry" != "$SNAP" ]; then
+    echo 'HOLD: unexpected item in private snapshot mount directory'; exit 2
+  fi
+done
+shopt -u nullglob dotglob
 if [ "$(git hash-object "$SCRIPTS/atlas-mcp-observer.mjs")" != \
      '56eafea5e1e2a60ec5de0a3eb8051ea6b72349c5' ] ||
    [ "$(git hash-object "$SCRIPTS/atlas-observer-snapshot.mjs")" != \
