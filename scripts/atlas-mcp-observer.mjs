@@ -48,22 +48,36 @@ const validRecord = value => {
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
 };
-const exactKeys = (value, allowed) => validRecord(value) &&
-  Object.keys(value).every(key => allowed.includes(key)) &&
-  allowed.filter(key => Object.hasOwn(value, key)).length === Object.keys(value).length;
-const emptyParams = value => value === undefined ||
-  (validRecord(value) && Object.keys(value).length === 0);
+// The exported handler is also used directly by offline tests and future local
+// adapters. Do not execute accessors or accept hidden/symbol properties at that
+// trust boundary, even though JSON.parse itself produces inert data properties.
+const ownDataKeys = value => {
+  if (!validRecord(value)) return null;
+  const keys = Reflect.ownKeys(value);
+  if (!keys.every(key => typeof key === "string")) return null;
+  for (const key of keys) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !Object.hasOwn(descriptor, "value") ||
+        descriptor.enumerable !== true) return null;
+  }
+  return keys;
+};
+const inertRecord = value => ownDataKeys(value) !== null;
+const exactKeys = (value, allowed) => {
+  const keys = ownDataKeys(value);
+  return keys !== null && keys.every(key => allowed.includes(key));
+};
+const emptyParams = value => value === undefined || exactKeys(value, []);
 const validInitializeParams = value =>
   exactKeys(value, ["protocolVersion", "capabilities", "clientInfo"]) &&
   typeof value.protocolVersion === "string" &&
   value.protocolVersion.length > 0 && value.protocolVersion.length <= 32 &&
-  (!Object.hasOwn(value, "capabilities") || validRecord(value.capabilities)) &&
-  (!Object.hasOwn(value, "clientInfo") || validRecord(value.clientInfo));
+  (!Object.hasOwn(value, "capabilities") || inertRecord(value.capabilities)) &&
+  (!Object.hasOwn(value, "clientInfo") || inertRecord(value.clientInfo));
 
 /** Denied methods and unauthorized tools never call readSnapshot. */
 export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now = Date.now} = {}) {
-  if (!validRecord(message) ||
-      !Object.keys(message).every(key => ["jsonrpc", "id", "method", "params"].includes(key)))
+  if (!exactKeys(message, ["jsonrpc", "id", "method", "params"]))
     return error(null, -32600, "Invalid request");
   const hasId = Object.hasOwn(message, "id");
   const id = hasId ? message.id : null;
@@ -95,7 +109,7 @@ export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now
       typeof message.params.name !== "string" ||
       !TOOLS.some(tool => tool.name === message.params.name)) return error(id, -32602, "Tool not allowed");
   const args = message.params.arguments === undefined ? {} : message.params.arguments;
-  if (!validRecord(args) || Object.keys(args).length !== 0)
+  if (!exactKeys(args, []))
     return error(id, -32602, "Arguments not allowed");
   if (message.params.name === "atlas_ping") return reply(id, {content: [{type: "text", text: PING_REPLY}], isError: false});
   if (message.params.name === "atlas_capabilities")
