@@ -70,6 +70,21 @@ test("dedupes exact retries and sorts rows canonically",()=>{
   ]);
 });
 
+
+test("rejects two CRM event keys claiming the same enquiry reference",()=>{
+  const first=event();
+  const duplicateLead=event({
+    submissionId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  });
+  assert.equal(first.enquiryRef,duplicateLead.enquiryRef);
+  assert.notEqual(first.eventKey,duplicateLead.eventKey);
+  assert.throws(
+    ()=>buildOfflineCrmExport([first,duplicateLead],config()),
+    /one enquiry reference cannot map to multiple CRM event keys/,
+  );
+});
+
+
 test("rejects connection details, credentials and write modes",()=>{
   assert.throws(
     ()=>buildOfflineCrmExport([],{...config(),url:"https://example.supabase.co"}),
