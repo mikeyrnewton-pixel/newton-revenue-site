@@ -521,3 +521,31 @@ test("classification maps reject active object shapes without running getters",(
   );
   assert.equal(accessed,false,"classification getters must never execute");
 });
+
+test("source arrays reject sparse or accessor-backed elements",()=>{
+  const sparse=fixture();
+  sparse.sources=Array(7);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(sparse),
+    /bounded inert source array required/,
+    "array length alone cannot represent the seven required sources",
+  );
+
+  const active=fixture();
+  let accessed=false;
+  const activeSources=[...active.sources];
+  Object.defineProperty(activeSources,"0",{
+    enumerable:true,
+    get(){
+      accessed=true;
+      return unreadable("CLOUDFLARE_KV");
+    },
+  });
+  active.sources=activeSources;
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(active),
+    /bounded inert source array required/,
+  );
+  assert.equal(accessed,false,"source-array getters must never execute");
+});
+
