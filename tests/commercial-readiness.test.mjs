@@ -31,8 +31,11 @@ const base=()=>({
 test("reconciles the exact quote-to-cleared evidence sequence without claiming revenue",()=>{
   const snapshot=reconcileCommercialReadiness(base());
   assert.equal(snapshot.state,"CLEARED");
-  assert.equal(snapshot.recordedPaymentEvidenceGBP,195);
-  assert.equal(snapshot.clearedEvidenceGBP,195);
+  assert.equal(snapshot.recordedPaymentEvidenceGBP,0);
+  assert.equal(snapshot.simulatedRecordedPaymentEvidenceGBP,195);
+  assert.equal(snapshot.clearedEvidenceGBP,0);
+  assert.equal(snapshot.simulatedClearedEvidenceGBP,195);
+  assert.equal(snapshot.automaticCommercialTransition,false);
   assert.equal(snapshot.commercialTruth,"FICTIONAL_ONLY_NOT_REVENUE");
   assert.equal(snapshot.customerDelivery,"HOLD");
   assert.equal(snapshot.sourceRecordId,sourceRecordId);
@@ -64,6 +67,9 @@ test("reports VAT, address and terms blockers before any commercial event",()=>{
   assert.equal(snapshot.recordedPaymentEvidenceGBP,0);
   assert.equal(snapshot.clearedEvidenceGBP,0);
   assert.equal(snapshot.customerDelivery,"HOLD");
+  assert.equal(snapshot.simulatedRecordedPaymentEvidenceGBP,0);
+  assert.equal(snapshot.simulatedClearedEvidenceGBP,0);
+  assert.equal(snapshot.automaticCommercialTransition,false);
   assert.equal(snapshot.priceGBP,195);
   assert.equal(snapshot.vatTreatment,"UNKNOWN");
   assert.equal(snapshot.supplierAddressApproved,false);
@@ -75,7 +81,9 @@ test("payment recorded remains distinct from cleared funds",()=>{
   input.events=input.events.slice(0,-1);
   const recorded=reconcileCommercialReadiness(input);
   assert.equal(recorded.state,"PAYMENT_RECORDED");
-  assert.equal(recorded.recordedPaymentEvidenceGBP,195);
+  assert.equal(recorded.recordedPaymentEvidenceGBP,0);
+  assert.equal(recorded.simulatedRecordedPaymentEvidenceGBP,195);
+  assert.equal(recorded.simulatedClearedEvidenceGBP,0);
   assert.equal(recorded.clearedEvidenceGBP,0);
   assert.equal(recorded.commercialTruth,"FICTIONAL_ONLY_NOT_REVENUE");
   assert.equal(recorded.customerDelivery,"HOLD");
@@ -175,3 +183,20 @@ test("refuses real activity, unknown evidence and activity while gates are block
   assert.throws(()=>reconcileCommercialReadiness(extra),/exact readiness input/);
 });
 
+
+
+test("every fictional commercial stage leaves real cleared/recorded money at zero",()=>{
+  for(let length=0;length<=TYPES.length;length++){
+    const input=base();
+    input.events=input.events.slice(0,length);
+    const result=reconcileCommercialReadiness(input);
+    assert.equal(result.synthetic,true);
+    assert.equal(result.recordedPaymentEvidenceGBP,0);
+    assert.equal(result.clearedEvidenceGBP,0);
+    assert.equal(result.customerDelivery,"HOLD");
+    assert.equal(result.automaticCommercialTransition,false);
+    assert.equal(result.commercialTruth,"FICTIONAL_ONLY_NOT_REVENUE");
+    assert.equal(result.simulatedRecordedPaymentEvidenceGBP,length>=6?195:0);
+    assert.equal(result.simulatedClearedEvidenceGBP,length===7?195:0);
+  }
+});
