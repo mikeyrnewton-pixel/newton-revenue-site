@@ -1247,3 +1247,99 @@ test("historical provider bindings are copied and frozen before cursor reuse",()
   mutableHistoricalBinding.sourceRecordId="11111111-1111-4111-8111-111111111111";
   assert.equal(retained.sourceRecordId,observation("PENDING").sourceRecordId);
 });
+
+
+test("payment connector accepts inert null-prototype records only",()=>{
+  const inert=Object.assign(Object.create(null),base());
+  assert.equal(preparePaymentEvidenceConnector(inert).state,"NEEDS_CONNECTION");
+
+  const polluted=Object.assign(Object.create({allowCharges:true}),base());
+  assert.throws(
+    ()=>preparePaymentEvidenceConnector(polluted),
+    /exact non-secret configuration required/,
+  );
+
+  let accessed=false;
+  const active={...base()};
+  Object.defineProperty(active,"provider",{
+    enumerable:true,
+    get(){accessed=true;return "OWNER_SELECTED_PROVIDER";},
+  });
+  assert.throws(
+    ()=>preparePaymentEvidenceConnector(active),
+    /exact non-secret configuration required/,
+  );
+  assert.equal(accessed,false);
+});
+
+test("payment observations and bindings reject active object shapes",()=>{
+  const pollutedObservation=Object.assign(
+    Object.create({status:"SETTLED"}),
+    observation("PENDING"),
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(pollutedObservation,binding()),
+    /exact synthetic observation required/,
+  );
+
+  let accessed=false;
+  const activeBinding={...binding()};
+  Object.defineProperty(activeBinding,"provider",{
+    enumerable:true,
+    get(){accessed=true;return "OWNER_SELECTED_PROVIDER";},
+  });
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("PENDING"),activeBinding),
+    /exact expected commercial binding required/,
+  );
+  assert.equal(accessed,false);
+});
+
+test("payment cursors and historical transactions reject active object shapes",()=>{
+  const pollutedCursor=Object.assign(
+    Object.create({synthetic:false}),
+    emptySyntheticPaymentEvidenceCursor(),
+  );
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:observation("PENDING"),
+      expectedBinding:binding(),
+    }],pollutedCursor),
+    /exact prior payment evidence cursor required/,
+  );
+
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  const activeTransaction=Object.assign(
+    Object.create({status:"SETTLED"}),
+    first.reconciliationCursor.providerTransactions[0],
+  );
+  const activeCursor={
+    ...first.reconciliationCursor,
+    providerTransactions:[activeTransaction],
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"e".repeat(64),
+      observation:{
+        ...observation("PENDING"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        evidenceDigest:"1".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        sourceEvidenceDigest:"2".repeat(64),
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        invoiceEvidenceDigest:"3".repeat(64),
+      },
+    }],activeCursor),
+    /exact prior provider transaction binding required/,
+  );
+});
