@@ -485,31 +485,28 @@ test("status changes require strictly newer provider evidence",()=>{
       },
       expectedBinding:binding(),
     }],first.reconciliationCursor),
-    /status changed without newer evidence/,
+    /reused provider transaction requires newer evidence/,
   );
 });
 
-test("same-status polling evidence may retain provider timestamp",()=>{
+test("same-status polling cannot replay an identical provider timestamp",()=>{
   const first=assessBatch([{
     providerTransactionDigest:"d".repeat(64),
     observation:observation("PENDING"),
     expectedBinding:binding(),
   }]);
-  const second=assessBatch([{
-    providerTransactionDigest:"d".repeat(64),
-    observation:{
-      ...observation("PENDING"),
-      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
-      evidenceDigest:"e".repeat(64),
-    },
-    expectedBinding:binding(),
-  }],first.reconciliationCursor);
-  assert.equal(second.reconciliationCursor.providerTransactions[0].status,"PENDING");
-  assert.equal(
-    second.reconciliationCursor.providerTransactions[0].observedAt,
-    observation("PENDING").observedAt,
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"d".repeat(64),
+      observation:{
+        ...observation("PENDING"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        evidenceDigest:"e".repeat(64),
+      },
+      expectedBinding:binding(),
+    }],first.reconciliationCursor),
+    /reused provider transaction requires newer evidence/,
   );
-  assert.equal(second.clearedEvidenceGBP,0);
 });
 
 test("provider transaction ownership and lifecycle persist across batches",()=>{
@@ -556,7 +553,7 @@ test("provider transaction ownership and lifecycle persist across batches",()=>{
       },
       expectedBinding:binding(),
     }],settled.reconciliationCursor),
-    /timeline moved backwards across batches/,
+    /reused provider transaction requires newer evidence/,
   );
 });
 
