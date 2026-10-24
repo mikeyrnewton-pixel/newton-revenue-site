@@ -43,6 +43,18 @@ canary_image=$("$DOCKER" inspect -f '{{.Image}}' "$CANARY") || hold CANARY_INSPE
 [ "$net" = "container:$CANARY" ] || [ "$net" = "container:$canary_id" ] || hold NETWORK_MISMATCH
 [ "$ports" = null ] || [ "$ports" = '{}' ] || hold PORTS_PUBLISHED
 [ "$image" = "$canary_image" ] || hold IMAGE_MISMATCH
+# An owner-only label or correct image is insufficient: independently check the
+# runtime UID, dropped capabilities, privilege escalation and resource ceilings.
+who=$("$DOCKER" inspect -f '{{.Config.User}}' "$OBSERVER") || hold SECURITY_INSPECT
+drops=$("$DOCKER" inspect -f '{{json .HostConfig.CapDrop}}' "$OBSERVER") || hold SECURITY_INSPECT
+sec=$("$DOCKER" inspect -f '{{json .HostConfig.SecurityOpt}}' "$OBSERVER") || hold SECURITY_INSPECT
+ram=$("$DOCKER" inspect -f '{{.HostConfig.Memory}}' "$OBSERVER") || hold SECURITY_INSPECT
+cpu=$("$DOCKER" inspect -f '{{.HostConfig.NanoCpus}}' "$OBSERVER") || hold SECURITY_INSPECT
+pids=$("$DOCKER" inspect -f '{{.HostConfig.PidsLimit}}' "$OBSERVER") || hold SECURITY_INSPECT
+[ "$who" = "$(id -u):$(id -g)" ] || hold UNEXPECTED_CONTAINER_USER
+case "$drops" in '["ALL"]'|'["all"]') ;; *) hold CAPABILITIES_NOT_DROPPED ;; esac
+case "$sec" in '["no-new-privileges:true"]'|'["no-new-privileges"]') ;; *) hold PRIVILEGE_POLICY_MISMATCH ;; esac
+[ "$ram" = 134217728 ] && [ "$cpu" = 500000000 ] && [ "$pids" = 64 ] || hold RESOURCE_CEILINGS_MISMATCH
 mounts=$("$DOCKER" inspect -f '{{range .Mounts}}{{.Destination}}|{{.RW}};{{end}}' "$OBSERVER") || hold MOUNTS_INSPECT
 # Accept either mount listing order, but no additional bind, volume or writable mount.
 forward='/opt/atlas-observer/scripts|false;/run/atlas-observer|false;'
