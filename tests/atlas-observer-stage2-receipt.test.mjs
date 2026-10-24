@@ -44,6 +44,11 @@ test("receipt cannot change containers, credentials, network or publish status",
   assert.match(source,/CAPABILITIES_NOT_DROPPED/);
   assert.match(source,/PRIVILEGE_POLICY_MISMATCH/);
   assert.match(source,/RESOURCE_CEILINGS_MISMATCH/);
+  assert.match(source,/CANARY_ID_CHANGED/);
+  assert.match(source,/TUNNEL_ID_CHANGED/);
+  assert.match(source,/TUNNEL_NETWORK_CHANGED/);
+  assert.match(source,/BASELINE_NETWORK_MISMATCH/);
+  assert.match(source,/BASELINE_CANARY_AND_TUNNEL=RUNNING_ORIGINAL_IDS/);
   assert.match(source,/\.Destination}}\|{{\.RW/);
   assert.doesNotMatch(source,/\$DOCKER"\s+(?:run|create|start|stop|restart|rm|kill|pull|push|build|cp|commit|update|network create|volume create)\b/);
   assert.doesNotMatch(source,/\b(?:curl|wget|sudo|scp|ssh|eval)\b/);
