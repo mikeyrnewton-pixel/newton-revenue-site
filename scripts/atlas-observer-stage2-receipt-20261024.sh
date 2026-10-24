@@ -43,10 +43,11 @@ canary_image=$("$DOCKER" inspect -f '{{.Image}}' "$CANARY") || hold CANARY_INSPE
 [ "$net" = "container:$CANARY" ] || [ "$net" = "container:$canary_id" ] || hold NETWORK_MISMATCH
 [ "$ports" = null ] || [ "$ports" = '{}' ] || hold PORTS_PUBLISHED
 [ "$image" = "$canary_image" ] || hold IMAGE_MISMATCH
-mounts=$("$DOCKER" inspect -f '{{range .Mounts}}{{.Destination}}|{{.RW}}{{"\\n"}}{{end}}' "$OBSERVER") || hold MOUNTS_INSPECT
-# Only the two known mounts, each read-only. The names are fixed; host paths
-# are not read or printed by this probe.
-expected=$(printf '/opt/atlas-observer/scripts|false\n/run/atlas-observer|false')
+mounts=$("$DOCKER" inspect -f '{{range .Mounts}}{{.Destination}}|{{.RW}};{{end}}' "$OBSERVER") || hold MOUNTS_INSPECT
+# Accept either mount listing order, but no additional bind, volume or writable mount.
+forward='/opt/atlas-observer/scripts|false;/run/atlas-observer|false;'
+reverse='/run/atlas-observer|false;/opt/atlas-observer/scripts|false;'
+[ "$mounts" = "$forward" ] || [ "$mounts" = "$reverse" ] || hold MOUNTS_MISMATCH
 [ "$mounts" = "$expected" ] || hold MOUNTS_MISMATCH
 printf 'OBSERVER_CONTAINER=RUNNING_GUARDED\n'
 # Fixed local loopback only, within the review container. Does not call tunnel.
