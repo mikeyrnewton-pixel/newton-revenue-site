@@ -96,3 +96,50 @@ test("Stage 2 rejects unknown and hidden host files inside either mounted direct
     assert.equal(check().status,0,"cleared temporary file passes");
   } finally {rmSync(root,{recursive:true,force:true});}
 });
+
+test("post-start safety gates identify exact mismatch without broadening canary namespace",()=>{
+  const from=source.indexOf("observer_running=$(");
+  const stop="echo 'OBSERVER_RUNTIME_ISOLATION=VERIFIED'";
+  const until=source.indexOf(stop,from);
+  assert.ok(from>0 && until>from,"four named isolation gates required");
+  const fragment=source.slice(from,until+stop.length);
+  const root=mkdtempSync(join(tmpdir(),"atlas-isolation-fixture-"));
+  const script=join(root,"mock-docker");
+  writeFileSync(script,[
+    "#!/bin/bash",
+    "[ \"$1\" = inspect ] && [ \"$2\" = -f ] || exit 4",
+    "case \"$3\" in",
+    "  '{{.State.Running}}') echo \"$MOCK_RUNNING\" ;;",
+    "  '{{.HostConfig.ReadonlyRootfs}}') echo \"$MOCK_ROOT\" ;;",
+    "  '{{.HostConfig.Privileged}}') echo \"$MOCK_PRIV\" ;;",
+    "  '{{.HostConfig.NetworkMode}}') echo \"$MOCK_NET\" ;;",
+    "  *) exit 4 ;;",
+    "esac",
+  ].join("\n"),{mode:0o700});
+  const mock=(overrides={})=>spawnSync("bash",["-c",
+    "set -euo pipefail; DOCKER=$1; CREATED_ID=review_id; CANARY=canary; CANARY_ID=exact_canary_id; "+fragment,
+    "isolation-check",script],{
+    encoding:"utf8",timeout:4000,
+    env:{...process.env,MOCK_RUNNING:"true",MOCK_ROOT:"true",
+      MOCK_PRIV:"false",MOCK_NET:"container:canary",...overrides},
+  });
+  try {
+    assert.equal(mock().status,0,"expected canary name accepted");
+    assert.equal(mock({MOCK_NET:"container:exact_canary_id"}).status,0,
+      "exact current canary ID accepted");
+    for(const [environment,marker] of [
+      [{MOCK_RUNNING:"false"},"OBSERVER_PROCESS_NOT_RUNNING_OR_REMOVED"],
+      [{MOCK_ROOT:"false"},"OBSERVER_READONLY_ROOT_NOT_VERIFIED"],
+      [{MOCK_PRIV:"true"},"OBSERVER_PRIVILEGED_STATE_UNSAFE"],
+      [{MOCK_NET:"container:another_canary"},"OBSERVER_CANARY_NAMESPACE_MISMATCH"],
+      [{MOCK_NET:"bridge"},"OBSERVER_CANARY_NAMESPACE_MISMATCH"],
+      [{MOCK_NET:"container:exact_canary_id_suffix"},"OBSERVER_CANARY_NAMESPACE_MISMATCH"],
+    ]){
+      const result=mock(environment);
+      assert.equal(result.status,2,JSON.stringify(environment));
+      assert.match(result.stdout,new RegExp(marker));
+      assert.doesNotMatch(result.stdout,/exact_canary_id|review_id/,
+        "must not expose Docker identities in failure receipts");
+    }
+  } finally {rmSync(root,{recursive:true,force:true});}
+});
