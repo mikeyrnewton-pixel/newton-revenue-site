@@ -24,7 +24,13 @@ test("Stage 3 only performs fixed read-only Docker checks",()=>{
   assert.match(s,/CUTOVER=NOT_STARTED/);
   assert.match(s,/PLATFORM_TUNNEL_ROLE=NOT_VERIFIED/);
   assert.match(s,/CHATGPT_PLUGIN_TOOL_DISCOVERY=NOT_REFRESHED/);
-  assert.match(s,/FILE_BACKED_READONLY_KEY_NOT_VERIFIED/);
+  assert.match(s,/FILE_BACKED_KEY_REFERENCE_NOT_VERIFIED/);
+  assert.match(s,/READONLY_RUNTIME_KEY_MOUNT_NOT_VERIFIED/);
+  assert.match(s,/keyfile_cmd=/);
+  assert.match(s,/keyfile_entry=/);
+  assert.match(s,/keyfile_args=/);
+  assert.match(s,/endpoint_env=/);
+  assert.match(s,/MCP_SERVER_URL=http:\/\/127\.0\.0\.1:18787\/mcp/);
   assert.match(s,/--mcp\.server-url=http:\/\/127\.0\.0\.1:18787\/mcp/);
   assert.match(s,/--control-plane\.api-key=file:\/run\/secrets\/openai_runtime_key/);
   assert.match(s,/\.Destination "\/run\/secrets\/openai_runtime_key"/);
@@ -35,4 +41,12 @@ test("Stage 3 only performs fixed read-only Docker checks",()=>{
   assert.doesNotMatch(s,/"\$DOCKER"\s+(?:exec|run|start|stop|restart|rm|kill|pull|push|create|cp|update|network|volume|logs)\b/);
   assert.doesNotMatch(s,/"\$DOCKER" inspect -f '\{\{(?:json )?\.(?:Config\.Env|Config\.Cmd|Args|Mounts)\}\}'/);
   assert.doesNotMatch(s,/\b(?:curl|wget|sudo|scp|ssh|eval)\b/);
+});
+
+test("Stage 3 matches previously verified configuration, not the unused template paths",()=>{
+  assert.match(s,/CANARY_TARGET_NOT_A_NEW_ENDPOINT|EXPECTED_CANARY_ENDPOINT_NOT_VERIFIED/);
+  assert.match(s,/RUNTIME_KEY=FILE_REFERENCED_READONLY_VALUE_NOT_READ/);
+  assert.doesNotMatch(s,/openai_runtime_key/);
+  assert.doesNotMatch(s,/\$DOCKER"\s+(?:run|start|stop|restart|rm|kill|exec|create|cp|logs)\b/);
+  assert.doesNotMatch(s,/printf.*(?:\$keyfile|\$mount|\$image|\$endpoint_env)/);
 });
