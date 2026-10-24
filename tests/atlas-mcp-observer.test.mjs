@@ -383,6 +383,43 @@ test("compressed HTTP bodies fail closed before parsing or snapshot access", asy
   }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
 });
 
+test("content-encoding normalization allows only one identity token", async () => {
+  let reads = 0;
+  await withServer(async port => {
+    for (const encoding of ["identity", "IDENTITY", " \tIdentity\t "]) {
+      const response = await http(port, {
+        body: {jsonrpc: "2.0", id: 83, method: "ping", params: {}},
+        headers: {"content-encoding": encoding},
+      });
+      assert.equal(response.status, 200, encoding);
+      assert.deepEqual(response.json.result, {});
+      assert.equal(response.headers["cache-control"], "no-store");
+    }
+
+    for (const encoding of [
+      "x-identity",
+      "identity,gzip",
+      "identity, identity",
+      "gzip,identity",
+      "compress",
+      ["identity", "gzip"],
+    ]) {
+      const response = await http(port, {
+        body: {
+          jsonrpc: "2.0", id: 84, method: "tools/call",
+          params: {name: "atlas_status", arguments: {}},
+        },
+        headers: {"content-encoding": encoding},
+      });
+      assert.equal(response.status, 415, JSON.stringify(encoding));
+      assert.deepEqual(response.json, {error: "Content encoding not allowed"});
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+    }
+    assert.equal(reads, 0);
+  }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
+});
+
 test("oversized streaming bodies fail fast without waiting for upload completion", async () => {
   let reads = 0;
   await withServer(async port => {
