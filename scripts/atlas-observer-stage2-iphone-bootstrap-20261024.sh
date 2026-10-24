@@ -18,11 +18,11 @@ finish() {
   printf 'ATLAS_BOOTSTRAP_EXIT=%s\n' "$status"
 }
 trap finish EXIT
-URL='https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/79ac106787ef1669a8d1898436b19e61ccd3ee15/scripts/atlas-observer-local-container-20261024.sh'
+URL='https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/d87e78dcc416d5127d79e0eef43c34afc3bcbe62/scripts/atlas-observer-local-container-20261024.sh'
 if ! /usr/bin/curl -fsSL --proto '=https' --tlsv1.2 --connect-timeout 12 --max-time 60 -o "$FILE" "$URL"; then
   echo 'HOLD: immutable installer HTTPS download failed'; exit 2
 fi
-if [ "$(/usr/bin/git hash-object "$FILE")" != 'e15fd9eb6678727aa8b93fb4548a295217afc8a9' ]; then
+if [ "$(/usr/bin/git hash-object "$FILE")" != '55b3e5dbdf6e3d010ca35e8f4d00dd7288079566' ]; then
   echo 'HOLD: immutable installer SHA mismatch'; exit 2
 fi
 if ! /bin/bash -n "$FILE"; then
