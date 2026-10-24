@@ -1,4 +1,15 @@
 # ATLAS Observer — Stage 3/4 authenticated cutover gate
+
+## 24 October 2026 — verified progress and corrected authentication diagnosis
+
+**Stage 2 is now MAC-LOCAL VERIFIED**, based on the owner's 17:28 BST SSH receipt: one isolated read-only Observer container running, exactly three accepted MCP tools, sanitized fresh local status, denied write/shell methods, no published ports, original canary/tunnel container identities preserved. This supersedes the earlier stage-2-pending baseline later in this historic document. The real ChatGPT tunnel tool still exposes only `atlas_ping`, so Stage 4 is NOT connected.
+
+At 18:24 BST the owner verified the original MCP target is set by `MCP_SERVER_URL` in Docker's environment, NOT as a command-line argument. At 18:38 and 20:13 BST, checks for an **illustrative but wrong credential destination** and for three specific key-valued environment variables returned no matches. This was not evidence of unauthenticated access. Original installation notes from 23 October identify an owner-controlled file-backed runtime key mounted read-only at `/run/secrets/runtime-key`, referenced by the pinned tunnel client from its launch settings. This is historical installation context, not a fresh inspection. The source-only Stage 3 preflight now checks the correct destination and searches Docker Args/Cmd/Entrypoint with equality-only comparisons. It neither reads key bytes nor prints environment contents, private mounts, IDs or launch arguments. No tunnel or Mac changes were made by correcting the script.
+
+**Version-specific documentation:** openai/tunnel-client `v0.0.17` supports `--control-plane.api-key=file:/path` and `MCP_SERVER_URL` configuration; Docker container environment values are immutable after create. Changing the running client target therefore requires a reviewed replacement/recreation path, not an assumed live endpoint switch. The local verifier's GitHub CI PASS is not proof of the runtime key's permissions. The runtime principal must have **Tunnels Read + Use**, no Manage or admin key; independent Platform role/workspace verification remains an explicit HOLD.
+
+**Existing canary is the rollback baseline.** No cutover before: (1) exact runtime key-file reference and read-only bind verified on the actual Mac; (2) original non-secret launch contract recorded for rollback without exposing key material; (3) Platform role and plugin visibility verified; (4) explicit owner-visible safe transition with means to restore original 18787 target; and (5) a genuine post-cutover remote `atlas_status` plus separately demonstrated rollback. Do not duplicate the existing tunnel identity, hand keys to ChatGPT, disable the canary, merge PR #47, or alter the five hourly commercial automations.
+
 **24 October 2026 · Review documentation ONLY · no Mac runtime or plugin changes.**
 
 ## Evidence baseline (must not be confused with target state)
