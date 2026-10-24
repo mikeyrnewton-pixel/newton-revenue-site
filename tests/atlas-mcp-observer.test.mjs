@@ -842,3 +842,63 @@ test("JSON-RPC request IDs are canonical and output-bounded", async () => {
   assert.equal(reads, 0, "invalid or discovery-only IDs must not read the snapshot");
 });
 
+
+
+test("JSON-RPC IDs reject the full control ranges and preserve bounded Unicode", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const invalidIds = [
+    "\u0000",
+    "\t",
+    "\r",
+    "\u007f",
+    "\u0080",
+    "\u0085",
+    "\u009f",
+    null,
+    false,
+    Number.MIN_SAFE_INTEGER - 1,
+    -1.25,
+  ];
+
+  for (const id of invalidIds) {
+    const result = handleObserverMcp({
+      jsonrpc: "2.0", id, method: "tools/call",
+      params: {name: "atlas_status", arguments: {}},
+    }, deps);
+    assert.deepEqual(result, {
+      jsonrpc: "2.0", id: null,
+      error: {code: -32600, message: "Invalid request"},
+    });
+  }
+  assert.deepEqual(handleObserverMcp({
+    jsonrpc: "2.0", id: 1n, method: "ping", params: {},
+  }, deps), {
+    jsonrpc: "2.0", id: null,
+    error: {code: -32600, message: "Invalid request"},
+  });
+
+  for (const id of ["résumé-✓", "😀".repeat(64), 0, Number.MIN_SAFE_INTEGER]) {
+    assert.deepEqual(call("ping", {}, id, deps), {
+      jsonrpc: "2.0", id, result: {},
+    });
+  }
+
+  await withServer(async port => {
+    for (const id of invalidIds) {
+      const response = await http(port, {body: {
+        jsonrpc: "2.0", id, method: "tools/call",
+        params: {name: "atlas_status", arguments: {}},
+      }});
+      assert.equal(response.status, 200);
+      assert.deepEqual(response.json, {
+        jsonrpc: "2.0", id: null,
+        error: {code: -32600, message: "Invalid request"},
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+    }
+  }, deps);
+
+  assert.equal(reads, 0, "ID validation and ping controls must never read the snapshot");
+});
