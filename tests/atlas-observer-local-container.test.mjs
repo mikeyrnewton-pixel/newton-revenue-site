@@ -49,7 +49,9 @@ test("Stage 2 uses exactly two read-only private host mounts and no auto-pull",(
 });
 
 test("Stage 2 never changes the existing canary, tunnel or plugin",()=>{
-  assert.match(source,/EXISTING_CANARY_AND_TUNNEL=UNMODIFIED/);
+  assert.match(source,/EXISTING_CANARY_AND_TUNNEL=RUNNING_ORIGINAL_IDS/);
+  assert.match(source,/TUNNEL_ID=\$\("\$DOCKER" inspect -f '\{\{\.Id\}\}' "\$TUNNEL"\)/);
+  assert.match(source,/baseline container identity or tunnel network changed/);
   assert.match(source,/CHATGPT_ATLAS_STATUS=NOT_CONNECTED/);
   assert.match(source,/MCP_TOOLS=EXACTLY_THREE_READ_ONLY/);
   assert.match(source,/UNAUTHORIZED_METHODS=DENIED/);
