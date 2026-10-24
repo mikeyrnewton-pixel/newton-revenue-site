@@ -715,3 +715,83 @@ test("active request properties fail closed without getter or snapshot execution
   assert.equal(getters, 0, "Observer validation must never execute request getters");
   assert.equal(reads, 0, "active request shapes must never reach the snapshot");
 });
+
+
+test("inert-property gate covers every nested request record and preserves data-only controls", () => {
+  let reads = 0;
+  let getters = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const accessor = (base, key, value) => {
+    const record = {...base};
+    Object.defineProperty(record, key, {
+      enumerable: true,
+      get() {
+        getters++;
+        return value;
+      },
+    });
+    return record;
+  };
+  const hidden = (base, key, value) => {
+    const record = {...base};
+    Object.defineProperty(record, key, {enumerable: false, value});
+    return record;
+  };
+
+  const activeArguments = accessor({}, "command", "sk-ACTIVE-whoami");
+  const activeArgumentsResult = call("tools/call", {
+    name: "atlas_status", arguments: activeArguments,
+  }, 101, deps);
+  assert.equal(activeArgumentsResult.error.code, -32602);
+  assert.equal(JSON.stringify(activeArgumentsResult).includes("sk-ACTIVE"), false);
+
+  const activeClientInfo = accessor({name: "fixture"}, "version", "sk-ACTIVE");
+  assert.equal(call("initialize", {
+    protocolVersion: "2025-06-18", clientInfo: activeClientInfo,
+  }, 102, deps).error.code, -32602);
+
+  const activeInitialize = accessor(
+    {capabilities: {}, clientInfo: {}},
+    "protocolVersion",
+    "2025-06-18",
+  );
+  assert.equal(call("initialize", activeInitialize, 103, deps).error.code, -32602);
+
+  const hiddenEnvelope = hidden(
+    {jsonrpc: "2.0", id: 104, method: "ping", params: {}},
+    "command",
+    "sk-HIDDEN-whoami",
+  );
+  const hiddenEnvelopeResult = handleObserverMcp(hiddenEnvelope, deps);
+  assert.equal(hiddenEnvelopeResult.error.code, -32600);
+  assert.equal(JSON.stringify(hiddenEnvelopeResult).includes("sk-HIDDEN"), false);
+
+  const symbolArguments = {};
+  symbolArguments[Symbol("url")] = "http://127.0.0.1:8080";
+  assert.equal(call("tools/call", {
+    name: "atlas_status", arguments: symbolArguments,
+  }, 105, deps).error.code, -32602);
+
+  const symbolClientInfo = {name: "fixture", version: "1"};
+  symbolClientInfo[Symbol("command")] = "whoami";
+  assert.equal(call("initialize", {
+    protocolVersion: "2025-06-18", clientInfo: symbolClientInfo,
+  }, 106, deps).error.code, -32602);
+
+  const nullMessage = Object.create(null);
+  nullMessage.jsonrpc = "2.0";
+  nullMessage.id = 107;
+  nullMessage.method = "tools/call";
+  nullMessage.params = Object.create(null);
+  nullMessage.params.name = "atlas_ping";
+  nullMessage.params.arguments = Object.create(null);
+  assert.equal(handleObserverMcp(nullMessage, deps).result.content[0].text, PING_REPLY);
+
+  const parsed = JSON.parse(
+    '{"jsonrpc":"2.0","id":108,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"fixture","version":"1"}}}',
+  );
+  assert.equal(handleObserverMcp(parsed, deps).result.protocolVersion, "2025-06-18");
+
+  assert.equal(getters, 0, "validation must inspect descriptors, never execute accessors");
+  assert.equal(reads, 0, "denials and data-only controls must not read the snapshot");
+});
