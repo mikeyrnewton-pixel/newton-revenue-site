@@ -174,12 +174,29 @@ CREATED_ID=$("$DOCKER" run -d --rm --pull=never \
     echo 'HOLD: guarded Observer container did not start'; exit 2
   }
 
-if [ "$("$DOCKER" inspect -f '{{.State.Running}}' "$CREATED_ID" 2>/dev/null)" != true ] ||
-   [ "$("$DOCKER" inspect -f '{{.HostConfig.ReadonlyRootfs}}' "$CREATED_ID" 2>/dev/null)" != true ] ||
-   [ "$("$DOCKER" inspect -f '{{.HostConfig.Privileged}}' "$CREATED_ID" 2>/dev/null)" != false ] ||
-   [ "$("$DOCKER" inspect -f '{{.HostConfig.NetworkMode}}' "$CREATED_ID" 2>/dev/null)" != "container:$CANARY" ]; then
-  echo 'HOLD: observer isolation cannot be verified'; exit 2
+# Check each safety predicate independently so an owner sees precisely
+# which gate failed. Print no Docker IDs, host paths, logs or secret metadata.
+# A --rm container may exit before docker inspect can resolve its ID.
+observer_running=$("$DOCKER" inspect -f '{{.State.Running}}' "$CREATED_ID" 2>/dev/null || true)
+if [ "$observer_running" != true ]; then
+  echo 'HOLD: OBSERVER_PROCESS_NOT_RUNNING_OR_REMOVED'; exit 2
 fi
+observer_root=$("$DOCKER" inspect -f '{{.HostConfig.ReadonlyRootfs}}' "$CREATED_ID" 2>/dev/null || true)
+if [ "$observer_root" != true ]; then
+  echo 'HOLD: OBSERVER_READONLY_ROOT_NOT_VERIFIED'; exit 2
+fi
+observer_priv=$("$DOCKER" inspect -f '{{.HostConfig.Privileged}}' "$CREATED_ID" 2>/dev/null || true)
+if [ "$observer_priv" != false ]; then
+  echo 'HOLD: OBSERVER_PRIVILEGED_STATE_UNSAFE'; exit 2
+fi
+observer_net=$("$DOCKER" inspect -f '{{.HostConfig.NetworkMode}}' "$CREATED_ID" 2>/dev/null || true)
+# Docker is permitted to store the exact current canary's immutable container
+# ID rather than its name. Accept neither a prefix nor an arbitrary container.
+if [ "$observer_net" != "container:$CANARY" ] &&
+   [ "$observer_net" != "container:$CANARY_ID" ]; then
+  echo 'HOLD: OBSERVER_CANARY_NAMESPACE_MISMATCH'; exit 2
+fi
+echo 'OBSERVER_RUNTIME_ISOLATION=VERIFIED'
 
 # Test from INSIDE the new Observer container; never use a host-published port
 # and never call the active tunnel. Every test speaks to 127.0.0.1:18788.
