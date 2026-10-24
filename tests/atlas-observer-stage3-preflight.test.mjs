@@ -32,8 +32,8 @@ test("Stage 3 only performs fixed read-only Docker checks",()=>{
   assert.match(s,/endpoint_env=/);
   assert.match(s,/MCP_SERVER_URL=http:\/\/127\.0\.0\.1:18787\/mcp/);
   assert.match(s,/--mcp\.server-url=http:\/\/127\.0\.0\.1:18787\/mcp/);
-  assert.match(s,/--control-plane\.api-key=file:\/run\/secrets\/openai_runtime_key/);
-  assert.match(s,/\.Destination "\/run\/secrets\/openai_runtime_key"/);
+  assert.match(s,/--control-plane\.api-key=file:\/run\/secrets\/runtime-key/);
+  assert.match(s,/\.Destination "\/run\/secrets\/runtime-key"/);
   assert.match(s,/\.HostConfig\.NetworkMode/);
   assert.match(s,/\.HostConfig\.ReadonlyRootfs/);
   assert.match(s,/\.HostConfig\.Privileged/);
