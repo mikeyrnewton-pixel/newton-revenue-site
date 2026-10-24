@@ -14,14 +14,14 @@ At 18:24 BST the owner verified the original MCP target is set by `MCP_SERVER_UR
 
 ## Evidence baseline (must not be confused with target state)
 - Mac source Stage 1 owner receipt: **34/34** tests and `ATLAS_OBSERVER_MCP=PINNED_OFFLINE_STAGE_TESTS_PASSED` at 12:10 BST.
-- Stage 2 revised guarded installer reviewed, backed by offline GitHub tests; **owner Mac Stage 2 receipt not yet observed**. No `ATLAS_OBSERVER_STAGE2=LOCAL_SERVICE_VERIFIED` evidence as of this record.
+- HISTORICAL 12:00–16:44 BST STATE (SUPERSEDED 17:28 BST): Stage 2 installer was under review; actual owner 17:28 BST Mac receipt later verified `ATLAS_OBSERVER_STAGE2=LOCAL_SERVICE_VERIFIED`. See opening addendum.
 - ChatGPT plugin `ATLAS — Private Mac Connection` presently exposes only harmless `atlas_ping`; fresh genuine ChatGPT call still returns `ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS`. This proves only canary transport, not Mac health.
 - Existing canary + tunnel pair must remain intact. Existing `atlas-tunnel-client-canary` configured to canary-only 127.0.0.1:18787; future Observer is designed for 127.0.0.1:18788 **within the shared namespace**. No host port or public ingress.
 - Stage 2 hardening: use exact running canary image ID, deny unknown mounted directory entries, keep non-root/read-only/no-new-privileges/resource limits, verify original canary + tunnel identities. Old installer pin `4760f363...` / `dbe3982...` is **superseded** by `79ac106787ef1669a8d1898436b19e61ccd3ee15` / Git blob `e15fd9eb6678727aa8b93fb4548a295217afc8a9`.
 - Historic intermittent macOS maintenance sleep remains **unresolved**. A single fresh snapshot says nothing about indefinite availability or future SLA.
 
 ## Non-negotiable preconditions before any Stage 3 change
-1. Owner Mac prints the explicit Stage 2 success marker from the guarded installer or an independently hash-verified, read-only on-Mac receipt script. A popup containing only `0` is NOT evidence; first confirm Shortcuts stdout with `printf 'ATLAS_SSH_STDOUT_OK\n'`. Never rerun installer blindly.
+1. SATISFIED 17:28 BST: Owner Mac independently printed actual Stage 2 success markers and read-only smoke receipt. A popup containing only `0` remains insufficient evidence for any future installs. Never rerun Stage 2 installer blindly.
 2. Confirm real local HTTP MCP call to the review container returns only `atlas_ping`, `atlas_capabilities`, `atlas_status` with fresh **allowlisted sanitized status**; deny `run_shell`, command/path/URL parameters, unknown tools, and `resources/list`. Verify JSON output contains no usernames, keys, device identifiers, private customer data or network paths.
 3. Verify namespace-sharing boundaries on the Mac. Observer listens only on loopback 18788, existing canary still 18787. Shared container namespace is NOT independent network isolation; any process in the shared namespace could reach both loopback listeners. No shell, Docker socket, Activepieces API or filesystem browsing may be exposed by MCP.
 4. Separately inspect the official runtime key's **Tunnels Read + Use** only; exclude Manage/admin permission from the long-running tunnel client. Do not paste, log, print or submit the key into ChatGPT, GitHub, Shortcut command text, screenshots or tests. Inspect the existing tunnel's authorized Platform organization and the intended ChatGPT workspace. Keep existing identity; do NOT create a new tunnel or key by default.
@@ -53,7 +53,7 @@ No money, paid API models, Work/Codex credits, production PR merges, customer ou
 - https://github.com/openai/tunnel-client/blob/master/docs/permissions.md
 - https://github.com/openai/tunnel-client/blob/master/docs/deployment/docker.md
 
-**Status: REVIEW_RUNBOOK_ONLY / MAC_STAGE2_UNVERIFIED / REMOTE_ATLAS_STATUS_UNVERIFIED / CURRENT_CANARY_VERIFIED.**
+**Historical review status superseded for Stage 2. Current as of 24 October evening: MAC_STAGE2_LOCAL_VERIFIED / STAGE3_AUTH_AND_CUTOVER_NOT_VERIFIED / REMOTE_ATLAS_STATUS_UNAVAILABLE / CURRENT_CANARY_VERIFIED.**
 
 ## 24 October 2026 — executable Stage 3 fixture acceptance
 
