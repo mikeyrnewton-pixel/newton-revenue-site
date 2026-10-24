@@ -95,6 +95,7 @@ for service in "$CANARY" "$TUNNEL"; do
   fi
 done
 CANARY_ID=$("$DOCKER" inspect -f '{{.Id}}' "$CANARY")
+TUNNEL_ID=$("$DOCKER" inspect -f '{{.Id}}' "$TUNNEL")
 NET=$("$DOCKER" inspect -f '{{.HostConfig.NetworkMode}}' "$TUNNEL")
 if [ "$NET" != "container:$CANARY" ] && [ "$NET" != "container:$CANARY_ID" ]; then
   echo 'HOLD: existing tunnel not isolated with canary'; exit 2
@@ -241,14 +242,21 @@ if [ "$RESTART" != no ]; then
 fi
 for service in "$CANARY" "$TUNNEL"; do
   if [ "$("$DOCKER" inspect -f '{{.State.Running}}' "$service" 2>/dev/null)" != true ]; then
-    echo 'HOLD: baseline service changed'; exit 2
+    echo 'HOLD: baseline service not running'; exit 2
   fi
 done
+# Require the same original running container IDs, rather than just checking
+# that containers with the same names happen to be running after setup.
+if [ "$("$DOCKER" inspect -f '{{.Id}}' "$CANARY")" != "$CANARY_ID" ] ||
+   [ "$("$DOCKER" inspect -f '{{.Id}}' "$TUNNEL")" != "$TUNNEL_ID" ] ||
+   [ "$("$DOCKER" inspect -f '{{.HostConfig.NetworkMode}}' "$TUNNEL")" != "$NET" ]; then
+  echo 'HOLD: baseline container identity or tunnel network changed'; exit 2
+fi
 
 trap - EXIT
 echo 'ATLAS_OBSERVER_STAGE2=LOCAL_SERVICE_VERIFIED'
 echo 'OBSERVER_CONTAINER=RUNNING_REVIEW_ONLY_NO_RESTART'
-echo 'EXISTING_CANARY_AND_TUNNEL=UNMODIFIED'
+echo 'EXISTING_CANARY_AND_TUNNEL=RUNNING_ORIGINAL_IDS'
 echo 'CHATGPT_ATLAS_STATUS=NOT_CONNECTED'
 echo 'HOST_PORTS=NONE'
 echo 'SPEND_GBP=0'
