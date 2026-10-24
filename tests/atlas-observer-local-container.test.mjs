@@ -35,7 +35,7 @@ test("Stage 2 uses exactly two read-only private host mounts and no auto-pull",(
     '--mount "type=bind,src=$SNAPDIR,dst=/run/atlas-observer,readonly"',
   ]);
   assert.equal((source.match(/--pull=never/g)??[]).length,3);
-  assert.match(source,/if \[ -e "\$STAGE" \] \|\| \[ -L "\$STAGE" \]/);
+  assert.match(source,/if \[ ! -d "\$dir" \] \|\| \[ -L "\$dir" \]/);
   assert.match(source,/if "\$DOCKER" container inspect "\$OBSERVER" >/);
   assert.match(source,/CREATED_ID=\$\("\$DOCKER" run -d --rm --pull=never/);
   assert.match(source,/--network "container:\$CANARY"/);
