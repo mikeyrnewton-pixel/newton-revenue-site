@@ -57,6 +57,9 @@ test("Stage 2 never changes the existing canary, tunnel or plugin",()=>{
   assert.match(source,/UNAUTHORIZED_METHODS=DENIED/);
   assert.match(source,/--entrypoint node "\$IMAGE"/);
   assert.match(source,/trap cleanup_on_error EXIT/);
+  assert.match(source,/STAGE2_CLEANUP=CREATED_CONTAINER_ABSENT/);
+  assert.match(source,/STAGE2_CLEANUP=CONTAINER_STILL_PRESENT_HOLD/);
+  assert.match(source,/container inspect "\$CREATED_ID" >/);
   assert.match(source,/"\$DOCKER" rm -f "\$CREATED_ID"/);
   assert.doesNotMatch(source,/"\$DOCKER" (?:stop|rm|restart|kill) "\$(?:CANARY|TUNNEL)"/);
   assert.doesNotMatch(source,/--env(?:=| )/);
