@@ -1343,3 +1343,59 @@ test("payment cursors and historical transactions reject active object shapes",(
     /exact prior provider transaction binding required/,
   );
 });
+
+test("payment batch and cursor arrays reject sparse or active elements",()=>{
+  const item={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  };
+
+  assert.throws(
+    ()=>assessBatch(Array(1)),
+    /inert synthetic payment observations required/,
+    "a sparse batch cannot claim one observation by length alone",
+  );
+
+  let batchAccessed=false;
+  const activeBatch=[];
+  Object.defineProperty(activeBatch,"0",{
+    enumerable:true,
+    get(){batchAccessed=true;return item;},
+  });
+  assert.throws(
+    ()=>assessBatch(activeBatch),
+    /inert synthetic payment observations required/,
+  );
+  assert.equal(batchAccessed,false);
+
+  let cursorAccessed=false;
+  const activeObservationIds=[];
+  Object.defineProperty(activeObservationIds,"0",{
+    enumerable:true,
+    get(){
+      cursorAccessed=true;
+      return "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    },
+  });
+  assert.throws(
+    ()=>assessBatch([item],{
+      ...emptySyntheticPaymentEvidenceCursor(),
+      observationIds:activeObservationIds,
+      evidenceDigests:["1".repeat(64)],
+    }),
+    /bounded inert prior payment evidence cursor required/,
+  );
+  assert.equal(cursorAccessed,false);
+
+  const sparseCursor={
+    ...emptySyntheticPaymentEvidenceCursor(),
+    observationIds:Array(1),
+    evidenceDigests:["1".repeat(64)],
+  };
+  assert.throws(
+    ()=>assessBatch([item],sparseCursor),
+    /bounded inert prior payment evidence cursor required/,
+  );
+});
+
