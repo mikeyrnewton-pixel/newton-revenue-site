@@ -280,6 +280,16 @@ test("readable counts require a canonical bounded evidence window",()=>{
     "a zero-duration query cannot support a verified source count",
   );
 
+  const tinyGmailWindow=fixture();
+  tinyGmailWindow.sources[1].coverageStartedAt="2026-10-20T12:13:58.000Z";
+  tinyGmailWindow.sources[1].evidenceDigest=
+    evidenceDigestFor(tinyGmailWindow.sources[1]);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(tinyGmailWindow),
+    /Gmail search window must cover at least one hour/,
+    "a tiny zero-result inbox query cannot support a meaningful source snapshot",
+  );
+
   const future=fixture();
   future.sources[1]={
     ...future.sources[1],coverageEndedAt:"2026-10-20T12:14:01.000Z",
