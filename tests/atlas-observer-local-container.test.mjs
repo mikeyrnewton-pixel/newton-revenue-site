@@ -39,6 +39,11 @@ test("Stage 2 uses exactly two read-only private host mounts and no auto-pull",(
   assert.match(source,/if "\$DOCKER" container inspect "\$OBSERVER" >/);
   assert.match(source,/CREATED_ID=\$\("\$DOCKER" run -d --rm --pull=never/);
   assert.match(source,/--network "container:\$CANARY"/);
+  // Stage 2 must execute the exact image ID already running as the canary;
+  // a locally retagged image must never silently become trusted.
+  assert.match(source,/inspect -f '\{\{\.Image\}\}' "\$CANARY"/);
+  assert.match(source,/sha256:\[0-9a-f\]\{64\}/);
+  assert.doesNotMatch(source,/inspect -f '\{\{\.Config\.Image\}\}' "\$CANARY"/);
 });
 
 test("Stage 2 never changes the existing canary, tunnel or plugin",()=>{
