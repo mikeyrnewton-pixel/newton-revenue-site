@@ -355,6 +355,34 @@ test("malformed, oversized and non-JSON HTTP bodies fail closed",async()=>{
   },{readSnapshot:()=>{reads++;return snap();},now:()=>NOW});
 });
 
+test("compressed HTTP bodies fail closed before parsing or snapshot access", async () => {
+  let reads = 0;
+  await withServer(async port => {
+    const requestBody = {
+      jsonrpc: "2.0", id: 81, method: "tools/call",
+      params: {name: "atlas_status", arguments: {}},
+    };
+    for (const encoding of ["gzip", "deflate", "br", "gzip, br"]) {
+      const response = await http(port, {
+        body: requestBody,
+        headers: {"content-encoding": encoding},
+      });
+      assert.equal(response.status, 415, encoding);
+      assert.deepEqual(response.json, {error: "Content encoding not allowed"});
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+    }
+
+    const identity = await http(port, {
+      body: {jsonrpc: "2.0", id: 82, method: "ping", params: {}},
+      headers: {"content-encoding": " identity "},
+    });
+    assert.equal(identity.status, 200);
+    assert.deepEqual(identity.json.result, {});
+    assert.equal(reads, 0);
+  }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
+});
+
 test("oversized streaming bodies fail fast without waiting for upload completion", async () => {
   let reads = 0;
   await withServer(async port => {
