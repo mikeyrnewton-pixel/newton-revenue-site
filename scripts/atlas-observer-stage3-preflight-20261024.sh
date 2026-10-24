@@ -52,18 +52,29 @@ ports=$("$DOCKER" inspect -f '{{json .HostConfig.PortBindings}}' "$TUNNEL") ||
 [ "$ports" = null ] || [ "$ports" = '{}' ] || hold HOST_PORT_PUBLISHED
 printf 'TUNNEL_IMAGE_AND_RUNTIME_CONFINEMENT=VERIFIED\n'
 
-# Compare literal known expected argv flag *inside* Docker's Go template:
-# emit only "yes" or empty, never capture or print arguments or key content.
+# Compare only exact known-safe values inside Docker's Go template.
+# Never emit raw argument/env values, mount Source, tunnel ID, or key content.
 endpoint=$("$DOCKER" inspect -f '{{range .Args}}{{if eq . "--mcp.server-url=http://127.0.0.1:18787/mcp"}}yes{{end}}{{end}}' "$TUNNEL") ||
   hold TUNNEL_ARGS_CHECK_FAILED
-keyfile=$("$DOCKER" inspect -f '{{range .Args}}{{if eq . "--control-plane.api-key=file:/run/secrets/runtime-key"}}yes{{end}}{{end}}' "$TUNNEL") ||
-  hold TUNNEL_KEYFILE_CHECK_FAILED
+# Actual owner-verified Docker deployment uses the restricted runtime-key
+# file at this *container destination*. A previous draft mistakenly checked
+# an example path from the never-deployed template.
+# Query exact expected literals across Docker arg representations. The
+# contents of Cmd/Entrypoint and the key itself are never printed.
+keyfile_args=$("$DOCKER" inspect -f '{{range .Args}}{{if eq . "--control-plane.api-key=file:/run/secrets/runtime-key"}}yes{{end}}{{end}}' "$TUNNEL") ||
+  hold TUNNEL_KEYFILE_ARGS_CHECK_FAILED
+keyfile_cmd=$("$DOCKER" inspect -f '{{range .Config.Cmd}}{{if eq . "--control-plane.api-key=file:/run/secrets/runtime-key"}}yes{{end}}{{end}}' "$TUNNEL") ||
+  hold TUNNEL_KEYFILE_CMD_CHECK_FAILED
+keyfile_entry=$("$DOCKER" inspect -f '{{range .Config.Entrypoint}}{{if eq . "--control-plane.api-key=file:/run/secrets/runtime-key"}}yes{{end}}{{end}}' "$TUNNEL") ||
+  hold TUNNEL_KEYFILE_ENTRY_CHECK_FAILED
 mount=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/secrets/runtime-key"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$TUNNEL") ||
   hold KEY_MOUNT_CHECK_FAILED
-endpoint_env=$("$DOCKER" inspect -f '{{range .Config.Env}}{{if eq . "MCP_SERVER_URL=http://127.0.0.1:18787/mcp"}}yes{{end}}{{end}}' "$TUNNEL") || hold TUNNEL_ENV_CHECK_FAILED
+endpoint_env=$("$DOCKER" inspect -f '{{range .Config.Env}}{{if eq . "MCP_SERVER_URL=http://127.0.0.1:18787/mcp"}}yes{{end}}{{end}}' "$TUNNEL") ||
+  hold TUNNEL_ENV_CHECK_FAILED
 [ "$endpoint" = yes ] || [ "$endpoint_env" = yes ] || hold EXPECTED_CANARY_ENDPOINT_NOT_VERIFIED
-[ "$keyfile" = yes ] && [ "$mount" = yes ] ||
-  hold FILE_BACKED_READONLY_KEY_NOT_VERIFIED
+[ "$keyfile_args" = yes ] || [ "$keyfile_cmd" = yes ] || [ "$keyfile_entry" = yes ] ||
+  hold FILE_BACKED_KEY_REFERENCE_NOT_VERIFIED
+[ "$mount" = yes ] || hold READONLY_RUNTIME_KEY_MOUNT_NOT_VERIFIED
 printf 'CURRENT_TUNNEL_TARGET=ORIGINAL_CANARY_18787\n'
 printf 'RUNTIME_KEY=FILE_REFERENCED_READONLY_VALUE_NOT_READ\n'
 printf 'OBSERVER_LOCAL_ENDPOINT=SEPARATE_REVIEW_18788\n'
