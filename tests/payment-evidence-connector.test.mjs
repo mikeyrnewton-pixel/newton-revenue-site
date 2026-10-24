@@ -102,6 +102,7 @@ const binding=()=>({
   invoiceEventId:"ccccccec-cccc-4ccc-8ccc-cccccccccccc",
   invoiceEvidenceDigest:"c".repeat(64),
   invoicedAt:"2026-10-20T10:59:59.000Z",
+  verifiedAt:"2026-10-20T11:00:01.000Z",
   provider:"OWNER_SELECTED_PROVIDER",
 });
 
@@ -285,6 +286,30 @@ test("payment observation must follow its bound invoice event",()=>{
       ...binding(),invoicedAt:"20 October 2026 10:59:59 UTC",
     }),
     /canonical UTC invoice timestamp/,
+  );
+});
+
+
+test("payment observation requires a fresh non-future verification boundary",()=>{
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),verifiedAt:"2026-10-20T10:59:59.000Z",
+    }),
+    /cannot postdate verification/,
+    "future-dated observations cannot support payment review",
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),verifiedAt:"2026-10-20T11:15:00.001Z",
+    }),
+    /stale at verification/,
+    "observations older than 15 minutes require a fresh provider read",
+  );
+  assert.throws(
+    ()=>assessSyntheticPaymentObservation(observation("SETTLED"),{
+      ...binding(),verifiedAt:"20 October 2026 11:00:01 UTC",
+    }),
+    /canonical UTC verification timestamp/,
   );
 });
 
