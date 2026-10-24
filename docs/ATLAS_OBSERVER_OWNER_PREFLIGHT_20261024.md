@@ -104,3 +104,29 @@ No `docker run`, `docker pull`, `docker stop`, `docker exec`, `launchctl load`, 
 5. **Uptime follow-up**: address recurring maintenance sleep using original sleep history and proper thermal safeguards; do not make permanent `pmset` changes as part of Observer deployment.
 
 Release states: **MAC_SNAPSHOT_OWNER_INSTALLED / LIVE_VERIFIED_CANARY / OBSERVER_MCP_TESTED_OFFLINE / OBSERVER_REMOTE_NOT_AVAILABLE**. £0 expenditure. No contracts, genuine customer data, payments, trading or production site changes.
+
+
+## Actual owner Mac preflight receipt — 24 Oct 2026 11:21 BST
+
+Owner executed the approved **read-only preflight** through iPhone SSH and supplied a screenshot at 11:21 BST. Every prerequisite in the preflight reported ready:
+
+- `AC_POWER=YES`; `LID_SENSOR_OPEN=YES`.
+- `SNAPSHOT_OWNER_PERMISSIONS=PRIVATE`; `SNAPSHOT_FRESH=YES`.
+- `OBSERVATION_AGENT=REGISTERED`.
+- `DOCKER_DAEMON=RESPONDING`.
+- `CANARY_CONTAINER=RUNNING`; `TUNNEL_CONTAINER=RUNNING`.
+- `CANARY_BASE_IMAGE=CACHED`; `OBSERVER_CONTAINER=ABSENT`.
+- `TUNNEL_NAMESPACE=CANARY_SHARED`.
+- Final receipt: `PREFLIGHT_COMPLETE=NO_CHANGES`.
+
+**What this confirms:** approved Mac-local snapshot and existing private canary/tunnel prerequisites are ready for an isolated observer *candidate*. **What it does not prove:** Node runtime/UID interoperability of the cached image; the new Observer service actually launching; a successful read-only 0600 snapshot directory bind; local three-tool MCP acceptance; current watchdog heartbeat; uninterrupted sleep-free runtime; or remote ChatGPT `atlas_status` accessibility. Base image availability does not prove its name, digest, architecture or ability to run our reviewed Observer. No changes occurred in this preflight.
+
+**Reviewed pinned service source at PR #47 head `1053f4251c7d092e9f1afbe709b89bcb27dea096`:**
+- `scripts/atlas-mcp-observer.mjs` Git blob SHA-1: `56eafea5e1e2a60ec5de0a3eb8051ea6b72349c5`.
+- `scripts/atlas-observer-snapshot.mjs` Git blob SHA-1: `7dde06ee91ce6776c6e6217e4dd43c402f678d79`.
+- `tests/atlas-mcp-observer.test.mjs` Git blob SHA-1: `0b43927fbe6843d05a6241785b83ed8d55b1b804`.
+- Pin the immutable commit and independently check `git hash-object` against these **exact Git blob hashes** before any proposed staging. No mutable branch/main retrieval or unverified dynamic download.
+
+**Next explicit scope for approval, not performed:** stage *only* those source files into a new private, non-overwriting review folder; execute the targeted offline suite; validate known cached Node image identity and snapshot mount permissions. Only with a separate explicit approval and passing local checks, consider starting **one** `atlas-mcp-observer-review` container with no published host ports, only a private read-only directory-level snapshot bind and read-only code bind, no host/Docker socket, dropped capabilities, no writable customer resources, same isolated canary network namespace and port **18788**. Keep existing canary and tunnel processes untouched and still targeting **18787**. Verify local MCP allowlist and stale/safety denials before any additional separate plugin/tunnel cutover approval. `OBSERVATION_AGENT` registration and `SNAPSHOT_FRESH` do not solve the previously observed unattended maintenance sleep.
+
+**Status: MAC_PREFLIGHT_PASS / SOURCE_REVIEWED / OBSERVER_CONTAINER_NOT_DEPLOYED / CHATGPT_MAC_STATUS_NOT_AVAILABLE.** £0 spent; no service, secrets, account, plugin, power, production or customer state changed.
