@@ -34,6 +34,16 @@ test("receipt cannot change containers, credentials, network or publish status",
   assert.match(source,/\.HostConfig\.NetworkMode/);
   assert.match(source,/\.HostConfig\.PortBindings/);
   assert.match(source,/\.HostConfig\.RestartPolicy\.Name/);
+  assert.match(source,/\.Config\.User/);
+  assert.match(source,/\.HostConfig\.CapDrop/);
+  assert.match(source,/\.HostConfig\.SecurityOpt/);
+  assert.match(source,/\.HostConfig\.Memory/);
+  assert.match(source,/\.HostConfig\.NanoCpus/);
+  assert.match(source,/\.HostConfig\.PidsLimit/);
+  assert.match(source,/UNEXPECTED_CONTAINER_USER/);
+  assert.match(source,/CAPABILITIES_NOT_DROPPED/);
+  assert.match(source,/PRIVILEGE_POLICY_MISMATCH/);
+  assert.match(source,/RESOURCE_CEILINGS_MISMATCH/);
   assert.match(source,/\.Destination}}\|{{\.RW/);
   assert.doesNotMatch(source,/\$DOCKER"\s+(?:run|create|start|stop|restart|rm|kill|pull|push|build|cp|commit|update|network create|volume create)\b/);
   assert.doesNotMatch(source,/\b(?:curl|wget|sudo|scp|ssh|eval)\b/);
