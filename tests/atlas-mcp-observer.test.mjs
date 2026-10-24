@@ -795,3 +795,50 @@ test("inert-property gate covers every nested request record and preserves data-
   assert.equal(getters, 0, "validation must inspect descriptors, never execute accessors");
   assert.equal(reads, 0, "denials and data-only controls must not read the snapshot");
 });
+
+test("JSON-RPC request IDs are canonical and output-bounded", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const invalidIds = [
+    "",
+    "line\nbreak",
+    "x".repeat(129),
+    1.5,
+    Number.MAX_SAFE_INTEGER + 1,
+  ];
+
+  for (const id of invalidIds) {
+    const result = handleObserverMcp({
+      jsonrpc: "2.0", id, method: "tools/call",
+      params: {name: "atlas_status", arguments: {}},
+    }, deps);
+    assert.equal(result.error.code, -32600);
+    assert.equal(result.id, null);
+    assert.equal(JSON.stringify(result).includes("line\\nbreak"), false);
+  }
+
+  const maxStringId = "x".repeat(128);
+  assert.deepEqual(call("ping", {}, maxStringId, deps), {
+    jsonrpc: "2.0", id: maxStringId, result: {},
+  });
+  assert.deepEqual(call("ping", {}, Number.MAX_SAFE_INTEGER, deps), {
+    jsonrpc: "2.0", id: Number.MAX_SAFE_INTEGER, result: {},
+  });
+
+  await withServer(async port => {
+    for (const id of invalidIds) {
+      const response = await http(port, {body: {
+        jsonrpc: "2.0", id, method: "tools/call",
+        params: {name: "atlas_status", arguments: {}},
+      }});
+      assert.equal(response.status, 200);
+      assert.equal(response.json.error.code, -32600);
+      assert.equal(response.json.id, null);
+      assert.equal(response.raw.includes("line\\nbreak"), false);
+      assert.equal(response.headers["cache-control"], "no-store");
+    }
+  }, deps);
+
+  assert.equal(reads, 0, "invalid or discovery-only IDs must not read the snapshot");
+});
+
