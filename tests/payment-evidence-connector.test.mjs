@@ -102,7 +102,7 @@ const binding=()=>({
   invoiceEventId:"ccccccec-cccc-4ccc-8ccc-cccccccccccc",
   invoiceEvidenceDigest:"c".repeat(64),
   invoicedAt:"2026-10-20T10:59:59.000Z",
-  verifiedAt:"2026-10-20T11:00:01.000Z",
+  verifiedAt:"2026-10-20T11:10:00.000Z",
   provider:"OWNER_SELECTED_PROVIDER",
 });
 
