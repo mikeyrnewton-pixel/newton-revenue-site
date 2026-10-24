@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {readFileSync} from "node:fs";
+import {readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync} from "node:fs";
+import {tmpdir} from "node:os";
+import {join} from "node:path";
 import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 
@@ -57,4 +59,38 @@ test("Stage 2 never changes the existing canary, tunnel or plugin",()=>{
   assert.doesNotMatch(source,/"\$DOCKER" (?:stop|rm|restart|kill) "\$(?:CANARY|TUNNEL)"/);
   assert.doesNotMatch(source,/--env(?:=| )/);
   assert.doesNotMatch(source,/--mount.*runtime-key/);
+});
+
+test("Stage 2 rejects unknown and hidden host files inside either mounted directory",()=>{
+  const from=source.indexOf("shopt -s nullglob dotglob");
+  const until=source.indexOf("shopt -u nullglob dotglob",from);
+  assert.ok(from>0 && until>from,"source must contain full fail-closed mount inventory");
+  const snippet=source.slice(from,until+"shopt -u nullglob dotglob".length);
+  const root=mkdtempSync(join(tmpdir(),"atlas-mount-inventory-"));
+  const scripts=join(root,"scripts"), snapdir=join(root,"snap");
+  mkdirSync(scripts);mkdirSync(snapdir);
+  writeFileSync(join(scripts,"atlas-mcp-observer.mjs"),"reviewed");
+  writeFileSync(join(scripts,"atlas-observer-snapshot.mjs"),"reviewed");
+  writeFileSync(join(snapdir,"status.json"),'{"schema":"atlas.observer.snapshot.v1"}');
+  const check=()=>spawnSync("bash",["-c",
+    "set -euo pipefail; SCRIPTS=$1; SNAPDIR=$2; SNAP=$SNAPDIR/status.json; "+snippet,
+    "atlas-inventory-check",scripts,snapdir],{encoding:"utf8",timeout:4000});
+  try {
+    assert.equal(check().status,0,"exact code files and snapshot allowed");
+    writeFileSync(join(scripts,".hidden-credential"),"NO");
+    let result=check();
+    assert.equal(result.status,2,"hidden unexpected code mount file must fail");
+    assert.match(result.stdout,/unexpected item in mounted source directory/);
+    rmSync(join(scripts,".hidden-credential"));
+    writeFileSync(join(snapdir,"unrelated-private.txt"),"NO");
+    result=check();
+    assert.equal(result.status,2,"unexpected snapshot directory file must fail");
+    assert.match(result.stdout,/unexpected item in private snapshot mount directory/);
+    rmSync(join(snapdir,"unrelated-private.txt"));
+    writeFileSync(join(snapdir,".status-publisher.tmp"),"NO");
+    result=check();
+    assert.equal(result.status,2,"publisher temp collision must hold until cleared");
+    rmSync(join(snapdir,".status-publisher.tmp"));
+    assert.equal(check().status,0,"cleared temporary file passes");
+  } finally {rmSync(root,{recursive:true,force:true});}
 });
