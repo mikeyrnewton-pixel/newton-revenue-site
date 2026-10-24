@@ -22,8 +22,8 @@ test("requires exact one-shot owner switch and fails closed before any remote ac
 });
 
 test("only immutable trusted installer is executed after hash and syntax checks",()=>{
-  assert.match(source,/79ac106787ef1669a8d1898436b19e61ccd3ee15/);
-  assert.match(source,/e15fd9eb6678727aa8b93fb4548a295217afc8a9/);
+  assert.match(source,/d87e78dcc416d5127d79e0eef43c34afc3bcbe62/);
+  assert.match(source,/55b3e5dbdf6e3d010ca35e8f4d00dd7288079566/);
   assert.match(source,/\/usr\/bin\/git hash-object/);
   assert.match(source,/\/bin\/bash -n "\$FILE"/);
   assert.match(source,/\/bin\/bash "\$FILE" --start-local-only 2>&1/);
