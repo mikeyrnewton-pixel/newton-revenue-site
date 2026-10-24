@@ -81,9 +81,12 @@ NET=$("$DOCKER" inspect -f '{{.HostConfig.NetworkMode}}' "$TUNNEL")
 if [ "$NET" != "container:$CANARY" ] && [ "$NET" != "container:$CANARY_ID" ]; then
   echo 'HOLD: existing tunnel not isolated with canary'; exit 2
 fi
-IMAGE=$("$DOCKER" inspect -f '{{.Config.Image}}' "$CANARY")
-if [ -z "$IMAGE" ] || ! "$DOCKER" image inspect "$IMAGE" >/dev/null 2>&1; then
-  echo 'HOLD: cached trusted canary base image not found'; exit 2
+# Reuse the immutable image ID of the *running* canary, never a mutable
+# local image tag that could now point to different unreviewed bytes.
+IMAGE=$("$DOCKER" inspect -f '{{.Image}}' "$CANARY")
+if [[ ! "$IMAGE" =~ ^sha256:[0-9a-f]{64}$ ]] ||
+   ! "$DOCKER" image inspect "$IMAGE" >/dev/null 2>&1; then
+  echo 'HOLD: exact cached running canary image ID unavailable'; exit 2
 fi
 # A temporary no-network, no-mount container verifies the cached image runs Node.
 VERSION=$("$DOCKER" run --rm --pull=never --network none --read-only \
