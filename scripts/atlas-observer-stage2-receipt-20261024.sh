@@ -21,6 +21,15 @@ for name in "$CANARY" "$TUNNEL"; do
   [ "$running" = true ] || hold BASELINE_NOT_RUNNING
 done
 printf 'BASELINE_CANARY_AND_TUNNEL=RUNNING\n'
+# Record original IDs and existing tunnel network before inspecting the review.
+# A replacement container with the same name must never pass as preserved.
+CANARY_ID=$("$DOCKER" inspect -f '{{.Id}}' "$CANARY") || hold CANARY_INSPECT
+TUNNEL_ID=$("$DOCKER" inspect -f '{{.Id}}' "$TUNNEL") || hold TUNNEL_INSPECT
+TUNNEL_NET=$("$DOCKER" inspect -f '{{.HostConfig.NetworkMode}}' "$TUNNEL") || hold TUNNEL_INSPECT
+case "$TUNNEL_NET" in
+  "container:$CANARY"|"container:$CANARY_ID") ;;
+  *) hold BASELINE_NETWORK_MISMATCH ;;
+esac
 if ! "$DOCKER" container inspect "$OBSERVER" >/dev/null 2>&1; then
   printf 'ATLAS_STAGE2_RECEIPT=NOT_INSTALLED\n'
   exit 0
@@ -97,5 +106,12 @@ for name in "$CANARY" "$TUNNEL"; do
   running=$("$DOCKER" inspect -f '{{.State.Running}}' "$name" 2>/dev/null) || hold BASELINE_AFTER_TEST
   [ "$running" = true ] || hold BASELINE_AFTER_TEST
 done
+[ "$("$DOCKER" inspect -f '{{.Id}}' "$CANARY")" = "$CANARY_ID" ] ||
+  hold CANARY_ID_CHANGED
+[ "$("$DOCKER" inspect -f '{{.Id}}' "$TUNNEL")" = "$TUNNEL_ID" ] ||
+  hold TUNNEL_ID_CHANGED
+[ "$("$DOCKER" inspect -f '{{.HostConfig.NetworkMode}}' "$TUNNEL")" = "$TUNNEL_NET" ] ||
+  hold TUNNEL_NETWORK_CHANGED
+printf 'BASELINE_CANARY_AND_TUNNEL=RUNNING_ORIGINAL_IDS\n'
 printf 'ATLAS_STAGE2_RECEIPT=LOCAL_SERVICE_VERIFIED\n'
 printf 'CHATGPT_ATLAS_STATUS=NOT_YET_VERIFIED\n'
