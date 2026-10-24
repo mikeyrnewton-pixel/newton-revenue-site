@@ -83,7 +83,7 @@ export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now
   const id = hasId ? message.id : null;
   const validId = !hasId ||
     (typeof id === "string" && id.length > 0 && id.length <= 128 &&
-     !/[\u0000-\u001f\u007f]/u.test(id)) ||
+     !/[\u0000-\u001f\u007f-\u009f]/u.test(id)) ||
     (typeof id === "number" && Number.isSafeInteger(id));
   if (message.jsonrpc !== "2.0" || typeof message.method !== "string" || !validId)
     return error(validId ? id : null, -32600, "Invalid request");
