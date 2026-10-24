@@ -168,3 +168,19 @@ Owner expressed explicit approval to pursue the remaining Observer stages on 24 
 **Still blocked beyond Stage 2:** actual isolated runtime must first return the local `ATLAS_OBSERVER_STAGE2=LOCAL_SERVICE_VERIFIED` marker. Only then separately review plugin/tunnel connection change. Current verified plugin has only `atlas_ping` and no ChatGPT `atlas_status`. Avoid reporting `FULL_OBSERVER_VERIFIED` before first remote call. The 24 Oct sleep root cause remains unresolved, so Stage2 process health doesn't prove unattended uptime.
 
 **24 October 2026 security hardening:** Draft Stage 2 installer uses the running canary's immutable Docker image ID `{{.Image}}` rather than a mutable `{{.Config.Image}}` tag. Stage 2 remains local-only and unexecuted; CI tests validate source properties but cannot prove on-Mac Docker mount access. The deliberate shared canary network namespace means the new loopback port can be accessed by the existing canary/tunnel namespace, though the tunnel's configured destination remains unchanged at 18787. This is not independent network isolation or authenticated remote `atlas_status` access. Only sanitized allowlisted snapshot fields may be mounted. No existing services or plugins are reconfigured by this source change.
+
+## 24 October 2026 — iPhone Shortcut output ambiguity and read-only receipt recovery
+
+Owner's Shortcut screenshot at 13:39 BST showed a Quick Look popup displaying only `0`; the subsequent editor screenshot showed a red warning on **Run Script over SSH** and an `Input: Ask for Input` field. There was **no** `ATLAS_OBSERVER_STAGE2=LOCAL_SERVICE_VERIFIED` Mac receipt and no captured stdout from the installer. A `0` popup is not independent evidence of execution or success. Do **not** rerun Stage 2 blindly or claim the container exists. The existing `atlas_ping` canary was independently called from ChatGPT after the incident and still returned its fixed constant.
+
+BUILD added `scripts/atlas-observer-stage2-receipt-20261024.sh` and `tests/atlas-observer-stage2-receipt.test.mjs` on the existing draft branch. This script is **inspection-only** and never starts, stops, deletes, reconfigures or publishes any service. It prints `ATLAS_STAGE2_RECEIPT=STARTED` immediately, then distinguishes `NOT_INSTALLED`, explicit `HOLD_...` preflight failures, or `LOCAL_SERVICE_VERIFIED`. Its positive receipt requires running canary+tunnel, exact owner-labelled Observer, the inherited canary image ID, read-only root, non-privileged container, no published host ports, no automatic restart, exactly two read-only reviewed mounts, local tools allowlist, denial of unauthorized `run_shell`, and fresh filtered local `atlas_status`. It never calls the remote tunnel or reads secret/counterparty records. GitHub checks are **offline/static only** until an owner Mac result is provided.
+
+**Lowest-friction iPhone SSH display check (no Docker and no Mac modifications):**
+
+```sh
+printf 'ATLAS_SSH_STDOUT_OK\n'
+```
+
+Only if Quick Look returns the exact text `ATLAS_SSH_STDOUT_OK` is the SSH stdout display channel confirmed. Otherwise inspect Shortcut `Run Script over SSH` action (including unexpected `Input: Ask for Input` prompt and its `Shell Script Result` handoff to `Show`) rather than rerunning an installer. This is the single next owner-only troubleshooting step if needed. Do not ask for SSH passwords or keys.
+
+Once the Shortcut output channel is confirmed, use an independently Git-hash-verified fetch of the review-only receipt script from an immutable commit. Run `bash -n` before execution; never pipe remote download directly into a shell. All Stage 2, plugin/tunnel, and Mac uptime status claims remain gated by observed Mac results. Keep all five hourly automations and commercial draft PRs intact. No new spend.
