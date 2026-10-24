@@ -56,11 +56,12 @@ printf 'TUNNEL_IMAGE_AND_RUNTIME_CONFINEMENT=VERIFIED\n'
 # emit only "yes" or empty, never capture or print arguments or key content.
 endpoint=$("$DOCKER" inspect -f '{{range .Args}}{{if eq . "--mcp.server-url=http://127.0.0.1:18787/mcp"}}yes{{end}}{{end}}' "$TUNNEL") ||
   hold TUNNEL_ARGS_CHECK_FAILED
-keyfile=$("$DOCKER" inspect -f '{{range .Args}}{{if eq . "--control-plane.api-key=file:/run/secrets/openai_runtime_key"}}yes{{end}}{{end}}' "$TUNNEL") ||
+keyfile=$("$DOCKER" inspect -f '{{range .Args}}{{if eq . "--control-plane.api-key=file:/run/secrets/runtime-key"}}yes{{end}}{{end}}' "$TUNNEL") ||
   hold TUNNEL_KEYFILE_CHECK_FAILED
-mount=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/secrets/openai_runtime_key"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$TUNNEL") ||
+mount=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/secrets/runtime-key"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$TUNNEL") ||
   hold KEY_MOUNT_CHECK_FAILED
-[ "$endpoint" = yes ] || hold EXPECTED_CANARY_ENDPOINT_NOT_VERIFIED
+endpoint_env=$("$DOCKER" inspect -f '{{range .Config.Env}}{{if eq . "MCP_SERVER_URL=http://127.0.0.1:18787/mcp"}}yes{{end}}{{end}}' "$TUNNEL") || hold TUNNEL_ENV_CHECK_FAILED
+[ "$endpoint" = yes ] || [ "$endpoint_env" = yes ] || hold EXPECTED_CANARY_ENDPOINT_NOT_VERIFIED
 [ "$keyfile" = yes ] && [ "$mount" = yes ] ||
   hold FILE_BACKED_READONLY_KEY_NOT_VERIFIED
 printf 'CURRENT_TUNNEL_TARGET=ORIGINAL_CANARY_18787\n'
