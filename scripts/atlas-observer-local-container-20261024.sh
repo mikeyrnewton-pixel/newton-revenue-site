@@ -155,6 +155,13 @@ cleanup_on_error() {
     if [ "$owned" = v1 ]; then
       "$DOCKER" rm -f "$CREATED_ID" >/dev/null 2>&1 || true
     fi
+    # A short-lived --rm container may have already exited and auto-removed.
+    # Report absence only after independently checking the exact created ID.
+    if "$DOCKER" container inspect "$CREATED_ID" >/dev/null 2>&1; then
+      echo 'STAGE2_CLEANUP=CONTAINER_STILL_PRESENT_HOLD'
+    else
+      echo 'STAGE2_CLEANUP=CREATED_CONTAINER_ABSENT'
+    fi
     echo 'STAGE2=HOLD_CLEANUP_ATTEMPTED'
   fi
 }
