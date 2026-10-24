@@ -392,6 +392,53 @@ test("oversized streaming bodies fail fast without waiting for upload completion
   }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
 });
 
+test("initialize rejects polluted prototypes while preserving protocol compatibility", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+
+  for (const protocolVersion of ["2024-11-05", "2025-03-26", "2025-06-18"]) {
+    const result = call("initialize", {protocolVersion, capabilities: {}, clientInfo: {}}, 1, deps);
+    assert.equal(result.result.protocolVersion, protocolVersion);
+  }
+  assert.equal(
+    call("initialize", {protocolVersion: "future-version"}, 2, deps).result.protocolVersion,
+    "2025-03-26",
+  );
+
+  const nullPrototype = Object.create(null);
+  nullPrototype.protocolVersion = "2025-06-18";
+  assert.equal(call("initialize", nullPrototype, 3, deps).result.protocolVersion, "2025-06-18");
+
+  const pollutedParams = Object.assign(
+    Object.create({command: "whoami", path: "/etc/passwd"}),
+    {protocolVersion: "2025-06-18"},
+  );
+  assert.equal(call("initialize", pollutedParams, 4, deps).error.code, -32602);
+
+  const pollutedCapabilities = Object.create({command: "whoami"});
+  pollutedCapabilities.tools = {};
+  assert.equal(call("initialize", {
+    protocolVersion: "2025-06-18", capabilities: pollutedCapabilities,
+  }, 5, deps).error.code, -32602);
+
+  await withServer(async port => {
+    const raw = JSON.stringify({
+      jsonrpc: "2.0", id: 6, method: "initialize",
+      params: {protocolVersion: "2025-06-18", "__proto__": {command: "whoami"}},
+    }).replace(
+      '"protocolVersion":"2025-06-18"',
+      '"protocolVersion":"2025-06-18","__proto__":{"command":"whoami"}',
+    );
+    const response = await http(port, {body: raw});
+    assert.equal(response.status, 200);
+    assert.equal(response.json.error.code, -32602);
+    assert.equal(response.raw.includes("whoami"), false);
+    assert.equal(response.headers["cache-control"], "no-store");
+  }, deps);
+
+  assert.equal(reads, 0);
+});
+
 test("HTTP initialization rejects smuggled parameters without snapshot access", async () => {
   let reads = 0;
   await withServer(async port => {
