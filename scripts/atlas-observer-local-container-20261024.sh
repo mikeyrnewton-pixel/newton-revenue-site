@@ -140,7 +140,7 @@ trap cleanup_on_error EXIT
 
 # The canary continues to own port 18787. This new review service binds only
 # 127.0.0.1:18788 INSIDE its existing isolated container network namespace.
-CREATED_ID=$("$DOCKER" run -d --rm --pull=never --restart=no \
+CREATED_ID=$("$DOCKER" run -d --rm --pull=never \
   --name "$OBSERVER" --label "$LABEL=v1" \
   --network "container:$CANARY" \
   --read-only --cap-drop=ALL --security-opt no-new-privileges:true \
