@@ -273,9 +273,29 @@ test("snapshot reader failure is bounded and redacted", () => {
   assert.deepEqual(result,{schema:SNAPSHOT_SCHEMA,status:"UNAVAILABLE"});
 });
 
-test("initialization negotiates protocols; notifications have no response", () => {
-  assert.equal(call("initialize",{protocolVersion:"2025-06-18"}).result.protocolVersion,"2025-06-18");
-  assert.equal(call("initialize",{protocolVersion:"unknown"}).result.protocolVersion,"2025-03-26");
+test("initialization negotiates protocols and rejects parameter smuggling", () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  assert.equal(call("initialize",{protocolVersion:"2025-06-18"},1,deps).result.protocolVersion,"2025-06-18");
+  assert.equal(call("initialize",{protocolVersion:"unknown"},1,deps).result.protocolVersion,"2025-03-26");
+  assert.equal(call("initialize",{
+    protocolVersion:"2025-06-18",capabilities:{},clientInfo:{name:"test",version:"1"},
+  },1,deps).error,undefined);
+  for (const params of [
+    undefined,null,[],{},
+    {protocolVersion:""},
+    {protocolVersion:"2025-06-18",command:"whoami"},
+    {protocolVersion:"2025-06-18",path:"/etc/passwd"},
+    {protocolVersion:"2025-06-18",url:"http://127.0.0.1:8080"},
+    {protocolVersion:"2025-06-18",_meta:{secret:"sk-DO-NOT-REFLECT"}},
+    {protocolVersion:"2025-06-18",capabilities:[]},
+    {protocolVersion:"2025-06-18",clientInfo:null},
+  ]) {
+    const result=call("initialize",params,2,deps);
+    assert.equal(result.error.code,-32602);
+    assert.equal(JSON.stringify(result).includes("sk-DO-NOT-REFLECT"),false);
+  }
+  assert.equal(reads,0);
   assert.deepEqual(call("ping").result,{});
   assert.equal(handleObserverMcp({jsonrpc:"2.0",method:"notifications/initialized"}),null);
 });
@@ -368,6 +388,30 @@ test("oversized streaming bodies fail fast without waiting for upload completion
     assert.equal(result.status, 413);
     assert.deepEqual(JSON.parse(result.raw), {error: "Request too large"});
     assert.equal(result.headers["cache-control"], "no-store");
+    assert.equal(reads, 0);
+  }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
+});
+
+test("HTTP initialization rejects smuggled parameters without snapshot access", async () => {
+  let reads = 0;
+  await withServer(async port => {
+    for (const params of [
+      null,[],
+      {protocolVersion: "2025-06-18", command: "whoami"},
+      {protocolVersion: "2025-06-18", path: "/etc/passwd"},
+      {protocolVersion: "2025-06-18", url: "http://127.0.0.1:8080"},
+      {protocolVersion: "2025-06-18", _meta: {secret: "sk-DO-NOT-REFLECT"}},
+    ]) {
+      const response = await http(port, {body: {
+        jsonrpc: "2.0", id: 4, method: "initialize", params,
+      }});
+      assert.equal(response.status, 200);
+      assert.equal(response.json.error.code, -32602);
+      assert.equal(response.raw.includes("sk-DO-NOT-REFLECT"), false);
+      assert.equal(response.raw.includes("/etc/passwd"), false);
+      assert.equal(response.raw.includes("127.0.0.1:8080"), false);
+      assert.equal(response.headers["cache-control"], "no-store");
+    }
     assert.equal(reads, 0);
   }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
 });
