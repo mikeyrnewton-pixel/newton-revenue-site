@@ -20,6 +20,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   coverageEndedAt:source.coverageEndedAt,
   evidenceLocator:source.evidenceLocator,
   searchScope:source.searchScope,
+  observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
     key,source.observedCounts[key],
   ])),
@@ -39,6 +40,9 @@ const readable=(sourceId,overrides={})=>{
     verifiedAt:"2026-10-20T12:14:00.000Z",
     ...overrides,
   };
+  source.observedRecordCount=Object.hasOwn(overrides,"observedRecordCount")?
+    overrides.observedRecordCount:
+    Object.values(source.observedCounts).reduce((total,count)=>total+count,0);
   source.evidenceDigest=Object.hasOwn(overrides,"evidenceDigest")?
     overrides.evidenceDigest:evidenceDigestFor(source);
   return source;
@@ -51,6 +55,7 @@ const unreadable=sourceId=>({
   coverageEndedAt:null,
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   searchScope:null,
+  observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
   evidenceDigest:null,
@@ -115,6 +120,7 @@ test("readable candidate and unknown rows remain explicit unresolved classificat
     }));
   const salesDesk=input.sources.find(source=>source.sourceId==="SALES_DESK");
   salesDesk.observedCounts={...zeroCounts(),CANDIDATE:1,UNKNOWN:2};
+  salesDesk.observedRecordCount=3;
   salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
   const result=reconcileEnquirySourceInventory(input);
   assert.equal(result.classificationStatus,"UNKNOWN_CLASSIFICATION_REVIEW");
@@ -129,6 +135,7 @@ test("unreadable stores cannot hide readable classification review",()=>{
   const input=fixture();
   const salesDesk=input.sources.find(source=>source.sourceId==="SALES_DESK");
   salesDesk.observedCounts={...zeroCounts(),CANDIDATE:1,UNKNOWN:2};
+  salesDesk.observedRecordCount=3;
   salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
   const result=reconcileEnquirySourceInventory(input);
   assert.equal(
@@ -379,6 +386,7 @@ test("one evidence snapshot cannot be counted under multiple primary sources",()
 test("readable source digest binds counts and timestamps to the exact observation",()=>{
   const changedCount=fixture();
   changedCount.sources[1].observedCounts.GENUINE=1;
+  changedCount.sources[1].observedRecordCount=1;
   assert.throws(
     ()=>reconcileEnquirySourceInventory(changedCount),
     /evidence digest does not bind the exact source observation/,
@@ -401,12 +409,33 @@ test("aggregate source counts cannot overflow the safe integer range",()=>{
   for(const sourceId of ["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"]){
     const source=input.sources.find(item=>item.sourceId===sourceId);
     source.observedCounts={...zeroCounts(),GENUINE:Number.MAX_SAFE_INTEGER};
+    source.observedRecordCount=Number.MAX_SAFE_INTEGER;
     source.evidenceDigest=evidenceDigestFor(source);
   }
   assert.throws(
     ()=>reconcileEnquirySourceInventory(input),
     /GENUINE aggregate count exceeds safe integer range/,
     "individually valid source counts must not produce a rounded aggregate",
+  );
+});
+
+
+test("one observed record cannot be counted in multiple classifications",()=>{
+  const input=fixture();
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.observedCounts={
+    ...zeroCounts(),
+    GENUINE:1,
+    OUTBOUND_REPLY:1,
+  };
+  personal.observedRecordCount=1;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /each observed record must have exactly one classification/,
+    "one message cannot simultaneously inflate genuine and outbound-reply totals",
   );
 });
 
