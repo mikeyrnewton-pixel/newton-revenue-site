@@ -83,6 +83,37 @@ test("price, currency, schema and extra fields fail closed",()=>{
     /exact non-secret configuration/);
 });
 
+test("hidden configuration properties fail the exact schema boundary",()=>{
+  const symbolBacked=base();
+  symbolBacked[Symbol("hidden")]="not permitted";
+  assert.throws(
+    ()=>preparePaymentEvidenceConnector(symbolBacked),
+    /exact non-secret configuration/,
+  );
+
+  const nonEnumerable=base();
+  Object.defineProperty(nonEnumerable,"hidden",{
+    value:"not permitted",
+    enumerable:false,
+  });
+  assert.throws(
+    ()=>preparePaymentEvidenceConnector(nonEnumerable),
+    /exact non-secret configuration/,
+  );
+
+  const hiddenExpected=base();
+  Object.defineProperty(hiddenExpected,"provider",{
+    value:hiddenExpected.provider,
+    enumerable:false,
+    configurable:true,
+    writable:true,
+  });
+  assert.throws(
+    ()=>preparePaymentEvidenceConnector(hiddenExpected),
+    /exact non-secret configuration/,
+  );
+});
+
 const observation=(status)=>({
   version:1,
   synthetic:true,
