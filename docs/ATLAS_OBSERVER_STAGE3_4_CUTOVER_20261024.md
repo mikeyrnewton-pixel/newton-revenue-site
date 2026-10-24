@@ -54,3 +54,11 @@ No money, paid API models, Work/Codex credits, production PR merges, customer ou
 - https://github.com/openai/tunnel-client/blob/master/docs/deployment/docker.md
 
 **Status: REVIEW_RUNBOOK_ONLY / MAC_STAGE2_UNVERIFIED / REMOTE_ATLAS_STATUS_UNVERIFIED / CURRENT_CANARY_VERIFIED.**
+
+## 24 October 2026 — executable Stage 3 fixture acceptance
+
+BUILD added `tests/atlas-observer-stage3-runtime-mocks.test.mjs` to the **existing** draft PR #47. Unlike the earlier static source-pattern tests, this suite extracts and executes the actual Stage 3 read-only Docker comparison logic against a fake local Docker CLI. Positive fixtures cover (a) the owner-observed `MCP_SERVER_URL` environment endpoint with a file-backed key reference supplied in Docker Cmd, plus an RO key bind, and (b) the original canary endpoint in Args with a key reference there. Negative fixtures require HOLD for missing endpoint, missing file-backed reference, and missing or writable expected key mount. It also checks that the test output doesn't print raw credential or tunnel-identity material.
+
+The Website quality workflow completed successfully for this code. **No Mac Stage 3 re-execution has occurred:** CI confirms the checked script's decision logic under synthetic Docker outputs, **not** the actual owner's secret bind, permissions, current client health or runtime key role. ChatGPT can still call the original `atlas_ping` canary; remote `atlas_status` is still unavailable.
+
+**Cutover remains a hard hold** pending an independently verified read-only Mac topology receipt and Platform principal/workspace `Read + Use` permission audit. No work requires the owner to regenerate keys, download a new runtime image, or change tunnel settings. The five enabled hourly engines remain unchanged. No customer data, API model credits or payment actions involved.
