@@ -660,3 +660,58 @@ test("protocol discovery methods reject parameter smuggling without snapshot acc
   }
   assert.equal(reads, 0);
 });
+
+
+test("active request properties fail closed without getter or snapshot execution", () => {
+  let reads = 0;
+  let getters = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const accessor = (base, key, value) => {
+    const record = {...base};
+    Object.defineProperty(record, key, {
+      enumerable: true,
+      get() {
+        getters++;
+        return value;
+      },
+    });
+    return record;
+  };
+
+  const activeMessage = accessor(
+    {jsonrpc: "2.0", id: 91, params: {}},
+    "method",
+    "ping",
+  );
+  assert.equal(handleObserverMcp(activeMessage, deps).error.code, -32600);
+
+  const activeParams = accessor(
+    {arguments: {}},
+    "name",
+    "atlas_status",
+  );
+  assert.equal(handleObserverMcp({
+    jsonrpc: "2.0", id: 92, method: "tools/call", params: activeParams,
+  }, deps).error.code, -32602);
+
+  const activeCapabilities = accessor({}, "tools", {listChanged: true});
+  assert.equal(call("initialize", {
+    protocolVersion: "2025-06-18", capabilities: activeCapabilities,
+  }, 93, deps).error.code, -32602);
+
+  const hiddenArguments = {};
+  Object.defineProperty(hiddenArguments, "command", {
+    enumerable: false,
+    value: "sk-HIDDEN-whoami",
+  });
+  assert.equal(call("tools/call", {
+    name: "atlas_status", arguments: hiddenArguments,
+  }, 94, deps).error.code, -32602);
+
+  const symbolParams = {name: "atlas_status", arguments: {}};
+  symbolParams[Symbol("command")] = "whoami";
+  assert.equal(call("tools/call", symbolParams, 95, deps).error.code, -32602);
+
+  assert.equal(getters, 0, "Observer validation must never execute request getters");
+  assert.equal(reads, 0, "active request shapes must never reach the snapshot");
+});
