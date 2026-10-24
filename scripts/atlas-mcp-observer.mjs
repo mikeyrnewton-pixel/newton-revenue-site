@@ -43,7 +43,11 @@ const TOOLS = Object.freeze([
 ]);
 const reply = (id, result) => ({jsonrpc: "2.0", id, result});
 const error = (id, code, message) => ({jsonrpc: "2.0", id, error: {code, message}});
-const validRecord = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const validRecord = value => {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
 const exactKeys = (value, allowed) => validRecord(value) &&
   Object.keys(value).every(key => allowed.includes(key)) &&
   allowed.filter(key => Object.hasOwn(value, key)).length === Object.keys(value).length;
