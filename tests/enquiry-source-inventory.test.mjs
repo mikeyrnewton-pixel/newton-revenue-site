@@ -459,3 +459,65 @@ test("bounded Gmail evidence cannot narrow the sender or category scope",()=>{
     /source search scope must be complete and allowlisted/,
   );
 });
+
+
+test("source inventory accepts inert null-prototype records",()=>{
+  const input=Object.assign(Object.create(null),fixture());
+  const result=reconcileEnquirySourceInventory(input);
+  assert.equal(result.customerDelivery,"HOLD");
+  assert.equal(result.productionMutation,false);
+});
+
+test("inventory and source records reject active object shapes without running getters",()=>{
+  const inherited=Object.assign(Object.create({claimedEnquiries:999}),fixture());
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(inherited),
+    /exact inventory fields required/,
+  );
+
+  const input=fixture();
+  let accessed=false;
+  const activeSource={...input.sources[1]};
+  Object.defineProperty(activeSource,"sourceId",{
+    enumerable:true,
+    get(){
+      accessed=true;
+      return "NEWTON_REVENUE_GMAIL";
+    },
+  });
+  input.sources[1]=activeSource;
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /exact source fields required/,
+  );
+  assert.equal(accessed,false,"source getters must never execute at the trust boundary");
+});
+
+test("classification maps reject active object shapes without running getters",()=>{
+  const inherited=fixture();
+  inherited.sources[1].observedCounts=Object.assign(
+    Object.create({GENUINE:999}),
+    inherited.sources[1].observedCounts,
+  );
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(inherited),
+    /exact classification counts required/,
+  );
+
+  const input=fixture();
+  let accessed=false;
+  const activeCounts={...input.sources[1].observedCounts};
+  Object.defineProperty(activeCounts,"GENUINE",{
+    enumerable:true,
+    get(){
+      accessed=true;
+      return 0;
+    },
+  });
+  input.sources[1].observedCounts=activeCounts;
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /exact classification counts required/,
+  );
+  assert.equal(accessed,false,"classification getters must never execute");
+});
