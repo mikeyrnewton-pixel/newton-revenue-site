@@ -681,6 +681,7 @@ test("Gmail pagination proof binds dense page totals and deduplicated IDs",()=>{
   });
   activeSource.pageRecordCounts=pages;
   activeSource.evidenceDigest=evidenceDigestFor(activeSource);
+  getterRuns=0;
   assert.throws(
     ()=>reconcileEnquirySourceInventory(activePages),
     /bounded dense per-page record counts/,
