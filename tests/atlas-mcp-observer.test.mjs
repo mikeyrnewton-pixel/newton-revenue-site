@@ -1262,3 +1262,53 @@ test("HTTP request target is exact and cannot smuggle SSRF-style destinations", 
 
   assert.equal(reads, 0, "rejected targets and ping control must never read the snapshot");
 });
+
+
+test("HTTP bounds JSON nesting before parsing or snapshot access", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const nest = (levels, leaf) => {
+    let value = leaf;
+    for (let index = 0; index < levels; index += 1) value = [value];
+    return value;
+  };
+
+  await withServer(async port => {
+    // Root, params and clientInfo consume three levels; 29 nested arrays reach
+    // the exact reviewed limit of 32 and remain compatible.
+    const atLimit = await http(port, {body: {
+      jsonrpc: "2.0", id: 431, method: "initialize",
+      params: {
+        protocolVersion: "2025-06-18",
+        clientInfo: {
+          name: "fixture",
+          note: "[brackets] and {braces} inside strings are inert",
+          nested: nest(29, "safe"),
+        },
+      },
+    }});
+    assert.equal(atLimit.status, 200);
+    assert.equal(atLimit.json.result.protocolVersion, "2025-06-18");
+
+    const overLimit = await http(port, {body: {
+      jsonrpc: "2.0", id: 432, method: "initialize",
+      params: {
+        protocolVersion: "2025-06-18",
+        clientInfo: {
+          name: "fixture",
+          nested: nest(30, "sk-DEPTH-INJECTION"),
+        },
+      },
+    }});
+    assert.equal(overLimit.status, 400);
+    assert.deepEqual(overLimit.json, {
+      jsonrpc: "2.0", id: null,
+      error: {code: -32600, message: "JSON nesting limit exceeded"},
+    });
+    assert.equal(overLimit.headers["cache-control"], "no-store");
+    assert.equal(overLimit.raw.includes("sk-DEPTH-INJECTION"), false);
+    assert.equal(overLimit.raw.includes("initialize"), false);
+  }, deps);
+
+  assert.equal(reads, 0, "nesting controls and denials must never read the snapshot");
+});
