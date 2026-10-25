@@ -62,7 +62,10 @@ function http(port, {method = "POST", url = "/mcp", headers = {}, body} = {}) {
       });
     });
     req.on("error", reject);
-    if (body !== undefined) req.write(typeof body === "string" ? body : JSON.stringify(body));
+    if (body !== undefined) req.write(
+      Buffer.isBuffer(body) ? body :
+        typeof body === "string" ? body : JSON.stringify(body),
+    );
     req.end();
   });
 }
@@ -353,6 +356,34 @@ test("malformed, oversized and non-JSON HTTP bodies fail closed",async()=>{
     assert.equal(rejected.json.error.code,-32602);
     assert.equal(reads,0);
   },{readSnapshot:()=>{reads++;return snap();},now:()=>NOW});
+});
+
+test("malformed UTF-8 fails before JSON parsing or snapshot access", async () => {
+  let reads = 0;
+  await withServer(async port => {
+    const prefix = Buffer.from(
+      '{"jsonrpc":"2.0","id":"',
+      "utf8",
+    );
+    const suffix = Buffer.from(
+      '","method":"tools/call","params":{"name":"atlas_status","arguments":{}}}',
+      "utf8",
+    );
+    for (const invalid of [
+      Buffer.from([0xc0, 0xaf]),
+      Buffer.from([0xe2, 0x28, 0xa1]),
+      Buffer.from([0xf0, 0x28, 0x8c, 0xbc]),
+    ]) {
+      const response = await http(port, {
+        body: Buffer.concat([prefix, invalid, suffix]),
+      });
+      assert.equal(response.status, 400);
+      assert.equal(response.json.error.code, -32700);
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+    }
+    assert.equal(reads, 0);
+  }, {readSnapshot: () => {reads++;return snap();}, now: () => NOW});
 });
 
 test("compressed HTTP bodies fail closed before parsing or snapshot access", async () => {
