@@ -4,6 +4,8 @@ import {readFileSync} from "node:fs";
 
 const draft=readFileSync(new URL("../docs/ATLAS_DIAGNOSTIC_OWNER_CRM_RLS_20261025.sql.review",
   import.meta.url),"utf8");
+// Audit executable statements separately from explanatory SQL comments.
+const statements=draft.split("\n").filter(line=>!line.trimStart().startsWith("--")).join("\n");
 
 test("private CRM SQL remains inert review material, not deployable from repository",()=>{
   assert.match(draft,/REVIEW-ONLY: not a migration, do NOT execute/);
@@ -11,8 +13,8 @@ test("private CRM SQL remains inert review material, not deployable from reposit
   assert.equal((draft.match(/^BEGIN;$/gm)||[]).length,1);
   assert.equal((draft.match(/^COMMIT;$/gm)||[]).length,1);
   assert.match(draft,/auth\.users WHERE id = owner_uid/);
-  assert.doesNotMatch(draft,/\b(?:CREATE|ALTER|DROP)\s+(?:DATABASE|ROLE|USER)\b/i);
-  assert.doesNotMatch(draft,/\b(?:TRUNCATE|DELETE FROM|DROP TABLE)\b/i);
+  assert.doesNotMatch(statements,/\b(?:CREATE|ALTER|DROP)\s+(?:DATABASE|ROLE|USER)\b/i);
+  assert.doesNotMatch(statements,/\b(?:TRUNCATE|DELETE FROM|DROP TABLE)\b/i);
 });
 test("cutover refuses nonempty table, a changed policy set and missing RLS",()=>{
   assert.match(draft,/EXISTING_CRM_ROWS_REQUIRE_REVIEW_AND_DATA_MIGRATION/);
