@@ -259,3 +259,59 @@ test("Concurrent Enter press cannot duplicate a failed submission and the user c
   assert.equal(sent[0].submissionId, sent[1].submissionId);
   assert.equal(state.status.className, "status success");
 });
+
+
+test("Edits made after a slow POST starts survive its success; only earlier snapshot is acknowledged", async () => {
+  const sent = [];
+  let finish;
+  const pending = new Promise(resolve => { finish = resolve; });
+  const state = mount(async (_path, init) => {
+    const payload = JSON.parse(init.body);
+    sent.push(payload);
+    if (sent.length === 1) return pending;
+    return new Response(JSON.stringify({ ok: true, received: true }), {
+      status: 201, headers: { "Content-Type": "application/json" },
+    });
+  });
+  const first = state.submit();
+  assert.equal(sent[0].problem, "Need follow-ups");
+  state.values.problem = "NEW problem described during slow connection";
+  state.values.company = "New business name";
+  await state.submit(); // second Enter must not start another POST in-flight
+  assert.equal(sent.length, 1);
+  finish(new Response(JSON.stringify({ ok: true, received: true }), {
+    status: 201, headers: { "Content-Type": "application/json" },
+  }));
+  await first;
+  assert.equal(state.resetCount, 0);
+  assert.equal(state.values.problem, "NEW problem described during slow connection");
+  assert.equal(state.values.company, "New business name");
+  assert.match(state.status.textContent, /earlier enquiry was received/i);
+  assert.match(state.status.textContent, /not included/i);
+  assert.equal(state.button.disabled, false);
+
+  await state.submit();
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].problem, "NEW problem described during slow connection");
+  assert.equal(sent[1].company, "New business name");
+  assert.notEqual(sent[0].submissionId, sent[1].submissionId);
+  assert.equal(state.resetCount, 1);
+  assert.equal(state.status.className, "status success");
+});
+
+test("Changing attribution or consent during the pending request does not silently claim it was sent", async () => {
+  let finish;
+  const pending = new Promise(resolve => { finish = resolve; });
+  const state = mount(async () => pending);
+  const first = state.submit();
+  state.location.search = "?utm_source=instagram";
+  state.values.contactPermission = "";
+  finish(new Response(JSON.stringify({ ok: true, received: true }), {
+    status: 201, headers: { "Content-Type": "application/json" },
+  }));
+  await first;
+  assert.equal(state.resetCount, 0);
+  assert.match(state.status.textContent, /not included/i);
+  assert.equal(state.status.className, "status");
+  assert.equal(state.button.disabled, false);
+});
