@@ -571,3 +571,33 @@ test("source arrays reject sparse or accessor-backed elements",()=>{
   assert.equal(accessed,false,"source-array getters must never execute");
 });
 
+
+
+test("inventory boundaries reject hidden symbol and non-enumerable fields",()=>{
+  const symbolInventory=fixture();
+  symbolInventory[Symbol("privatePayload")]="hidden";
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(symbolInventory),
+    /exact inventory fields required/,
+    "symbol-backed data cannot bypass the exact inventory schema",
+  );
+
+  const hiddenSource=fixture();
+  Object.defineProperty(hiddenSource.sources[1],"privatePayload",{
+    enumerable:false,
+    value:"hidden",
+  });
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(hiddenSource),
+    /exact source fields required/,
+    "non-enumerable source data cannot bypass the privacy-safe source schema",
+  );
+
+  const symbolCounts=fixture();
+  symbolCounts.sources[1].observedCounts[Symbol("unclassified")]=1;
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(symbolCounts),
+    /exact classification counts required/,
+    "hidden classification buckets cannot evade record-count reconciliation",
+  );
+});
