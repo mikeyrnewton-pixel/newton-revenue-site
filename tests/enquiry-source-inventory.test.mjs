@@ -405,6 +405,7 @@ test("readable source digest binds counts and timestamps to the exact observatio
   const changedCount=fixture();
   changedCount.sources[1].observedCounts.GENUINE=1;
   changedCount.sources[1].observedRecordCount=1;
+  changedCount.sources[1].pageRecordCounts=[1];
   assert.throws(
     ()=>reconcileEnquirySourceInventory(changedCount),
     /evidence digest does not bind the exact source observation/,
@@ -428,6 +429,7 @@ test("aggregate source counts cannot overflow the safe integer range",()=>{
     const source=input.sources.find(item=>item.sourceId===sourceId);
     source.observedCounts={...zeroCounts(),GENUINE:Number.MAX_SAFE_INTEGER};
     source.observedRecordCount=Number.MAX_SAFE_INTEGER;
+    source.pageRecordCounts=[Number.MAX_SAFE_INTEGER];
     source.evidenceDigest=evidenceDigestFor(source);
   }
   assert.throws(
@@ -448,9 +450,11 @@ test("combined unresolved classifications cannot overflow the safe integer range
   );
   revenue.observedCounts={...zeroCounts(),CANDIDATE:Number.MAX_SAFE_INTEGER};
   revenue.observedRecordCount=Number.MAX_SAFE_INTEGER;
+  revenue.pageRecordCounts=[Number.MAX_SAFE_INTEGER];
   revenue.evidenceDigest=evidenceDigestFor(revenue);
   personal.observedCounts={...zeroCounts(),UNKNOWN:1};
   personal.observedRecordCount=1;
+  personal.pageRecordCounts=[1];
   personal.evidenceDigest=evidenceDigestFor(personal);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(input),
