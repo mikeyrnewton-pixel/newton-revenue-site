@@ -162,6 +162,34 @@ test("Changing source/channel tracking tags forces a fresh retry receipt", async
   assert.equal(outgoing[1].channel, "instagram");
 });
 
+test("Erased receipt explains recovery and next deliberate submit gets a fresh UUID", async () => {
+  const outgoing = [];
+  let erased = true;
+  const state = mount(async (_path, init) => {
+    outgoing.push(JSON.parse(init.body));
+    if (erased) {
+      erased = false;
+      return new Response(JSON.stringify({
+        error: "This enquiry was erased. Refresh before submitting a new enquiry.",
+      }), { status: 410, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ received: true, ok: true }), {
+      status: 201, headers: { "Content-Type": "application/json" },
+    });
+  });
+
+  await state.submit();
+  assert.match(state.status.textContent, /earlier enquiry was erased/i);
+  assert.equal(state.status.className, "status error");
+  assert.equal(state.resetCount, 0);
+  assert.equal(state.button.disabled, false);
+
+  await state.submit();
+  assert.notEqual(outgoing[0].submissionId, outgoing[1].submissionId);
+  assert.equal(state.status.className, "status success");
+  assert.equal(state.resetCount, 1);
+});
+
 test("No unapproved data leaves the site except the POST the user explicitly submits", async () => {
   const paths = [];
   const state = mount(async (path, _init) => {
