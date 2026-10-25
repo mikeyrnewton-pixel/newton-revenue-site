@@ -21,6 +21,8 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   evidenceLocator:source.evidenceLocator,
   searchScope:source.searchScope,
   paginationComplete:source.paginationComplete,
+  pageRecordCounts:source.pageRecordCounts,
+  deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
     key,source.observedCounts[key],
@@ -39,6 +41,8 @@ const readable=(sourceId,overrides={})=>{
       "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
     paginationComplete:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       true:null,
+    pageRecordCounts:null,
+    deduplicatedRecordIdsDigest:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
     ...overrides,
@@ -46,6 +50,14 @@ const readable=(sourceId,overrides={})=>{
   source.observedRecordCount=Object.hasOwn(overrides,"observedRecordCount")?
     overrides.observedRecordCount:
     Object.values(source.observedCounts).reduce((total,count)=>total+count,0);
+  if(["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)){
+    source.pageRecordCounts=Object.hasOwn(overrides,"pageRecordCounts")?
+      overrides.pageRecordCounts:[source.observedRecordCount];
+    source.deduplicatedRecordIdsDigest=Object.hasOwn(
+      overrides,"deduplicatedRecordIdsDigest",
+    )?overrides.deduplicatedRecordIdsDigest:createHash("sha256")
+      .update(sourceId+":"+source.observedRecordCount).digest("hex");
+  }
   source.evidenceDigest=Object.hasOwn(overrides,"evidenceDigest")?
     overrides.evidenceDigest:evidenceDigestFor(source);
   return source;
@@ -59,6 +71,8 @@ const unreadable=sourceId=>({
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   searchScope:null,
   paginationComplete:null,
+  pageRecordCounts:null,
+  deduplicatedRecordIdsDigest:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
@@ -626,6 +640,85 @@ test("Gmail source truth fails closed until every result page is consumed",()=>{
     ()=>reconcileEnquirySourceInventory(nonGmail),
     /other sources must use null/,
     "pagination claims are reserved for bounded Gmail evidence",
+  );
+});
+
+test("Gmail pagination proof binds dense page totals and deduplicated IDs",()=>{
+  const mismatched=fixture();
+  const source=mismatched.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  source.pageRecordCounts=[1];
+  source.evidenceDigest=evidenceDigestFor(source);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(mismatched),
+    /Gmail page totals must equal the observed record count/,
+  );
+
+  const emptyPages=fixture();
+  const emptySource=emptyPages.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  emptySource.pageRecordCounts=[];
+  emptySource.evidenceDigest=evidenceDigestFor(emptySource);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(emptyPages),
+    /bounded dense per-page record counts/,
+  );
+
+  let getterRuns=0;
+  const activePages=fixture();
+  const activeSource=activePages.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const pages=[0];
+  Object.defineProperty(pages,"0",{
+    enumerable:true,
+    get(){
+      getterRuns++;
+      return 0;
+    },
+  });
+  activeSource.pageRecordCounts=pages;
+  activeSource.evidenceDigest=evidenceDigestFor(activeSource);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(activePages),
+    /bounded dense per-page record counts/,
+  );
+  assert.equal(getterRuns,0,"page-count getter must not execute");
+
+  const noIdDigest=fixture();
+  const noDigestSource=noIdDigest.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  noDigestSource.deduplicatedRecordIdsDigest=null;
+  noDigestSource.evidenceDigest=evidenceDigestFor(noDigestSource);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(noIdDigest),
+    /deduplicated record ID digest required/,
+  );
+
+  const nonGmailProof=fixture();
+  const salesDesk=nonGmailProof.sources.find(
+    item=>item.sourceId==="SALES_DESK",
+  );
+  salesDesk.pageRecordCounts=[salesDesk.observedRecordCount];
+  salesDesk.deduplicatedRecordIdsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmailProof),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const unreadableProof=fixture();
+  unreadableProof.sources[0]={
+    ...unreadableProof.sources[0],
+    pageRecordCounts:[0],
+    deduplicatedRecordIdsDigest:"f".repeat(64),
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(unreadableProof),
+    /unreadable source cannot claim pagination proof/,
   );
 });
 
