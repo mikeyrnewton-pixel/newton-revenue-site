@@ -452,6 +452,13 @@ test("payment batch emits a frozen cumulative replay cursor",()=>{
     synthetic:true,
     observationIds:[observation("SETTLED").observationId],
     evidenceDigests:[observation("SETTLED").evidenceDigest],
+    observationBindings:[{
+      observationId:observation("SETTLED").observationId,
+      evidenceDigest:observation("SETTLED").evidenceDigest,
+      providerTransactionDigest:"d".repeat(64),
+      sourceRecordId:observation("SETTLED").sourceRecordId,
+      invoiceEventId:observation("SETTLED").invoiceEventId,
+    }],
     sourceEvidenceDigests:[binding().sourceEvidenceDigest],
     invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
     providerTransactions:[{
@@ -468,6 +475,8 @@ test("payment batch emits a frozen cumulative replay cursor",()=>{
   assert.ok(Object.isFrozen(result.reconciliationCursor));
   assert.ok(Object.isFrozen(result.reconciliationCursor.observationIds));
   assert.ok(Object.isFrozen(result.reconciliationCursor.evidenceDigests));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.observationBindings));
+  assert.ok(Object.isFrozen(result.reconciliationCursor.observationBindings[0]));
   assert.ok(Object.isFrozen(result.reconciliationCursor.sourceEvidenceDigests));
   assert.ok(Object.isFrozen(result.reconciliationCursor.invoiceEvidenceDigests));
   assert.ok(Object.isFrozen(result.reconciliationCursor.providerTransactions));
@@ -543,6 +552,49 @@ test("status changes require strictly newer provider evidence",()=>{
     }],first.reconciliationCursor),
     /reused provider transaction requires newer evidence/,
   );
+});
+
+test("refund and dispute require prior settled evidence",()=>{
+  const pending=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  for(const status of ["REFUNDED","DISPUTED"]){
+    assert.throws(
+      ()=>assessBatch([{
+        providerTransactionDigest:"d".repeat(64),
+        observation:{
+          ...observation(status),
+          observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          observedAt:"2026-10-20T11:05:00.000Z",
+          evidenceDigest:"e".repeat(64),
+        },
+        expectedBinding:binding(),
+      }],pending.reconciliationCursor),
+      /status regressed across batches/,
+      `PENDING must not jump directly to ${status}`,
+    );
+  }
+
+  const settled=assessBatch([{
+    providerTransactionDigest:"e".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }]);
+  const refunded=assessBatch([{
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("REFUNDED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"f".repeat(64),
+    },
+    expectedBinding:binding(),
+  }],settled.reconciliationCursor);
+  assert.equal(refunded.candidates[0].state,"PAYMENT_EXCEPTION_HOLD");
+  assert.equal(refunded.candidates[0].commercialEventCandidate,null);
+  assert.equal(refunded.clearedEvidenceGBP,0);
 });
 
 test("same-status polling cannot replay an identical provider timestamp",()=>{
@@ -695,6 +747,22 @@ test("malformed cursor rejects historical duplicate invoice ownership",()=>{
       "ffffffff-ffff-4fff-8fff-ffffffffffff",
     ],
     evidenceDigests:["4".repeat(64),"5".repeat(64)],
+    observationBindings:[
+      {
+        observationId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        evidenceDigest:"4".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
+      },
+      {
+        observationId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        evidenceDigest:"5".repeat(64),
+        providerTransactionDigest:"e".repeat(64),
+        sourceRecordId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        invoiceEventId:observation("PENDING").invoiceEventId,
+      },
+    ],
     sourceEvidenceDigests:[binding().sourceEvidenceDigest],
     invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
     providerTransactions:[
@@ -883,6 +951,13 @@ test("historical cursor rejects evidence digest role collisions",()=>{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
       evidenceDigests:["1".repeat(64)],
+      observationBindings:[{
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        evidenceDigest:"1".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
+      }],
       sourceEvidenceDigests:["1".repeat(64)],
     }),
     /payment evidence digest reused from commercial binding/,
@@ -892,6 +967,13 @@ test("historical cursor rejects evidence digest role collisions",()=>{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
       evidenceDigests:["d".repeat(64)],
+      observationBindings:[{
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        evidenceDigest:"d".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
+      }],
       providerTransactions:[{
         providerTransactionDigest:"d".repeat(64),
         sourceRecordId:observation("PENDING").sourceRecordId,
@@ -1022,6 +1104,13 @@ test("historical cursor rejects identifier role collisions",()=>{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:[observation("PENDING").sourceRecordId],
       evidenceDigests:["4".repeat(64)],
+      observationBindings:[{
+        observationId:observation("PENDING").sourceRecordId,
+        evidenceDigest:"4".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
+      }],
       sourceEvidenceDigests:[binding().sourceEvidenceDigest],
       invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
       providerTransactions:[{
@@ -1081,14 +1170,14 @@ test("historical cursor rejects orphan observation IDs or evidence digests",()=>
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
     }),
-    /one-to-one cardinality/,
+    /exact evidence bindings/,
   );
   assert.throws(
     ()=>assessBatch(item,{
       ...emptySyntheticPaymentEvidenceCursor(),
       evidenceDigests:["1".repeat(64)],
     }),
-    /one-to-one cardinality/,
+    /exact evidence bindings/,
   );
 });
 
@@ -1119,27 +1208,52 @@ test("historical provider transaction requires observation evidence",()=>{
       ...first.reconciliationCursor,
       observationIds:[],
       evidenceDigests:[],
+      observationBindings:[],
     }),
     /lacks payment observation evidence/,
   );
 });
 
 test("cursor capacity fails closed before emitting an unusable next cursor",()=>{
-  const fullEvidence=Array.from({length:1000},(_,index)=>
-    index.toString(16).padStart(64,"0"));
-  const fullObservationIds=Array.from({length:1000},(_,index)=>{
-    const prefix=index.toString(16).padStart(8,"0");
+  const uuid=(role,index)=>{
     const suffix=index.toString(16).padStart(12,"0");
-    return `${prefix}-0000-4000-8000-${suffix}`;
-  });
+    return `${role.repeat(8)}-${role.repeat(4)}-4${role.repeat(3)}-8${role.repeat(3)}-${suffix}`;
+  };
+  const digest=(role,index)=>role+index.toString(16).padStart(63,"0");
+  const observationIds=Array.from({length:1000},(_,index)=>uuid("0",index));
+  const evidenceDigests=Array.from({length:1000},(_,index)=>digest("0",index));
+  const sourceEvidenceDigests=Array.from(
+    {length:1000},(_,index)=>digest("2",index),
+  );
+  const invoiceEvidenceDigests=Array.from(
+    {length:1000},(_,index)=>digest("3",index),
+  );
+  const providerTransactions=Array.from({length:1000},(_,index)=>Object.freeze({
+    providerTransactionDigest:digest("1",index),
+    sourceRecordId:uuid("1",index),
+    sourceEvidenceDigest:sourceEvidenceDigests[index],
+    invoiceEventId:uuid("2",index),
+    invoiceEvidenceDigest:invoiceEvidenceDigests[index],
+    provider:"OWNER_SELECTED_PROVIDER",
+    observedAt:"2026-10-20T11:00:00.000Z",
+    status:"PENDING",
+  }));
   const prior={
     version:1,
     synthetic:true,
-    observationIds:fullObservationIds,
-    evidenceDigests:fullEvidence,
-    sourceEvidenceDigests:[],
-    invoiceEvidenceDigests:[],
-    providerTransactions:[],
+    observationIds,
+    evidenceDigests,
+    observationBindings:observationIds.map((observationId,index)=>({
+      observationId,
+      evidenceDigest:evidenceDigests[index],
+      providerTransactionDigest:providerTransactions[index]
+        .providerTransactionDigest,
+      sourceRecordId:providerTransactions[index].sourceRecordId,
+      invoiceEventId:providerTransactions[index].invoiceEventId,
+    })),
+    sourceEvidenceDigests,
+    invoiceEvidenceDigests,
+    providerTransactions,
   };
   assert.throws(
     ()=>assessBatch([{
@@ -1430,3 +1544,133 @@ test("payment batch and cursor arrays reject sparse or active elements",()=>{
   );
 });
 
+
+test("cursor binds each observation and evidence digest to its provider transaction",()=>{
+  const first=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  assert.deepEqual(first.reconciliationCursor.observationBindings,[{
+    observationId:observation("PENDING").observationId,
+    evidenceDigest:observation("PENDING").evidenceDigest,
+    providerTransactionDigest:"d".repeat(64),
+    sourceRecordId:observation("PENDING").sourceRecordId,
+    invoiceEventId:observation("PENDING").invoiceEventId,
+  }]);
+
+  const unregisteredEvidence={
+    ...first.reconciliationCursor,
+    observationBindings:[{
+      ...first.reconciliationCursor.observationBindings[0],
+      evidenceDigest:"1".repeat(64),
+    }],
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"e".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        evidenceDigest:"4".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        sourceEvidenceDigest:"5".repeat(64),
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        invoiceEvidenceDigest:"6".repeat(64),
+      },
+    }],unregisteredEvidence),
+    /observation evidence binding is not registered/,
+  );
+
+  const reassignedTransaction={
+    ...first.reconciliationCursor,
+    observationBindings:[{
+      ...first.reconciliationCursor.observationBindings[0],
+      providerTransactionDigest:"e".repeat(64),
+    }],
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"e".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        evidenceDigest:"4".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        sourceEvidenceDigest:"5".repeat(64),
+        invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        invoiceEvidenceDigest:"6".repeat(64),
+      },
+    }],reassignedTransaction),
+    /observation binding commercial ownership mismatch/,
+  );
+});
+
+
+test("historical cursor rejects observation-to-transaction ownership reshuffling",()=>{
+  const firstItem={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  };
+  const secondItem={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("PENDING"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"1".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      sourceEvidenceDigest:"2".repeat(64),
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      invoiceEvidenceDigest:"3".repeat(64),
+    },
+  };
+  const first=assessBatch([firstItem,secondItem]);
+  const swapped={
+    ...first.reconciliationCursor,
+    observationBindings:first.reconciliationCursor.observationBindings.map(
+      (item,index)=>({
+        ...item,
+        providerTransactionDigest:first.reconciliationCursor
+          .observationBindings[1-index].providerTransactionDigest,
+      }),
+    ),
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"f".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"11111111-1111-4111-8111-111111111111",
+        sourceRecordId:"22222222-2222-4222-8222-222222222222",
+        invoiceEventId:"33333333-3333-4333-8333-333333333333",
+        observedAt:"2026-10-20T11:05:00.000Z",
+        evidenceDigest:"4".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"22222222-2222-4222-8222-222222222222",
+        sourceEvidenceDigest:"5".repeat(64),
+        invoiceEventId:"33333333-3333-4333-8333-333333333333",
+        invoiceEvidenceDigest:"6".repeat(64),
+      },
+    }],swapped),
+    /observation binding commercial ownership mismatch/,
+  );
+});
