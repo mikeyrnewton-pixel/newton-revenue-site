@@ -702,6 +702,18 @@ test("malformed cursor rejects historical duplicate invoice ownership",()=>{
       "ffffffff-ffff-4fff-8fff-ffffffffffff",
     ],
     evidenceDigests:["4".repeat(64),"5".repeat(64)],
+    observationBindings:[
+      {
+        observationId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        evidenceDigest:"4".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+      },
+      {
+        observationId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+        evidenceDigest:"5".repeat(64),
+        providerTransactionDigest:"e".repeat(64),
+      },
+    ],
     sourceEvidenceDigests:[binding().sourceEvidenceDigest],
     invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
     providerTransactions:[
@@ -890,6 +902,11 @@ test("historical cursor rejects evidence digest role collisions",()=>{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
       evidenceDigests:["1".repeat(64)],
+      observationBindings:[{
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        evidenceDigest:"1".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+      }],
       sourceEvidenceDigests:["1".repeat(64)],
     }),
     /payment evidence digest reused from commercial binding/,
@@ -899,6 +916,11 @@ test("historical cursor rejects evidence digest role collisions",()=>{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
       evidenceDigests:["d".repeat(64)],
+      observationBindings:[{
+        observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        evidenceDigest:"d".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+      }],
       providerTransactions:[{
         providerTransactionDigest:"d".repeat(64),
         sourceRecordId:observation("PENDING").sourceRecordId,
@@ -1029,6 +1051,11 @@ test("historical cursor rejects identifier role collisions",()=>{
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:[observation("PENDING").sourceRecordId],
       evidenceDigests:["4".repeat(64)],
+      observationBindings:[{
+        observationId:observation("PENDING").sourceRecordId,
+        evidenceDigest:"4".repeat(64),
+        providerTransactionDigest:"d".repeat(64),
+      }],
       sourceEvidenceDigests:[binding().sourceEvidenceDigest],
       invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
       providerTransactions:[{
@@ -1088,14 +1115,14 @@ test("historical cursor rejects orphan observation IDs or evidence digests",()=>
       ...emptySyntheticPaymentEvidenceCursor(),
       observationIds:["dddddddd-dddd-4ddd-8ddd-dddddddddddd"],
     }),
-    /one-to-one cardinality/,
+    /exact evidence bindings/,
   );
   assert.throws(
     ()=>assessBatch(item,{
       ...emptySyntheticPaymentEvidenceCursor(),
       evidenceDigests:["1".repeat(64)],
     }),
-    /one-to-one cardinality/,
+    /exact evidence bindings/,
   );
 });
 
@@ -1126,6 +1153,7 @@ test("historical provider transaction requires observation evidence",()=>{
       ...first.reconciliationCursor,
       observationIds:[],
       evidenceDigests:[],
+      observationBindings:[],
     }),
     /lacks payment observation evidence/,
   );
