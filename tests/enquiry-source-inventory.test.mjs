@@ -36,6 +36,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
   deduplicatedRecordCount:source.deduplicatedRecordCount,
   recordTimestampDigest:source.recordTimestampDigest,
+  recordIdTimestampPairsDigest:source.recordIdTimestampPairsDigest,
   allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
@@ -65,6 +66,7 @@ const readable=(sourceId,overrides={})=>{
     deduplicatedRecordIdsDigest:null,
     deduplicatedRecordCount:null,
     recordTimestampDigest:null,
+    recordIdTimestampPairsDigest:null,
     allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
@@ -93,6 +95,10 @@ const readable=(sourceId,overrides={})=>{
     )?overrides.recordTimestampDigest:createHash("sha256")
       .update(sourceId+":"+source.coverageStartedAt+":"+
         source.coverageEndedAt+":"+source.observedRecordCount).digest("hex");
+    source.recordIdTimestampPairsDigest=Object.hasOwn(
+      overrides,"recordIdTimestampPairsDigest",
+    )?overrides.recordIdTimestampPairsDigest:createHash("sha256")
+      .update(sourceId+":ID-TIMESTAMP-PAIRS:"+source.observedRecordCount).digest("hex");
     source.allRecordsWithinCoverageWindow=Object.hasOwn(
       overrides,"allRecordsWithinCoverageWindow",
     )?overrides.allRecordsWithinCoverageWindow:true;
@@ -118,6 +124,7 @@ const unreadable=sourceId=>({
   deduplicatedRecordIdsDigest:null,
   deduplicatedRecordCount:null,
   recordTimestampDigest:null,
+  recordIdTimestampPairsDigest:null,
   allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
@@ -955,3 +962,45 @@ test("Gmail pagination evidence binds ordered traversal and terminal cursor exha
   );
 });
 
+
+
+test("Gmail evidence binds record identities to their timestamps",()=>{
+  const missingPairDigest=fixture();
+  const revenue=missingPairDigest.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdTimestampPairsDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingPairDigest),
+    /record ID\/timestamp pair digest required/,
+    "separate ID and timestamp sets cannot prove which timestamp belongs to each message",
+  );
+
+  const collapsedPairProof=fixture();
+  const personal=collapsedPairProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdTimestampPairsDigest=personal.recordTimestampDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedPairProof),
+    /record-pair evidence must be independently bound/,
+    "a timestamp-only digest cannot also stand in for identity/timestamp pairing",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.recordIdTimestampPairsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityTimeBound,
+    true,
+  );
+});
