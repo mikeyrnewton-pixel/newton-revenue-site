@@ -16,6 +16,7 @@ export const OBSERVER_HOST = "127.0.0.1";
 export const OBSERVER_PORT = 18788; // Different from running atlas_ping canary.
 export const PING_REPLY = "ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS";
 const MAX_REQUEST_BYTES = 8192;
+const MAX_REQUEST_HEADER_BYTES = 8192;
 const MAX_REQUEST_HEADERS = 32;
 const MAX_JSON_NESTING = 32;
 const PROTOCOL = "2025-03-26";
@@ -199,7 +200,7 @@ function inspectJsonStructure(text) {
 }
 
 export function createObserverServer(deps = {}) {
-  const server = createServer((req, res) => {
+  const server = createServer({maxHeaderSize: MAX_REQUEST_HEADER_BYTES}, (req, res) => {
     if (req.method === "GET" && req.url === "/healthz")
       return json(res, 200, {status: "OBSERVER_PROCESS_ALIVE_ONLY"});
     if (req.url !== "/mcp") return json(res, 404, {error: "Not found"});
