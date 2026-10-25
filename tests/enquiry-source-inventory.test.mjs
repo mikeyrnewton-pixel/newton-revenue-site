@@ -20,6 +20,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   coverageEndedAt:source.coverageEndedAt,
   evidenceLocator:source.evidenceLocator,
   searchScope:source.searchScope,
+  paginationComplete:source.paginationComplete,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
     key,source.observedCounts[key],
@@ -36,6 +37,8 @@ const readable=(sourceId,overrides={})=>{
     evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
     searchScope:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
+    paginationComplete:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+      true:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
     ...overrides,
@@ -55,6 +58,7 @@ const unreadable=sourceId=>({
   coverageEndedAt:null,
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   searchScope:null,
+  paginationComplete:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
@@ -601,3 +605,27 @@ test("inventory boundaries reject hidden symbol and non-enumerable fields",()=>{
     "hidden classification buckets cannot evade record-count reconciliation",
   );
 });
+
+test("Gmail source truth fails closed until every result page is consumed",()=>{
+  for(const paginationComplete of [false,null]){
+    const input=fixture();
+    input.sources[1].paginationComplete=paginationComplete;
+    input.sources[1].evidenceDigest=evidenceDigestFor(input.sources[1]);
+    assert.throws(
+      ()=>reconcileEnquirySourceInventory(input),
+      /Gmail evidence must be fully paginated/,
+      "a first-page count cannot be attested as the complete bounded snapshot",
+    );
+  }
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.paginationComplete=true;
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /other sources must use null/,
+    "pagination claims are reserved for bounded Gmail evidence",
+  );
+});
+
