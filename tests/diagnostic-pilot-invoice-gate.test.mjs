@@ -8,7 +8,8 @@ const base=()=>({
   pilotRef:"PILOT-DIAGNOSTIC-195",
   sourceRecordId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   sourceClassification:"GENUINE",
-  invoiceDraftId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  quoteDraftId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  invoiceDraftId:"cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   quoteApprovedAt:"2026-10-25T10:00:00.000Z",
   quoteDeliveredAt:"2026-10-25T10:05:00.000Z",
   acceptedAt:"2026-10-25T10:30:00.000Z",
@@ -21,6 +22,7 @@ const base=()=>({
   procurementStatus:"VALIDATED_NOT_REQUIRED",
   sourceEvidenceDigest:"1".repeat(64),
   quoteEvidenceDigest:"2".repeat(64),
+  quoteBindingEvidenceDigest:"c".repeat(64),
   quoteDeliveryEvidenceDigest:"3".repeat(64),
   acceptanceEvidenceDigest:"4".repeat(64),
   buyerAuthorityEvidenceDigest:"5".repeat(64),
@@ -35,6 +37,8 @@ const base=()=>({
 test("complete evidence makes only an internal invoice ready for owner approval",()=>{
   const result=assessDiagnosticPilotInvoiceReadiness(base());
   assert.equal(result.state,"INVOICE_READY_FOR_OWNER_ISSUE_APPROVAL");
+  assert.equal(result.quoteDraftId,base().quoteDraftId);
+  assert.equal(result.invoiceDraftId,base().invoiceDraftId);
   assert.equal(result.invoiceReady,true);
   for(const key of ["invoiceIssued","paymentRequested","paymentRecorded",
     "deliveryReady","buyerContactPermitted","automaticTransition","networkCalled",
@@ -48,6 +52,28 @@ test("complete evidence makes only an internal invoice ready for owner approval"
     "DELIVERY_RELEASE_REMAINS_HELD",
   ]);
   assert.ok(Object.isFrozen(result)&&Object.isFrozen(result.blockers));
+});
+
+test("invoice readiness is bound to distinct source, quote and invoice records",()=>{
+  assert.throws(
+    ()=>assessDiagnosticPilotInvoiceReadiness({
+      ...base(),quoteDraftId:"not-a-uuid",
+    }),
+    /canonical source, quote-draft and invoice-draft IDs/,
+  );
+  for(const overrides of [
+    {quoteDraftId:base().sourceRecordId},
+    {invoiceDraftId:base().quoteDraftId},
+  ])assert.throws(
+    ()=>assessDiagnosticPilotInvoiceReadiness({...base(),...overrides}),
+    /distinct records/,
+  );
+  assert.throws(
+    ()=>assessDiagnosticPilotInvoiceReadiness({
+      ...base(),quoteBindingEvidenceDigest:base().quoteEvidenceDigest,
+    }),
+    /evidence must differ/,
+  );
 });
 
 test("only a reviewed genuine £195 GBP source with resolved VAT can enter",()=>{
