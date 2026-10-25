@@ -149,3 +149,11 @@ The specific count and value of prior records should NOT be reused as current fa
 - Reordered source input and exact retries produce the same digest; any material accepted research change produces a different digest. This gives a future authenticated server-side adapter an inert value to bind to an idempotent receipt without carrying source URLs, notes or customer details across the boundary.
 - The nested sync envelope is explicitly `NO_WRITE_PREVIEW`: `writeAuthorised:false`, `syncAttempted:false`, authenticated receipt required and release held pending Auth, RLS, independent source validation and owner approval.
 - This is source-level tamper/replay evidence only. It is not an authentication token, database idempotency lock, Supabase receipt, buyer verification, outreach approval, invoice, payment or production integration.
+
+
+## Legacy-safe CRM cutover composition — no write
+
+- `reviewOfflineBuyerResearchCrmCutover` now composes the deterministic buyer-signal preview with the existing aggregate-only CRM cutover review. The result is always `NO_WRITE_CUTOVER_REVIEW` and `PRODUCTION_CRM_CUTOVER_HOLD`.
+- Any existing rows trigger an explicit preservation blocker. Insert, update, upsert and delete remain false until a non-destructive legacy identity mapping, preview-to-existing-row collision test, authenticated idempotency receipt, isolated database-role tests, Auth/RLS review and scoped owner security approval are independently evidenced.
+- Even apparently empty CRM metadata plus an asserted owner account cannot release the gate. Aggregate observations remain operator declarations, not authenticated database authority.
+- This is review-branch source and CI evidence only. It performed no Supabase query or write, policy/schema/auth change, customer-data read, outreach, deployment, invoice, payment or production action.
