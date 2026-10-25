@@ -16,6 +16,7 @@ export const OBSERVER_HOST = "127.0.0.1";
 export const OBSERVER_PORT = 18788; // Different from running atlas_ping canary.
 export const PING_REPLY = "ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS";
 const MAX_REQUEST_BYTES = 8192;
+const MAX_REQUEST_HEADERS = 32;
 const MAX_JSON_NESTING = 32;
 const PROTOCOL = "2025-03-26";
 const SUPPORTED = new Set(["2024-11-05", PROTOCOL, "2025-06-18"]);
@@ -203,6 +204,11 @@ export function createObserverServer(deps = {}) {
       return json(res, 200, {status: "OBSERVER_PROCESS_ALIVE_ONLY"});
     if (req.url !== "/mcp") return json(res, 404, {error: "Not found"});
     if (req.method !== "POST") return json(res, 405, {error: "Method not allowed"});
+    // Preserve enough raw fields to detect overflow explicitly. Silently
+    // truncating excess headers could hide a duplicate security-sensitive
+    // declaration beyond Node\'s parsed-header limit.
+    if (req.rawHeaders.length / 2 > MAX_REQUEST_HEADERS)
+      return json(res, 431, {error: "Too many request headers"});
     // Node deliberately de-duplicates Content-Type in req.headers. Inspect the
     // raw field names as well so duplicated/conflicting declarations cannot be
     // normalized into a single allowlisted value before this trust boundary.
@@ -281,7 +287,9 @@ export function createObserverServer(deps = {}) {
   server.headersTimeout = 5000;
   server.keepAliveTimeout = 1000;
   server.maxRequestsPerSocket = 20;
-  server.maxHeadersCount = 32;
+  // Keep a parser ceiling above the application limit so every over-limit
+  // request reaching this handler is rejected rather than silently truncated.
+  server.maxHeadersCount = 64;
   return server;
 }
 export function startObserver({host = OBSERVER_HOST, port = OBSERVER_PORT} = {}) {
