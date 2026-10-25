@@ -1139,3 +1139,38 @@ test("duplicate Content-Encoding fields fail despite identity case and whitespac
 
   assert.equal(reads, 0, "encoding denials and ping controls must never read the snapshot");
 });
+
+test("HTTP rejects duplicate JSON object keys before parsing or snapshot access", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const ambiguousBodies = [
+    '{"jsonrpc":"2.0","id":401,"method":"ping","method":"tools/call","params":{"name":"atlas_status","arguments":{}}}',
+    '{"jsonrpc":"2.0","id":402,"method":"tools/call","params":{"name":"atlas_ping","name":"atlas_status","arguments":{}}}',
+    '{"jsonrpc":"2.0","id":403,"method":"tools/call","params":{"name":"atlas_status","arguments":{"command":"safe","command":"sk-DUPLICATE"}}}',
+    '{"jsonrpc":"2.0","id":404,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"fixture","name":"sk-DUPLICATE"}}}',
+    '{"jsonrpc":"2.0","id":405,"method":"ping","\\u006dethod":"tools/call","params":{}}',
+  ];
+
+  await withServer(async port => {
+    for (const body of ambiguousBodies) {
+      const response = await http(port, {body});
+      assert.equal(response.status, 400, body);
+      assert.deepEqual(response.json, {
+        jsonrpc: "2.0", id: null,
+        error: {code: -32600, message: "Duplicate JSON object keys not allowed"},
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+      assert.equal(response.raw.includes("sk-DUPLICATE"), false);
+    }
+
+    const separateScopes = await http(port, {
+      body: '{"jsonrpc":"2.0","id":406,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"name":"client"},"clientInfo":{"name":"fixture"}}}',
+    });
+    assert.equal(separateScopes.status, 200);
+    assert.equal(separateScopes.json.result.protocolVersion, "2025-06-18");
+  }, deps);
+
+  assert.equal(reads, 0, "duplicate-key denials and initialize control must not read the snapshot");
+});
+
