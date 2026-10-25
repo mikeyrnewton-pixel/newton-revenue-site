@@ -59,7 +59,7 @@ test("stage3 existing Observer drift: rootfs, privileged or restarts all HOLD",(
   }
 });
 test("Stage3 root process uid, empty user or untrusted user names fail closed",()=>{
-  for(const value of ["0","0:0","root","root:root","","501","001:0"]){
+  for(const value of ["0","0:0","root","root:root","","501","001:0","501:0"]){
     const r=run({MOCK_USER:value});
     assert.equal(r.status,2,JSON.stringify(value)+r.stdout);
     assert.match(r.stdout,/HOLD_OBSERVER_NONROOT_USER_NOT_VERIFIED/);
