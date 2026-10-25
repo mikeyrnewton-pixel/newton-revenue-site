@@ -933,3 +933,56 @@ test("JSON-RPC IDs reject the full control ranges and preserve bounded Unicode",
 
   assert.equal(reads, 0, "ID validation and ping controls must never read the snapshot");
 });
+
+
+test("fatal UTF-8 gate rejects surrogate, out-of-range and truncated byte sequences", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const prefix = Buffer.from(
+    '{"jsonrpc":"2.0","id":"',
+    "utf8",
+  );
+  const suffix = Buffer.from(
+    '","method":"tools/call","params":{"name":"atlas_status","arguments":{}}}',
+    "utf8",
+  );
+  const invalidSequences = [
+    Buffer.from([0x80]),                    // lone continuation
+    Buffer.from([0xc1, 0x81]),              // overlong ASCII
+    Buffer.from([0xe2, 0x82]),              // truncated three-byte sequence
+    Buffer.from([0xed, 0xa0, 0x80]),        // UTF-16 high surrogate
+    Buffer.from([0xed, 0xbf, 0xbf]),        // UTF-16 low surrogate
+    Buffer.from([0xf4, 0x90, 0x80, 0x80]),  // above U+10FFFF
+    Buffer.from([0xf5, 0x80, 0x80, 0x80]),  // invalid leading byte
+  ];
+
+  await withServer(async port => {
+    for (const invalid of invalidSequences) {
+      const response = await http(port, {
+        body: Buffer.concat([prefix, invalid, suffix]),
+      });
+      assert.equal(response.status, 400, invalid.toString("hex"));
+      assert.deepEqual(response.json, {
+        jsonrpc: "2.0", id: null,
+        error: {code: -32700, message: "Invalid JSON"},
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+      assert.equal(response.raw.includes(invalid.toString("hex")), false);
+    }
+
+    const unicodeId = "café-日本-😀";
+    const positive = await http(port, {
+      body: Buffer.from(JSON.stringify({
+        jsonrpc: "2.0", id: unicodeId, method: "ping", params: {},
+      }), "utf8"),
+    });
+    assert.equal(positive.status, 200);
+    assert.deepEqual(positive.json, {
+      jsonrpc: "2.0", id: unicodeId, result: {},
+    });
+    assert.equal(positive.headers["cache-control"], "no-store");
+  }, deps);
+
+  assert.equal(reads, 0, "UTF-8 denials and ping control must never read the snapshot");
+});
