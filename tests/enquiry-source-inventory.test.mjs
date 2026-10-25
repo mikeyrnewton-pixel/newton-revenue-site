@@ -23,6 +23,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   paginationComplete:source.paginationComplete,
   pageRecordCounts:source.pageRecordCounts,
   deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
+  deduplicatedRecordCount:source.deduplicatedRecordCount,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
     key,source.observedCounts[key],
@@ -43,6 +44,7 @@ const readable=(sourceId,overrides={})=>{
       true:null,
     pageRecordCounts:null,
     deduplicatedRecordIdsDigest:null,
+    deduplicatedRecordCount:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
     ...overrides,
@@ -57,6 +59,9 @@ const readable=(sourceId,overrides={})=>{
       overrides,"deduplicatedRecordIdsDigest",
     )?overrides.deduplicatedRecordIdsDigest:createHash("sha256")
       .update(sourceId+":"+source.observedRecordCount).digest("hex");
+    source.deduplicatedRecordCount=Object.hasOwn(
+      overrides,"deduplicatedRecordCount",
+    )?overrides.deduplicatedRecordCount:source.observedRecordCount;
   }
   source.evidenceDigest=Object.hasOwn(overrides,"evidenceDigest")?
     overrides.evidenceDigest:evidenceDigestFor(source);
@@ -73,6 +78,7 @@ const unreadable=sourceId=>({
   paginationComplete:null,
   pageRecordCounts:null,
   deduplicatedRecordIdsDigest:null,
+  deduplicatedRecordCount:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
@@ -727,3 +733,40 @@ test("Gmail pagination proof binds dense page totals and deduplicated IDs",()=>{
   );
 });
 
+
+
+test("Gmail pagination proof requires the deduplicated ID count to match classifications",()=>{
+  const duplicated=fixture();
+  const gmail=duplicated.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  gmail.deduplicatedRecordCount=0;
+  gmail.evidenceDigest=evidenceDigestFor(gmail);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(duplicated),
+    /deduplicated record count must equal the observed record count/,
+    "duplicate IDs across pages cannot inflate classified enquiry evidence",
+  );
+
+  const invalidCount=fixture();
+  const revenue=invalidCount.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.deduplicatedRecordCount=-1;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(invalidCount),
+    /deduplicated record count must be a non-negative integer/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(
+    source=>source.sourceId==="SALES_DESK",
+  );
+  salesDesk.deduplicatedRecordCount=0;
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+});
