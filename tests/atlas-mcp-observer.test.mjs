@@ -1388,3 +1388,31 @@ test("excess request headers fail closed instead of being silently truncated", a
 
   assert.equal(reads, 0, "header overflow denial and ping control must never read the snapshot");
 });
+
+
+test("aggregate request header bytes are parser-bounded", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+
+  await withServer(async port => {
+    const injected = "sk-HEADER-BYTES-" + "x".repeat(9000);
+    const rejected = await http(port, {
+      headers: {"x-oversized-fixture": injected},
+      body: {jsonrpc: "2.0", id: 461, method: "ping", params: {}},
+    });
+    assert.equal(rejected.status, 431);
+    assert.equal(rejected.raw.includes("sk-HEADER-BYTES"), false);
+    assert.equal(rejected.raw.includes("ping"), false);
+
+    const accepted = await http(port, {
+      headers: {"x-bounded-fixture": "x".repeat(128)},
+      body: {jsonrpc: "2.0", id: 462, method: "ping", params: {}},
+    });
+    assert.equal(accepted.status, 200);
+    assert.deepEqual(accepted.json, {
+      jsonrpc: "2.0", id: 462, result: {},
+    });
+  }, deps);
+
+  assert.equal(reads, 0, "header-byte denial and ping control must never read the snapshot");
+});
