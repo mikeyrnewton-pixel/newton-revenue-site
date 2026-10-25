@@ -136,14 +136,22 @@ function empty(res, status) {
   res.writeHead(status, {"cache-control": "no-store", "content-length": 0});
   res.end();
 }
+function canonicalJsonContentType(value) {
+  if (typeof value !== "string") return false;
+  const parts = value.split(";").map(part => part.trim());
+  if (parts[0]?.toLowerCase() !== "application/json") return false;
+  if (parts.length === 1) return true;
+  return parts.length === 2 &&
+    /^charset\s*=\s*utf-8$/iu.test(parts[1]);
+}
 export function createObserverServer(deps = {}) {
   const server = createServer((req, res) => {
     if (req.method === "GET" && req.url === "/healthz")
       return json(res, 200, {status: "OBSERVER_PROCESS_ALIVE_ONLY"});
     if (req.url !== "/mcp") return json(res, 404, {error: "Not found"});
     if (req.method !== "POST") return json(res, 405, {error: "Method not allowed"});
-    if ((req.headers["content-type"] ?? "").split(";", 1)[0].trim().toLowerCase() !== "application/json")
-      return json(res, 415, {error: "JSON required"});
+    if (!canonicalJsonContentType(req.headers["content-type"]))
+      return json(res, 415, {error: "Canonical UTF-8 JSON required"});
     // The byte cap applies to the body received by this process. Refuse
     // compression so an encoded request cannot expand beyond that reviewed
     // bound or create decoder ambiguity at the Observer trust boundary.
