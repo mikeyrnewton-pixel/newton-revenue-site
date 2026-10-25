@@ -1036,3 +1036,59 @@ test("HTTP rejects ambiguous JSON media parameters before parsing or snapshot ac
 
   assert.equal(reads, 0, "media-type denials and ping controls must not read the snapshot");
 });
+
+
+test("media-type gate rejects aliases, quoted parameters and duplicate header ambiguity", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const statusBody = {
+    jsonrpc: "2.0", id: 311, method: "tools/call",
+    params: {name: "atlas_status", arguments: {}},
+  };
+  const invalidContentTypes = [
+    "application/ld+json",
+    "application/json-patch+json",
+    "text/json",
+    'application/json; charset="utf-8"',
+    "application/json; charset=utf-8, text/plain",
+    "application/json; charset=utf-8=evil",
+    "application/json; charset*=utf-8''",
+    "application/json; charset=utf-8;",
+    "application/json;;charset=utf-8",
+    ["application/json", "application/json"],
+    ["application/json", "text/plain"],
+  ];
+
+  await withServer(async port => {
+    for (const contentType of invalidContentTypes) {
+      const response = await http(port, {
+        headers: {"content-type": contentType},
+        body: statusBody,
+      });
+      assert.equal(response.status, 415, JSON.stringify(contentType));
+      assert.deepEqual(response.json, {
+        error: "Canonical UTF-8 JSON required",
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+      assert.equal(response.raw.includes("text/plain"), false);
+    }
+
+    for (const contentType of [
+      " application/json ",
+      "application/json ; charset\t=\tUTF-8",
+    ]) {
+      const response = await http(port, {
+        headers: {"content-type": contentType},
+        body: {jsonrpc: "2.0", id: 312, method: "ping", params: {}},
+      });
+      assert.equal(response.status, 200, contentType);
+      assert.deepEqual(response.json, {
+        jsonrpc: "2.0", id: 312, result: {},
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+    }
+  }, deps);
+
+  assert.equal(reads, 0, "media-type denials and ping controls must never read the snapshot");
+});
