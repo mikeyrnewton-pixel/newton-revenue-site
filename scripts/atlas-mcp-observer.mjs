@@ -144,6 +144,56 @@ function canonicalJsonContentType(value) {
   return parts.length === 2 &&
     /^charset\s*=\s*utf-8$/iu.test(parts[1]);
 }
+function hasDuplicateJsonObjectKeys(text) {
+  const stack = [];
+  for (let index = 0; index < text.length;) {
+    const char = text[index];
+    if (/\s/u.test(char)) {index += 1;continue;}
+    if (char === "{") {
+      stack.push({type: "object", keys: new Set(), expectingKey: true});
+      index += 1;
+      continue;
+    }
+    if (char === "[") {
+      stack.push({type: "array"});
+      index += 1;
+      continue;
+    }
+    if (char === "}" || char === "]") {
+      stack.pop();
+      index += 1;
+      continue;
+    }
+    if (char === ",") {
+      const current = stack.at(-1);
+      if (current?.type === "object") current.expectingKey = true;
+      index += 1;
+      continue;
+    }
+    if (char !== "\"") {index += 1;continue;}
+
+    const start = index;
+    index += 1;
+    let escaped = false;
+    while (index < text.length) {
+      const next = text[index++];
+      if (escaped) {escaped = false;continue;}
+      if (next === "\\") {escaped = true;continue;}
+      if (next === "\"") break;
+    }
+    const current = stack.at(-1);
+    if (current?.type === "object" && current.expectingKey) {
+      let key;
+      try {key = JSON.parse(text.slice(start, index));}
+      catch {continue;}
+      if (current.keys.has(key)) return true;
+      current.keys.add(key);
+      current.expectingKey = false;
+    }
+  }
+  return false;
+}
+
 export function createObserverServer(deps = {}) {
   const server = createServer((req, res) => {
     if (req.method === "GET" && req.url === "/healthz")
@@ -199,6 +249,8 @@ export function createObserverServer(deps = {}) {
         const body = new TextDecoder("utf-8", {fatal: true}).decode(
           Buffer.concat(chunks),
         );
+        if (hasDuplicateJsonObjectKeys(body))
+          return json(res, 400, error(null, -32600, "Duplicate JSON object keys not allowed"));
         message = JSON.parse(body);
       } catch {
         return json(res, 400, error(null, -32700, "Invalid JSON"));
