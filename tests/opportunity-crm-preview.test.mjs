@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   previewOfflineOpportunityCrmRow,
   previewOfflineBuyerResearchCrmRows,
+  reviewOfflineBuyerResearchCrmCutover,
 } from "../lib/opportunity-crm-preview.js";
 const offer=()=>({
   version:1,opportunityId:"OPP-CRMPREVIEW",description:"Fictional private offer for a small UK service company.",
@@ -179,3 +180,62 @@ test("CRM preview inherits buyer-research provenance and privacy denials",()=>{
   );
 });
 
+
+const crmObservation=(overrides={})=>({
+  version:1,
+  observedAt:"2026-10-25T12:30:00.000Z",
+  reportedBy:"OWNER_READ_ONLY_RECONCILIATION",
+  opportunityRowCount:21,
+  authUserCount:0,
+  rlsEnabled:true,
+  policyCount:0,
+  ownerColumnPresent:false,
+  ...overrides,
+});
+
+test("CRM cutover preserves every legacy row and forbids preview mutation",()=>{
+  const result=reviewOfflineBuyerResearchCrmCutover(
+    [publicBrief()],
+    "2026-10-25T11:00:00.000Z",
+    crmObservation(),
+  );
+  assert.equal(result.schema,"NEWTON_OFFLINE_BUYER_SIGNAL_CRM_CUTOVER_REVIEW_V1");
+  assert.equal(result.operation,"NO_WRITE_CUTOVER_REVIEW");
+  assert.equal(result.cutoverOutcome,"PRODUCTION_CRM_CUTOVER_HOLD");
+  assert.equal(result.previewRecordCount,1);
+  assert.equal(result.observedLegacyRecordCount,21);
+  assert.match(result.previewDigest,/^sha256:[0-9a-f]{64}$/);
+  assert.ok(result.blockers.includes(
+    "PRESERVE_EXISTING_RECORDS_BEFORE_OWNERSHIP_MIGRATION",
+  ));
+  assert.ok(result.blockers.includes("LEGACY_IDENTITY_MAPPING_NOT_REVIEWED"));
+  assert.ok(result.blockers.includes(
+    "PREVIEW_TO_EXISTING_ROW_COLLISION_TEST_NOT_RUN",
+  ));
+  assert.equal(result.legacyRecordsPreserved,true);
+  for(const key of ["legacyRecordMutationAllowed","insertAllowed","updateAllowed",
+    "upsertAllowed","deleteAllowed","collisionTestPassed","identityMappingReviewed",
+    "authenticatedIdempotencyReceipt","ownerSecurityApprovalRecorded",
+    "databaseConnected","customerDataAccess","externalContact","invoices"]){
+    assert.equal(result[key],false,key);
+  }
+  assert.equal(result.clearedEvidenceGBP,0);
+  assert.match(result.release,/^HOLD_/);
+  assert.ok(Object.isFrozen(result)&&Object.isFrozen(result.blockers));
+});
+
+test("apparently empty CRM metadata never authorises a buyer-signal sync",()=>{
+  const result=reviewOfflineBuyerResearchCrmCutover(
+    [publicBrief()],
+    "2026-10-25T11:00:00.000Z",
+    crmObservation({opportunityRowCount:0,authUserCount:1}),
+  );
+  assert.equal(result.cutoverOutcome,"PRODUCTION_CRM_CUTOVER_HOLD");
+  assert.ok(result.blockers.includes("ISOLATED_REAL_POSTGRES_ROLE_TEST_NOT_EXECUTED"));
+  assert.ok(result.blockers.includes("SCOPED_OWNER_SECURITY_APPROVAL_REQUIRED"));
+  assert.ok(result.blockers.includes(
+    "AUTHENTICATED_IDEMPOTENCY_RECEIPT_NOT_IMPLEMENTED",
+  ));
+  assert.equal(result.insertAllowed,false);
+  assert.equal(result.databaseConnected,false);
+});
