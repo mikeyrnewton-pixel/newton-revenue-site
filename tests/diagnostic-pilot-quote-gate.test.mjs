@@ -6,6 +6,7 @@ const base=()=>({
   version:1,
   pilotRef:"PILOT-DIAGNOSTIC-195",
   sourceRecordId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  quoteDraftId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   sourceClassification:"GENUINE",
   sourceEvidenceDigest:"1".repeat(64),
   verifiedAt:"2026-10-25T10:55:00.000Z",
@@ -22,6 +23,7 @@ const base=()=>({
 test("complete distinct evidence makes only an internal quote draft ready",()=>{
   const result=assessDiagnosticPilotQuoteDraft(base());
   assert.equal(result.state,"QUOTE_DRAFT_READY_FOR_OWNER_REVIEW");
+  assert.equal(result.quoteDraftId,base().quoteDraftId);
   assert.equal(result.quoteDraftReady,true);
   for(const key of ["quoteSent","invoiceReady","invoiceIssued","paymentRequested",
     "paymentRecorded","buyerContactPermitted","automaticTransition","networkCalled",
@@ -36,6 +38,19 @@ test("complete distinct evidence makes only an internal quote draft ready",()=>{
     "INDEPENDENT_SETTLEMENT_EVIDENCE_REQUIRED",
   ]);
   assert.ok(Object.isFrozen(result)&&Object.isFrozen(result.blockers));
+});
+
+test("quote draft identity is canonical and distinct from its source record",()=>{
+  assert.throws(
+    ()=>assessDiagnosticPilotQuoteDraft({...base(),quoteDraftId:"not-a-uuid"}),
+    /canonical source and quote-draft IDs/,
+  );
+  assert.throws(
+    ()=>assessDiagnosticPilotQuoteDraft({
+      ...base(),quoteDraftId:base().sourceRecordId,
+    }),
+    /distinct records/,
+  );
 });
 
 test("synthetic, candidate or unknown source evidence cannot open the quote gate",()=>{
