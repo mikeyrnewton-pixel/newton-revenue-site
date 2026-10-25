@@ -1174,3 +1174,43 @@ test("HTTP rejects duplicate JSON object keys before parsing or snapshot access"
   assert.equal(reads, 0, "duplicate-key denials and initialize control must not read the snapshot");
 });
 
+
+
+test("duplicate-key gate decodes complex aliases without crossing object scopes", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const duplicateBodies = [
+    '{"jsonrpc":"2.0","id":411,"method":"ping","m\\u0065thod":"tools/call","params":{}}',
+    '{"jsonrpc":"2.0","id":412,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"😀":"first","\\ud83d\\ude00":"second"}}}',
+    '{"jsonrpc":"2.0","id":413,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"quote\\\"key":"first","quote\\u0022key":"second"}}}',
+    '{"jsonrpc":"2.0","id":414,"method":"tools/call","params":{"name":"atlas_status","arguments":{"slash\\\\key":"first","slash\\u005ckey":"second"}}}',
+  ];
+
+  await withServer(async port => {
+    for (const body of duplicateBodies) {
+      const response = await http(port, {body});
+      assert.equal(response.status, 400, body);
+      assert.deepEqual(response.json, {
+        jsonrpc: "2.0", id: null,
+        error: {code: -32600, message: "Duplicate JSON object keys not allowed"},
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+      assert.equal(response.raw.includes("second"), false);
+    }
+
+    const separateNestedScopes = await http(port, {
+      body: '{"jsonrpc":"2.0","id":415,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"name":"outer","items":[{"name":"one"},{"name":"two"}]},"clientInfo":{"name":"fixture","version":"value with { braces }, commas, and \\\"quotes\\\""}}}',
+    });
+    assert.equal(separateNestedScopes.status, 200);
+    assert.equal(separateNestedScopes.json.result.protocolVersion, "2025-06-18");
+
+    const repeatedAcrossParentAndChild = await http(port, {
+      body: '{"jsonrpc":"2.0","id":416,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"protocolVersion":"nested"},"clientInfo":{"name":"fixture"}}}',
+    });
+    assert.equal(repeatedAcrossParentAndChild.status, 200);
+    assert.equal(repeatedAcrossParentAndChild.json.result.protocolVersion, "2025-06-18");
+  }, deps);
+
+  assert.equal(reads, 0, "duplicate denials and initialize controls must never read the snapshot");
+});
