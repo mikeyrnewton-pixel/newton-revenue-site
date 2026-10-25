@@ -20,6 +20,14 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   coverageEndedAt:source.coverageEndedAt,
   evidenceLocator:source.evidenceLocator,
   searchScope:source.searchScope,
+  paginationComplete:source.paginationComplete,
+  terminalPageTokenAbsent:source.terminalPageTokenAbsent,
+  paginationTraversalDigest:source.paginationTraversalDigest,
+  pageRecordCounts:source.pageRecordCounts,
+  deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
+  deduplicatedRecordCount:source.deduplicatedRecordCount,
+  recordTimestampDigest:source.recordTimestampDigest,
+  allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
     key,source.observedCounts[key],
@@ -36,6 +44,17 @@ const readable=(sourceId,overrides={})=>{
     evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
     searchScope:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
+    paginationComplete:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+      true:null,
+    terminalPageTokenAbsent:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+      true:null,
+    paginationTraversalDigest:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+      createHash("sha256").update(sourceId+":CURSOR-CHAIN").digest("hex"):null,
+    pageRecordCounts:null,
+    deduplicatedRecordIdsDigest:null,
+    deduplicatedRecordCount:null,
+    recordTimestampDigest:null,
+    allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
     ...overrides,
@@ -43,6 +62,25 @@ const readable=(sourceId,overrides={})=>{
   source.observedRecordCount=Object.hasOwn(overrides,"observedRecordCount")?
     overrides.observedRecordCount:
     Object.values(source.observedCounts).reduce((total,count)=>total+count,0);
+  if(["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)){
+    source.pageRecordCounts=Object.hasOwn(overrides,"pageRecordCounts")?
+      overrides.pageRecordCounts:[source.observedRecordCount];
+    source.deduplicatedRecordIdsDigest=Object.hasOwn(
+      overrides,"deduplicatedRecordIdsDigest",
+    )?overrides.deduplicatedRecordIdsDigest:createHash("sha256")
+      .update(sourceId+":"+source.observedRecordCount).digest("hex");
+    source.deduplicatedRecordCount=Object.hasOwn(
+      overrides,"deduplicatedRecordCount",
+    )?overrides.deduplicatedRecordCount:source.observedRecordCount;
+    source.recordTimestampDigest=Object.hasOwn(
+      overrides,"recordTimestampDigest",
+    )?overrides.recordTimestampDigest:createHash("sha256")
+      .update(sourceId+":"+source.coverageStartedAt+":"+
+        source.coverageEndedAt+":"+source.observedRecordCount).digest("hex");
+    source.allRecordsWithinCoverageWindow=Object.hasOwn(
+      overrides,"allRecordsWithinCoverageWindow",
+    )?overrides.allRecordsWithinCoverageWindow:true;
+  }
   source.evidenceDigest=Object.hasOwn(overrides,"evidenceDigest")?
     overrides.evidenceDigest:evidenceDigestFor(source);
   return source;
@@ -55,6 +93,14 @@ const unreadable=sourceId=>({
   coverageEndedAt:null,
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   searchScope:null,
+  paginationComplete:null,
+  terminalPageTokenAbsent:null,
+  paginationTraversalDigest:null,
+  pageRecordCounts:null,
+  deduplicatedRecordIdsDigest:null,
+  deduplicatedRecordCount:null,
+  recordTimestampDigest:null,
+  allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
@@ -387,6 +433,8 @@ test("readable source digest binds counts and timestamps to the exact observatio
   const changedCount=fixture();
   changedCount.sources[1].observedCounts.GENUINE=1;
   changedCount.sources[1].observedRecordCount=1;
+  changedCount.sources[1].pageRecordCounts=[1];
+  changedCount.sources[1].deduplicatedRecordCount=1;
   assert.throws(
     ()=>reconcileEnquirySourceInventory(changedCount),
     /evidence digest does not bind the exact source observation/,
@@ -410,12 +458,40 @@ test("aggregate source counts cannot overflow the safe integer range",()=>{
     const source=input.sources.find(item=>item.sourceId===sourceId);
     source.observedCounts={...zeroCounts(),GENUINE:Number.MAX_SAFE_INTEGER};
     source.observedRecordCount=Number.MAX_SAFE_INTEGER;
+    source.pageRecordCounts=[Number.MAX_SAFE_INTEGER];
+    source.deduplicatedRecordCount=Number.MAX_SAFE_INTEGER;
     source.evidenceDigest=evidenceDigestFor(source);
   }
   assert.throws(
     ()=>reconcileEnquirySourceInventory(input),
     /GENUINE aggregate count exceeds safe integer range/,
     "individually valid source counts must not produce a rounded aggregate",
+  );
+});
+
+
+test("combined unresolved classifications cannot overflow the safe integer range",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  revenue.observedCounts={...zeroCounts(),CANDIDATE:Number.MAX_SAFE_INTEGER};
+  revenue.observedRecordCount=Number.MAX_SAFE_INTEGER;
+  revenue.pageRecordCounts=[Number.MAX_SAFE_INTEGER];
+  revenue.deduplicatedRecordCount=Number.MAX_SAFE_INTEGER;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  personal.observedCounts={...zeroCounts(),UNKNOWN:1};
+  personal.observedRecordCount=1;
+  personal.pageRecordCounts=[1];
+  personal.deduplicatedRecordCount=1;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /UNRESOLVED_CLASSIFICATION aggregate count exceeds safe integer range/,
+    "candidate and unknown totals must not combine into a rounded unresolved count",
   );
 });
 
@@ -547,5 +623,260 @@ test("source arrays reject sparse or accessor-backed elements",()=>{
     /bounded inert source array required/,
   );
   assert.equal(accessed,false,"source-array getters must never execute");
+});
+
+
+
+test("inventory boundaries reject hidden symbol and non-enumerable fields",()=>{
+  const symbolInventory=fixture();
+  symbolInventory[Symbol("privatePayload")]="hidden";
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(symbolInventory),
+    /exact inventory fields required/,
+    "symbol-backed data cannot bypass the exact inventory schema",
+  );
+
+  const hiddenSource=fixture();
+  Object.defineProperty(hiddenSource.sources[1],"privatePayload",{
+    enumerable:false,
+    value:"hidden",
+  });
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(hiddenSource),
+    /exact source fields required/,
+    "non-enumerable source data cannot bypass the privacy-safe source schema",
+  );
+
+  const symbolCounts=fixture();
+  symbolCounts.sources[1].observedCounts[Symbol("unclassified")]=1;
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(symbolCounts),
+    /exact classification counts required/,
+    "hidden classification buckets cannot evade record-count reconciliation",
+  );
+});
+
+test("Gmail source truth fails closed until every result page is consumed",()=>{
+  for(const paginationComplete of [false,null]){
+    const input=fixture();
+    input.sources[1].paginationComplete=paginationComplete;
+    input.sources[1].evidenceDigest=evidenceDigestFor(input.sources[1]);
+    assert.throws(
+      ()=>reconcileEnquirySourceInventory(input),
+      /Gmail evidence must be fully paginated/,
+      "a first-page count cannot be attested as the complete bounded snapshot",
+    );
+  }
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.paginationComplete=true;
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /other sources must use null/,
+    "pagination claims are reserved for bounded Gmail evidence",
+  );
+});
+
+test("Gmail pagination proof binds dense page totals and deduplicated IDs",()=>{
+  const mismatched=fixture();
+  const source=mismatched.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  source.pageRecordCounts=[1];
+  source.evidenceDigest=evidenceDigestFor(source);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(mismatched),
+    /Gmail page totals must equal the observed record count/,
+  );
+
+  const emptyPages=fixture();
+  const emptySource=emptyPages.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  emptySource.pageRecordCounts=[];
+  emptySource.evidenceDigest=evidenceDigestFor(emptySource);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(emptyPages),
+    /bounded dense per-page record counts/,
+  );
+
+  let getterRuns=0;
+  const activePages=fixture();
+  const activeSource=activePages.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const pages=[0];
+  Object.defineProperty(pages,"0",{
+    enumerable:true,
+    get(){
+      getterRuns++;
+      return 0;
+    },
+  });
+  activeSource.pageRecordCounts=pages;
+  activeSource.evidenceDigest=evidenceDigestFor(activeSource);
+  getterRuns=0;
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(activePages),
+    /bounded dense per-page record counts/,
+  );
+  assert.equal(getterRuns,0,"page-count getter must not execute");
+
+  const noIdDigest=fixture();
+  const noDigestSource=noIdDigest.sources.find(
+    item=>item.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  noDigestSource.deduplicatedRecordIdsDigest=null;
+  noDigestSource.evidenceDigest=evidenceDigestFor(noDigestSource);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(noIdDigest),
+    /deduplicated record ID digest required/,
+  );
+
+  const nonGmailProof=fixture();
+  const salesDesk=nonGmailProof.sources.find(
+    item=>item.sourceId==="SALES_DESK",
+  );
+  salesDesk.pageRecordCounts=[salesDesk.observedRecordCount];
+  salesDesk.deduplicatedRecordIdsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmailProof),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const unreadableProof=fixture();
+  unreadableProof.sources[0]={
+    ...unreadableProof.sources[0],
+    pageRecordCounts:[0],
+    deduplicatedRecordIdsDigest:"f".repeat(64),
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(unreadableProof),
+    /unreadable source cannot claim pagination proof/,
+  );
+});
+
+
+
+test("Gmail pagination proof requires the deduplicated ID count to match classifications",()=>{
+  const duplicated=fixture();
+  const gmail=duplicated.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  gmail.deduplicatedRecordCount=0;
+  gmail.evidenceDigest=evidenceDigestFor(gmail);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(duplicated),
+    /deduplicated record count must equal the observed record count/,
+    "duplicate IDs across pages cannot inflate classified enquiry evidence",
+  );
+
+  const invalidCount=fixture();
+  const revenue=invalidCount.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.deduplicatedRecordCount=-1;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(invalidCount),
+    /deduplicated record count must be a non-negative integer/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(
+    source=>source.sourceId==="SALES_DESK",
+  );
+  salesDesk.deduplicatedRecordCount=0;
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+});
+
+
+test("Gmail records must be cryptographically bound inside the declared window",()=>{
+  const missingDigest=fixture();
+  const revenue=missingDigest.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordTimestampDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingDigest),
+    /record timestamp digest required/,
+  );
+
+  const outsideWindow=fixture();
+  const personal=outsideWindow.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.allRecordsWithinCoverageWindow=false;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(outsideWindow),
+    /every Gmail record must be proven inside the declared coverage window/,
+    "a complete page traversal cannot count records outside its attested window",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.recordTimestampDigest="f".repeat(64);
+  salesDesk.allRecordsWithinCoverageWindow=true;
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+});
+
+test("Gmail pagination evidence binds ordered traversal and terminal cursor exhaustion",()=>{
+  const missingTraversal=fixture();
+  const missing=missingTraversal.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  missing.paginationTraversalDigest=null;
+  missing.evidenceDigest=evidenceDigestFor(missing);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingTraversal),
+    /ordered pagination traversal digest required/,
+    "page totals and an ID-set digest cannot prove that the cursor chain was traversed",
+  );
+
+  const unterminated=fixture();
+  const gmail=unterminated.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  gmail.terminalPageTokenAbsent=false;
+  gmail.evidenceDigest=evidenceDigestFor(gmail);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(unterminated),
+    /terminate without a next-page token/,
+    "a remaining next-page token means the bounded search is incomplete",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.terminalPageTokenAbsent=true;
+  salesDesk.paginationTraversalDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const unreadableProof=fixture();
+  unreadableProof.sources[0]={
+    ...unreadableProof.sources[0],
+    terminalPageTokenAbsent:true,
+    paginationTraversalDigest:"f".repeat(64),
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(unreadableProof),
+    /unreadable source cannot claim pagination proof/,
+  );
 });
 
