@@ -4,6 +4,7 @@ import {
   previewOfflineOpportunityCrmRow,
   previewOfflineBuyerResearchCrmRows,
   reviewOfflineBuyerResearchCrmCutover,
+  reviewOfflineBuyerResearchCrmKeyspace,
 } from "../lib/opportunity-crm-preview.js";
 const offer=()=>({
   version:1,opportunityId:"OPP-CRMPREVIEW",description:"Fictional private offer for a small UK service company.",
@@ -91,6 +92,10 @@ test("deduplicated public buyer signals map to one no-write CRM preview row",()=
   assert.equal(result.syncEnvelope.previewDigest,result.previewDigest);
   assert.equal(result.syncEnvelope.operation,"NO_WRITE_PREVIEW");
   assert.equal(result.syncEnvelope.recordCount,1);
+  assert.equal(result.syncEnvelope.idempotencyKeyCount,1);
+  assert.equal(result.syncEnvelope.legacyCollisionCheckRequired,true);
+  assert.equal(result.syncEnvelope.insertAuthorised,false);
+  assert.equal(result.syncEnvelope.upsertAuthorised,false);
   assert.equal(result.syncEnvelope.writeAuthorised,false);
   assert.equal(result.syncEnvelope.syncAttempted,false);
   assert.equal(result.syncEnvelope.authenticatedReceiptRequired,true);
@@ -106,6 +111,8 @@ test("deduplicated public buyer signals map to one no-write CRM preview row",()=
   assert.equal(result.rows.length,1);
   assert.equal(result.rows[0].status,"discovered");
   assert.equal(result.rows[0].metadata.source_count,2);
+  assert.match(result.rows[0].metadata.sync_key_digest,/^sha256:[0-9a-f]{64}$/);
+  assert.equal(result.rows[0].metadata.sync_key_scope,"INSERT_IF_ABSENT_REVIEW_ONLY");
   assert.equal(result.rows[0].evidence.length,2);
   assert.equal(result.rows[0].metadata.source_claim_verified,false);
   assert.equal(result.rows[0].metadata.buyer_purchase_intent_verified,false);
@@ -238,4 +245,78 @@ test("apparently empty CRM metadata never authorises a buyer-signal sync",()=>{
   ));
   assert.equal(result.insertAllowed,false);
   assert.equal(result.databaseConnected,false);
+});
+
+
+test("CRM sync keys are deterministic and collision review never authorises mutation",()=>{
+  const records=[publicBrief()];
+  const baseline=previewOfflineBuyerResearchCrmRows(
+    records,"2026-10-25T11:00:00.000Z",
+  );
+  const syncKey=baseline.rows[0].metadata.sync_key_digest;
+  const collision=reviewOfflineBuyerResearchCrmKeyspace(
+    records,"2026-10-25T11:00:00.000Z",[syncKey],
+  );
+  assert.equal(collision.schema,"NEWTON_OFFLINE_BUYER_SIGNAL_CRM_KEYSPACE_REVIEW_V1");
+  assert.equal(collision.previewDigest,baseline.previewDigest);
+  assert.equal(collision.previewKeyCount,1);
+  assert.equal(collision.legacyKeyCount,1);
+  assert.equal(collision.collisionCount,1);
+  assert.equal(collision.collisionFreeInProvidedSnapshot,false);
+  assert.equal(collision.snapshotAuthority,"CALLER_SUPPLIED_DIGESTS_NOT_DATABASE_PROOF");
+  assert.equal(collision.operation,"NO_WRITE_KEYSPACE_REVIEW");
+  for(const key of ["insertAllowed","updateAllowed","upsertAllowed","deleteAllowed",
+    "databaseConnected","customerDataAccess","externalContact","invoices"]){
+    assert.equal(collision[key],false,key);
+  }
+  assert.equal(collision.clearedEvidenceGBP,0);
+  assert.match(collision.release,/^HOLD_/);
+
+  const clear=reviewOfflineBuyerResearchCrmKeyspace(
+    records,"2026-10-25T11:00:00.000Z",[],
+  );
+  assert.equal(clear.collisionCount,0);
+  assert.equal(clear.collisionFreeInProvidedSnapshot,true);
+  assert.equal(clear.insertAllowed,false,
+    "a caller-supplied collision-free snapshot is not database authority");
+  assert.equal(
+    previewOfflineBuyerResearchCrmRows(
+      records,"2026-10-25T11:00:00.000Z",
+    ).rows[0].metadata.sync_key_digest,
+    syncKey,
+  );
+});
+
+test("CRM keyspace review rejects ambiguous or active legacy digest snapshots",()=>{
+  const records=[publicBrief()];
+  const syncKey=previewOfflineBuyerResearchCrmRows(
+    records,"2026-10-25T11:00:00.000Z",
+  ).rows[0].metadata.sync_key_digest;
+
+  assert.throws(
+    ()=>reviewOfflineBuyerResearchCrmKeyspace(
+      records,"2026-10-25T11:00:00.000Z",[syncKey,syncKey],
+    ),
+    /must not contain duplicates/,
+  );
+  assert.throws(
+    ()=>reviewOfflineBuyerResearchCrmKeyspace(
+      records,"2026-10-25T11:00:00.000Z",["not-a-digest"],
+    ),
+    /bounded inert legacy sync-key digest array/,
+  );
+
+  let accessed=false;
+  const active=[syncKey];
+  Object.defineProperty(active,"0",{
+    enumerable:true,
+    get(){accessed=true;return syncKey;},
+  });
+  assert.throws(
+    ()=>reviewOfflineBuyerResearchCrmKeyspace(
+      records,"2026-10-25T11:00:00.000Z",active,
+    ),
+    /bounded inert legacy sync-key digest array/,
+  );
+  assert.equal(accessed,false,"legacy digest getters must never execute");
 });
