@@ -456,6 +456,8 @@ test("payment batch emits a frozen cumulative replay cursor",()=>{
       observationId:observation("SETTLED").observationId,
       evidenceDigest:observation("SETTLED").evidenceDigest,
       providerTransactionDigest:"d".repeat(64),
+      sourceRecordId:observation("SETTLED").sourceRecordId,
+      invoiceEventId:observation("SETTLED").invoiceEventId,
     }],
     sourceEvidenceDigests:[binding().sourceEvidenceDigest],
     invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
@@ -707,11 +709,15 @@ test("malformed cursor rejects historical duplicate invoice ownership",()=>{
         observationId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         evidenceDigest:"4".repeat(64),
         providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
       },
       {
         observationId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
         evidenceDigest:"5".repeat(64),
         providerTransactionDigest:"e".repeat(64),
+        sourceRecordId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        invoiceEventId:observation("PENDING").invoiceEventId,
       },
     ],
     sourceEvidenceDigests:[binding().sourceEvidenceDigest],
@@ -906,6 +912,8 @@ test("historical cursor rejects evidence digest role collisions",()=>{
         observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         evidenceDigest:"1".repeat(64),
         providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
       }],
       sourceEvidenceDigests:["1".repeat(64)],
     }),
@@ -920,6 +928,8 @@ test("historical cursor rejects evidence digest role collisions",()=>{
         observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         evidenceDigest:"d".repeat(64),
         providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
       }],
       providerTransactions:[{
         providerTransactionDigest:"d".repeat(64),
@@ -1055,6 +1065,8 @@ test("historical cursor rejects identifier role collisions",()=>{
         observationId:observation("PENDING").sourceRecordId,
         evidenceDigest:"4".repeat(64),
         providerTransactionDigest:"d".repeat(64),
+        sourceRecordId:observation("PENDING").sourceRecordId,
+        invoiceEventId:observation("PENDING").invoiceEventId,
       }],
       sourceEvidenceDigests:[binding().sourceEvidenceDigest],
       invoiceEvidenceDigests:[binding().invoiceEvidenceDigest],
@@ -1193,6 +1205,8 @@ test("cursor capacity fails closed before emitting an unusable next cursor",()=>
       evidenceDigest:evidenceDigests[index],
       providerTransactionDigest:providerTransactions[index]
         .providerTransactionDigest,
+      sourceRecordId:providerTransactions[index].sourceRecordId,
+      invoiceEventId:providerTransactions[index].invoiceEventId,
     })),
     sourceEvidenceDigests,
     invoiceEvidenceDigests,
@@ -1498,6 +1512,8 @@ test("cursor binds each observation and evidence digest to its provider transact
     observationId:observation("PENDING").observationId,
     evidenceDigest:observation("PENDING").evidenceDigest,
     providerTransactionDigest:"d".repeat(64),
+    sourceRecordId:observation("PENDING").sourceRecordId,
+    invoiceEventId:observation("PENDING").invoiceEventId,
   }]);
 
   const unregisteredEvidence={
@@ -1554,5 +1570,64 @@ test("cursor binds each observation and evidence digest to its provider transact
       },
     }],reassignedTransaction),
     /unknown provider transaction/,
+  );
+});
+
+
+test("historical cursor rejects observation-to-transaction ownership reshuffling",()=>{
+  const firstItem={
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  };
+  const secondItem={
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("PENDING"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"1".repeat(64),
+    },
+    expectedBinding:{
+      ...binding(),
+      sourceRecordId:"eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      sourceEvidenceDigest:"2".repeat(64),
+      invoiceEventId:"ffffffff-ffff-4fff-8fff-ffffffffffff",
+      invoiceEvidenceDigest:"3".repeat(64),
+    },
+  };
+  const first=assessBatch([firstItem,secondItem]);
+  const swapped={
+    ...first.reconciliationCursor,
+    observationBindings:first.reconciliationCursor.observationBindings.map(
+      (item,index)=>({
+        ...item,
+        providerTransactionDigest:first.reconciliationCursor
+          .observationBindings[1-index].providerTransactionDigest,
+      }),
+    ),
+  };
+  assert.throws(
+    ()=>assessBatch([{
+      providerTransactionDigest:"f".repeat(64),
+      observation:{
+        ...observation("SETTLED"),
+        observationId:"11111111-1111-4111-8111-111111111111",
+        sourceRecordId:"22222222-2222-4222-8222-222222222222",
+        invoiceEventId:"33333333-3333-4333-8333-333333333333",
+        observedAt:"2026-10-20T11:05:00.000Z",
+        evidenceDigest:"4".repeat(64),
+      },
+      expectedBinding:{
+        ...binding(),
+        sourceRecordId:"22222222-2222-4222-8222-222222222222",
+        sourceEvidenceDigest:"5".repeat(64),
+        invoiceEventId:"33333333-3333-4333-8333-333333333333",
+        invoiceEvidenceDigest:"6".repeat(64),
+      },
+    }],swapped),
+    /observation binding commercial ownership mismatch/,
   );
 });
