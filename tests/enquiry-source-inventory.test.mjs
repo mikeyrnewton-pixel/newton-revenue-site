@@ -12,6 +12,13 @@ const zeroCounts=()=>({
   OUTBOUND_REPLY:0,
   UNKNOWN:0,
 });
+const gmailQueryDigestFor=source=>createHash("sha256").update(JSON.stringify({
+  sourceId:source.sourceId,
+  accountIdentityDigest:source.accountIdentityDigest,
+  coverageStartedAt:source.coverageStartedAt,
+  coverageEndedAt:source.coverageEndedAt,
+  searchScope:source.searchScope,
+})).digest("hex");
 const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   sourceId:source.sourceId,
   accessState:source.accessState,
@@ -20,6 +27,8 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   coverageEndedAt:source.coverageEndedAt,
   evidenceLocator:source.evidenceLocator,
   searchScope:source.searchScope,
+  accountIdentityDigest:source.accountIdentityDigest,
+  searchQueryDigest:source.searchQueryDigest,
   paginationComplete:source.paginationComplete,
   terminalPageTokenAbsent:source.terminalPageTokenAbsent,
   paginationTraversalDigest:source.paginationTraversalDigest,
@@ -44,6 +53,8 @@ const readable=(sourceId,overrides={})=>{
     evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
     searchScope:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
+    accountIdentityDigest:null,
+    searchQueryDigest:null,
     paginationComplete:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       true:null,
     terminalPageTokenAbsent:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
@@ -63,6 +74,11 @@ const readable=(sourceId,overrides={})=>{
     overrides.observedRecordCount:
     Object.values(source.observedCounts).reduce((total,count)=>total+count,0);
   if(["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)){
+    source.accountIdentityDigest=Object.hasOwn(overrides,"accountIdentityDigest")?
+      overrides.accountIdentityDigest:createHash("sha256")
+        .update(sourceId+":ACCOUNT").digest("hex");
+    source.searchQueryDigest=Object.hasOwn(overrides,"searchQueryDigest")?
+      overrides.searchQueryDigest:gmailQueryDigestFor(source);
     source.pageRecordCounts=Object.hasOwn(overrides,"pageRecordCounts")?
       overrides.pageRecordCounts:[source.observedRecordCount];
     source.deduplicatedRecordIdsDigest=Object.hasOwn(
@@ -93,6 +109,8 @@ const unreadable=sourceId=>({
   coverageEndedAt:null,
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   searchScope:null,
+  accountIdentityDigest:null,
+  searchQueryDigest:null,
   paginationComplete:null,
   terminalPageTokenAbsent:null,
   paginationTraversalDigest:null,
@@ -653,6 +671,57 @@ test("inventory boundaries reject hidden symbol and non-enumerable fields",()=>{
     ()=>reconcileEnquirySourceInventory(symbolCounts),
     /exact classification counts required/,
     "hidden classification buckets cannot evade record-count reconciliation",
+  );
+});
+
+test("Gmail evidence is bound to the exact account and declared search window",()=>{
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(baseline.sourceCoverage.NEWTON_REVENUE_GMAIL.accountIdentityBound,true);
+  assert.equal(baseline.sourceCoverage.NEWTON_REVENUE_GMAIL.searchQueryBound,true);
+
+  const missingAccount=fixture();
+  const revenue=missingAccount.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.accountIdentityDigest=null;
+  revenue.searchQueryDigest=gmailQueryDigestFor(revenue);
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingAccount),
+    /account identity digest required/,
+  );
+
+  const replayedWindow=fixture();
+  const personal=replayedWindow.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.coverageStartedAt="2026-10-20T10:00:00.000Z";
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(replayedWindow),
+    /search-query digest must bind account, source and coverage window/,
+    "a previously attested query cannot be replayed under another window",
+  );
+
+  const collapsedProof=fixture();
+  const collapsed=collapsedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  collapsed.searchQueryDigest=collapsed.accountIdentityDigest;
+  collapsed.evidenceDigest=evidenceDigestFor(collapsed);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedProof),
+    /independently bound/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.accountIdentityDigest="e".repeat(64);
+  salesDesk.searchQueryDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
   );
 });
 
