@@ -52,6 +52,34 @@ ports=$("$DOCKER" inspect -f '{{json .HostConfig.PortBindings}}' "$TUNNEL") ||
 [ "$ports" = null ] || [ "$ports" = '{}' ] || hold HOST_PORT_PUBLISHED
 printf 'TUNNEL_IMAGE_AND_RUNTIME_CONFINEMENT=VERIFIED\n'
 
+# Independently validate the *existing* Stage 2 Observer's safe properties
+# before ANY later tunnel cutover. These are inspect-only property matches:
+# never reveal IDs, environment, mount sources, commands or key bytes.
+observer_root=$("$DOCKER" inspect -f '{{.HostConfig.ReadonlyRootfs}}' "$OBSERVER") ||
+  hold OBSERVER_ROOT_INSPECT_FAILED
+observer_priv=$("$DOCKER" inspect -f '{{.HostConfig.Privileged}}' "$OBSERVER") ||
+  hold OBSERVER_PRIV_INSPECT_FAILED
+observer_restart=$("$DOCKER" inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$OBSERVER") ||
+  hold OBSERVER_RESTART_INSPECT_FAILED
+observer_ports=$("$DOCKER" inspect -f '{{json .HostConfig.PortBindings}}' "$OBSERVER") ||
+  hold OBSERVER_PORTS_INSPECT_FAILED
+# User string must be a numeric, nonzero uid:gid (Stage 2 launch contract).
+observer_user_ok=$("$DOCKER" inspect -f '{{if .Config.User}}{{if not (eq .Config.User "0")}}{{if not (eq .Config.User "root")}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
+  hold OBSERVER_USER_INSPECT_FAILED
+observer_caps=$("$DOCKER" inspect -f '{{range .HostConfig.CapDrop}}{{if eq . "ALL"}}yes{{end}}{{end}}' "$OBSERVER") ||
+  hold OBSERVER_CAPS_INSPECT_FAILED
+observer_source_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/opt/atlas-observer/scripts"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
+  hold OBSERVER_SOURCE_MOUNT_INSPECT_FAILED
+observer_snapshot_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/atlas-observer"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
+  hold OBSERVER_SNAPSHOT_MOUNT_INSPECT_FAILED
+[ "$observer_root" = true ] && [ "$observer_priv" = false ] &&
+[ "$observer_restart" = no ] && [ "$observer_user_ok" = yes ] &&
+[ "$observer_caps" = yes ] &&
+{ [ "$observer_ports" = null ] || [ "$observer_ports" = '{}' ]; } &&
+[ "$observer_source_ro" = yes ] && [ "$observer_snapshot_ro" = yes ] ||
+  hold OBSERVER_RUNTIME_ISOLATION_DRIFT
+printf 'OBSERVER_EXISTING_READONLY_CONFINEMENT=VERIFIED\n'
+
 # Compare only exact known-safe values inside Docker's Go template.
 # Never emit raw argument/env values, mount Source, tunnel ID, or key content.
 endpoint=$("$DOCKER" inspect -f '{{range .Args}}{{if eq . "--mcp.server-url=http://127.0.0.1:18787/mcp"}}yes{{end}}{{end}}' "$TUNNEL") ||
