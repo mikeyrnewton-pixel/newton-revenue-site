@@ -228,6 +228,16 @@ export function createObserverServer(deps = {}) {
          (contentEncodingCount !== 1 || typeof contentEncoding !== "string" ||
           contentEncoding.trim().toLowerCase() !== "identity")))
       return json(res, 415, {error: "Content encoding not allowed"});
+    // Fail before reading a body when its declared size already exceeds the
+    // reviewed cap. The streaming counter below remains authoritative for
+    // chunked requests and clients that under-declare then send more bytes.
+    const declaredLength = req.headers["content-length"];
+    if (typeof declaredLength === "string" &&
+        /^[0-9]+$/u.test(declaredLength) &&
+        Number(declaredLength) > MAX_REQUEST_BYTES) {
+      req.resume();
+      return json(res, 413, {error: "Request too large"});
+    }
     const chunks = [];
     let size = 0;
     let oversized = false;
