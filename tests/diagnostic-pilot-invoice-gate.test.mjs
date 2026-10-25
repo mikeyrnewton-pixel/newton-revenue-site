@@ -22,6 +22,8 @@ const base=()=>({
   procurementStatus:"VALIDATED_NOT_REQUIRED",
   sourceEvidenceDigest:"1".repeat(64),
   quoteEvidenceDigest:"2".repeat(64),
+  acceptedQuoteEvidenceDigest:"2".repeat(64),
+  invoiceQuoteEvidenceDigest:"2".repeat(64),
   quoteBindingEvidenceDigest:"c".repeat(64),
   quoteDeliveryEvidenceDigest:"3".repeat(64),
   acceptanceEvidenceDigest:"4".repeat(64),
@@ -39,6 +41,7 @@ test("complete evidence makes only an internal invoice ready for owner approval"
   assert.equal(result.state,"INVOICE_READY_FOR_OWNER_ISSUE_APPROVAL");
   assert.equal(result.quoteDraftId,base().quoteDraftId);
   assert.equal(result.invoiceDraftId,base().invoiceDraftId);
+  assert.equal(result.quoteBindingVerified,true);
   assert.equal(result.invoiceReady,true);
   for(const key of ["invoiceIssued","paymentRequested","paymentRecorded",
     "deliveryReady","buyerContactPermitted","automaticTransition","networkCalled",
@@ -73,6 +76,17 @@ test("invoice readiness is bound to distinct source, quote and invoice records",
       ...base(),quoteBindingEvidenceDigest:base().quoteEvidenceDigest,
     }),
     /evidence must differ/,
+  );
+});
+
+test("acceptance and invoice draft must reference the exact quote artifact",()=>{
+  for(const overrides of [
+    {acceptedQuoteEvidenceDigest:"d".repeat(64)},
+    {invoiceQuoteEvidenceDigest:"e".repeat(64)},
+    {acceptedQuoteEvidenceDigest:"not-a-digest"},
+  ])assert.throws(
+    ()=>assessDiagnosticPilotInvoiceReadiness({...base(),...overrides}),
+    /canonical quote-reference|exact quote evidence/,
   );
 });
 
