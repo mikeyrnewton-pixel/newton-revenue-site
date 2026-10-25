@@ -420,6 +420,28 @@ test("aggregate source counts cannot overflow the safe integer range",()=>{
 });
 
 
+test("combined unresolved classifications cannot overflow the safe integer range",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  revenue.observedCounts={...zeroCounts(),CANDIDATE:Number.MAX_SAFE_INTEGER};
+  revenue.observedRecordCount=Number.MAX_SAFE_INTEGER;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  personal.observedCounts={...zeroCounts(),UNKNOWN:1};
+  personal.observedRecordCount=1;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /UNRESOLVED_CLASSIFICATION aggregate count exceeds safe integer range/,
+    "candidate and unknown totals must not combine into a rounded unresolved count",
+  );
+});
+
+
 test("one observed record cannot be counted in multiple classifications",()=>{
   const input=fixture();
   const personal=input.sources.find(
