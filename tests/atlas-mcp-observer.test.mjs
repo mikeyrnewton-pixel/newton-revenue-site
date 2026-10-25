@@ -433,6 +433,7 @@ test("content-encoding normalization allows only one identity token", async () =
       "identity, identity",
       "gzip,identity",
       "compress",
+      ["identity", "identity"],
       ["identity", "gzip"],
     ]) {
       const response = await http(port, {
