@@ -84,3 +84,40 @@ test("rejects unknown workflow fields and failing source provenance",()=>{
   assert.throws(()=>buildOfflineDiagnosticFirstSaleDesk(obj),/PILOT DESK HOLD/);
   assert.equal(calls,0);
 });
+
+test("operator-reported existing legacy rows are preserved, not replaced by fake empty CRM",()=>{
+  const sample=workspace();
+  sample.crmObservation={
+    version:1,observedAt:"2026-10-25T13:00:00.000Z",
+    reportedBy:"OWNER_READ_ONLY_RECONCILIATION",
+    opportunityRowCount:21,authUserCount:0,rlsEnabled:true,
+    policyCount:0,ownerColumnPresent:false,
+  };
+  const result=buildOfflineDiagnosticFirstSaleDesk(sample);
+  assert.equal(result.crmCutover.observedOpportunityRows,21);
+  assert.equal(result.crmCutover.observedAuthUsers,0);
+  assert.ok(result.crmCutover.blockers.includes("PRESERVE_EXISTING_RECORDS_BEFORE_OWNERSHIP_MIGRATION"));
+  assert.ok(result.crmCutover.blockers.includes("NO_VERIFIED_OWNER_AUTH_SESSION"));
+  assert.match(result.nextActions.at(-1).action,/PRESERVE pre-existing CRM rows/);
+  assert.equal(result.writesPerformed,false);
+  assert.equal(result.crmCutover.legacyRecordsWillBeDeleted,false);
+  assert.equal(result.release,"INTERNAL_REVIEW_ONLY");
+  assert.equal(result.clearedCashGBP,0);
+});
+test("optional CRM observation cannot smuggle personal data or bypass release",()=>{
+  const sample=workspace();
+  sample.crmObservation={
+    version:1,observedAt:"2026-10-25T13:00:00.000Z",
+    reportedBy:"OWNER_READ_ONLY_RECONCILIATION",
+    opportunityRowCount:0,authUserCount:1,rlsEnabled:true,
+    policyCount:0,ownerColumnPresent:false,
+  };
+  const result=buildOfflineDiagnosticFirstSaleDesk(sample);
+  assert.equal(result.crmCutover.outcome,"PRODUCTION_CRM_CUTOVER_HOLD");
+  assert.equal(result.crmCutover.ownerApprovalRecorded,false);
+  assert.equal(result.customerMessagesSent,0);
+  assert.equal(result.paymentsCapturedGBP,0);
+  const invalid=structuredClone(sample);
+  invalid.crmObservation.customerEmail="someone@example.com";
+  assert.throws(()=>buildOfflineDiagnosticFirstSaleDesk(invalid),/CRM CUTOVER HOLD/);
+});
