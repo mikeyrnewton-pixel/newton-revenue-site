@@ -337,6 +337,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
     coverageStartedAt:"2026-10-20T12:14:00.000Z",
     coverageEndedAt:"2026-10-01T00:00:00.000Z",
   };
+  backwards.sources[1].searchQueryDigest=gmailQueryDigestFor(backwards.sources[1]);
   assert.throws(()=>reconcileEnquirySourceInventory(backwards),
     /coverage window must be non-empty and move forwards/);
 
@@ -345,6 +346,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
     ...emptyWindow.sources[1],
     coverageStartedAt:emptyWindow.sources[1].coverageEndedAt,
   };
+  emptyWindow.sources[1].searchQueryDigest=gmailQueryDigestFor(emptyWindow.sources[1]);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(emptyWindow),
     /coverage window must be non-empty and move forwards/,
@@ -353,6 +355,8 @@ test("readable counts require a canonical bounded evidence window",()=>{
 
   const tinyGmailWindow=fixture();
   tinyGmailWindow.sources[1].coverageStartedAt="2026-10-20T12:13:58.000Z";
+  tinyGmailWindow.sources[1].searchQueryDigest=
+    gmailQueryDigestFor(tinyGmailWindow.sources[1]);
   tinyGmailWindow.sources[1].evidenceDigest=
     evidenceDigestFor(tinyGmailWindow.sources[1]);
   assert.throws(
@@ -365,6 +369,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
   future.sources[1]={
     ...future.sources[1],coverageEndedAt:"2026-10-20T12:14:01.000Z",
   };
+  future.sources[1].searchQueryDigest=gmailQueryDigestFor(future.sources[1]);
   assert.throws(()=>reconcileEnquirySourceInventory(future),
     /coverage cannot end after verification/);
 
@@ -379,6 +384,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
 test("fresh attestation cannot disguise an obsolete source coverage window",()=>{
   const input=fixture();
   input.sources[1].coverageEndedAt="2026-10-20T11:58:59.000Z";
+  input.sources[1].searchQueryDigest=gmailQueryDigestFor(input.sources[1]);
   input.sources[1].evidenceDigest=evidenceDigestFor(input.sources[1]);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(input),
