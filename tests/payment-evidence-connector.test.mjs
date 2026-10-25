@@ -554,6 +554,49 @@ test("status changes require strictly newer provider evidence",()=>{
   );
 });
 
+test("refund and dispute require prior settled evidence",()=>{
+  const pending=assessBatch([{
+    providerTransactionDigest:"d".repeat(64),
+    observation:observation("PENDING"),
+    expectedBinding:binding(),
+  }]);
+  for(const status of ["REFUNDED","DISPUTED"]){
+    assert.throws(
+      ()=>assessBatch([{
+        providerTransactionDigest:"d".repeat(64),
+        observation:{
+          ...observation(status),
+          observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+          observedAt:"2026-10-20T11:05:00.000Z",
+          evidenceDigest:"e".repeat(64),
+        },
+        expectedBinding:binding(),
+      }],pending.reconciliationCursor),
+      /status regressed across batches/,
+      `PENDING must not jump directly to ${status}`,
+    );
+  }
+
+  const settled=assessBatch([{
+    providerTransactionDigest:"e".repeat(64),
+    observation:observation("SETTLED"),
+    expectedBinding:binding(),
+  }]);
+  const refunded=assessBatch([{
+    providerTransactionDigest:"e".repeat(64),
+    observation:{
+      ...observation("REFUNDED"),
+      observationId:"dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      observedAt:"2026-10-20T11:05:00.000Z",
+      evidenceDigest:"f".repeat(64),
+    },
+    expectedBinding:binding(),
+  }],settled.reconciliationCursor);
+  assert.equal(refunded.candidates[0].state,"PAYMENT_EXCEPTION_HOLD");
+  assert.equal(refunded.candidates[0].commercialEventCandidate,null);
+  assert.equal(refunded.clearedEvidenceGBP,0);
+});
+
 test("same-status polling cannot replay an identical provider timestamp",()=>{
   const first=assessBatch([{
     providerTransactionDigest:"d".repeat(64),
