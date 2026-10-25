@@ -123,3 +123,12 @@ Owner explicitly instructed **NO CUTTING CORNERS**. Treat this as strict quality
 9. **Go/no-go:** review exact build, security suite, runbooks/rollback, live verification and owner commercial approval. If ANY item is not proven, release is **HOLD**, no workaround via owner-declared 'verified' flags.
 
 All five existing hourly engines remain active and unchanged; no deploy/merge, customer messaging, security change, database write, Mac change, purchase, invoice, real trade or collected £ confirmed in this work.
+
+## Buyer research → existing CRM preview bridge
+
+State: **BUILT / TESTED_OFFLINE / REVIEW_BRANCH**.
+
+- `previewOfflineBuyerResearchCrmRows` consumes the privacy-safe buyer-research triage result and maps only `VALIDATE_PUBLIC_BRIEF_SCOPE` candidates to the existing `public.newton_opportunities` review schema.
+- Multiple public pages for the same organisation remain separate hashed evidence references but produce one deduplicated `discovered` candidate row.
+- Source URLs, research notes and personal/customer details are not carried into the CRM preview. Source verification, purchase intent, contact permission, lawful channel, outreach, buyer status, invoicing, payment and cleared cash remain false.
+- This is a deterministic no-write adapter only: no Supabase connection, authentication, RLS policy, schema change, customer-data transfer, outreach or production deployment was added.
