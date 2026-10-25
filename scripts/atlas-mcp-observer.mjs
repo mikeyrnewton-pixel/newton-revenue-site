@@ -172,8 +172,14 @@ export function createObserverServer(deps = {}) {
       if (res.writableEnded) return;
       if (oversized) return json(res, 413, {error: "Request too large"});
       let message;
-      try { message = JSON.parse(Buffer.concat(chunks).toString("utf8")); }
-      catch { return json(res, 400, error(null, -32700, "Invalid JSON")); }
+      try {
+        const body = new TextDecoder("utf-8", {fatal: true}).decode(
+          Buffer.concat(chunks),
+        );
+        message = JSON.parse(body);
+      } catch {
+        return json(res, 400, error(null, -32700, "Invalid JSON"));
+      }
       if (Array.isArray(message)) return json(res, 400, error(null, -32600, "Batch requests disabled"));
       const result = handleObserverMcp(message, deps);
       if (result === null) return empty(res, 202);
