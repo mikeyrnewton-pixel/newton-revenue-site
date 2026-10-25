@@ -986,3 +986,53 @@ test("fatal UTF-8 gate rejects surrogate, out-of-range and truncated byte sequen
 
   assert.equal(reads, 0, "UTF-8 denials and ping control must never read the snapshot");
 });
+
+
+test("HTTP rejects ambiguous JSON media parameters before parsing or snapshot access", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const body = {
+    jsonrpc: "2.0", id: 301, method: "tools/call",
+    params: {name: "atlas_status", arguments: {}},
+  };
+  const invalidContentTypes = [
+    "application/json; charset=iso-8859-1",
+    "application/json; charset=utf-16",
+    "application/json;",
+    "application/json; boundary=snapshot",
+    "application/json; charset=utf-8; boundary=snapshot",
+    "application/json; charset=utf-8; charset=utf-8",
+  ];
+
+  await withServer(async port => {
+    for (const contentType of invalidContentTypes) {
+      const response = await http(port, {
+        headers: {"content-type": contentType},
+        body,
+      });
+      assert.equal(response.status, 415, contentType);
+      assert.deepEqual(response.json, {
+        error: "Canonical UTF-8 JSON required",
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+    }
+
+    for (const contentType of [
+      "application/json",
+      "Application/JSON; Charset=UTF-8",
+      "application/json; charset = utf-8",
+    ]) {
+      const response = await http(port, {
+        headers: {"content-type": contentType},
+        body: {jsonrpc: "2.0", id: 302, method: "ping", params: {}},
+      });
+      assert.equal(response.status, 200, contentType);
+      assert.deepEqual(response.json, {
+        jsonrpc: "2.0", id: 302, result: {},
+      });
+    }
+  }, deps);
+
+  assert.equal(reads, 0, "media-type denials and ping controls must not read the snapshot");
+});
