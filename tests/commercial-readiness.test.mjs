@@ -200,3 +200,83 @@ test("every fictional commercial stage leaves real cleared/recorded money at zer
     assert.equal(result.simulatedClearedEvidenceGBP,length===7?195:0);
   }
 });
+
+test("commercial readiness rejects active object shapes without executing getters",()=>{
+  let getterRuns=0;
+  const activeInput=base();
+  Object.defineProperty(activeInput,"projectRef",{
+    enumerable:true,
+    get(){
+      getterRuns++;
+      return "DEMO-CASH-195";
+    },
+  });
+  assert.throws(
+    ()=>reconcileCommercialReadiness(activeInput),
+    /exact readiness input required/,
+  );
+  assert.equal(getterRuns,0,"input getter must not execute");
+
+  const customInput=Object.assign(Object.create({polluted:true}),base());
+  assert.throws(
+    ()=>reconcileCommercialReadiness(customInput),
+    /exact readiness input required/,
+  );
+
+  const activeEvent=base();
+  Object.defineProperty(activeEvent.events[0],"type",{
+    enumerable:true,
+    get(){
+      getterRuns++;
+      return "QUOTE_READY";
+    },
+  });
+  assert.throws(
+    ()=>reconcileCommercialReadiness(activeEvent),
+    /exact event fields required/,
+  );
+  assert.equal(getterRuns,0,"event getter must not execute");
+
+  const customEvent=base();
+  customEvent.events[0]=Object.assign(
+    Object.create({polluted:true}),customEvent.events[0],
+  );
+  assert.throws(
+    ()=>reconcileCommercialReadiness(customEvent),
+    /exact event fields required/,
+  );
+
+  const sparse=base();
+  sparse.events=Array(7);
+  sparse.events[0]=events()[0];
+  assert.throws(
+    ()=>reconcileCommercialReadiness(sparse),
+    /bounded inert dense event array required/,
+  );
+
+  class CommercialEvents extends Array {}
+  const subclassed=base();
+  subclassed.events=CommercialEvents.from(events());
+  assert.throws(
+    ()=>reconcileCommercialReadiness(subclassed),
+    /bounded inert dense event array required/,
+  );
+
+  const hidden=base();
+  Object.defineProperty(hidden.events[0],"hidden",{
+    value:true,
+    enumerable:false,
+  });
+  assert.throws(
+    ()=>reconcileCommercialReadiness(hidden),
+    /exact event fields required/,
+  );
+
+  const symbolBacked=base();
+  symbolBacked.events[0][Symbol("hidden")]=true;
+  assert.throws(
+    ()=>reconcileCommercialReadiness(symbolBacked),
+    /exact event fields required/,
+  );
+});
+
