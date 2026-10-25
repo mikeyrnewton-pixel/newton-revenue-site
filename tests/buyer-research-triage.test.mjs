@@ -17,6 +17,8 @@ test("fresh public brief becomes review work, never a qualified or contacted buy
   const result=triageOfflineBuyerResearch([base()],asOf);
   assert.equal(result.uniqueSourceCount,1);
   assert.equal(result.publicBriefsForManualValidation,1);
+  assert.equal(result.uniqueOrganisationsForManualValidation,1);
+  assert.deepEqual(result.manualValidationCandidateIds,["ORG-TESTCOMPANY01"]);
   assert.equal(result.records[0].triageDesk,"VALIDATE_PUBLIC_BRIEF_SCOPE");
   assert.equal(result.records[0].sourceClaimVerified,false);
   assert.equal(result.records[0].buyerPurchaseIntentVerified,false);
@@ -103,4 +105,24 @@ test("bounded batch, stable order, no synthetic cash promotion",()=>{
   assert.throws(()=>triageOfflineBuyerResearch(Array.from({length:51},()=>base()),asOf),
     /up to 50/);
   assert.equal(triageOfflineBuyerResearch([],asOf).uniqueSourceCount,0);
+});
+
+
+test("multiple evidence pages for one organisation remain one validation candidate",()=>{
+  const first=base();
+  const second={
+    ...base(),
+    sourceId:"SRC-BRIEF002",
+    sourceUrl:"https://example.org/procurement/enquiry-brief-update",
+    observedAt:"2026-10-25T09:30:00.000Z",
+  };
+  const result=triageOfflineBuyerResearch([second,first],asOf);
+  assert.equal(result.uniqueSourceCount,2);
+  assert.equal(result.publicBriefsForManualValidation,2);
+  assert.equal(result.uniqueOrganisationsForManualValidation,1);
+  assert.deepEqual(result.manualValidationCandidateIds,["ORG-TESTCOMPANY01"]);
+  assert.equal(Object.isFrozen(result.manualValidationCandidateIds),true);
+  assert.equal(result.genuineBuyersVerified,0);
+  assert.equal(result.outreachApproved,false);
+  assert.equal(result.externalContact,false);
 });
