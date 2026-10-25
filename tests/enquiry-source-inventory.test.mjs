@@ -26,6 +26,8 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   pageRecordCounts:source.pageRecordCounts,
   deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
   deduplicatedRecordCount:source.deduplicatedRecordCount,
+  recordTimestampDigest:source.recordTimestampDigest,
+  allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
     key,source.observedCounts[key],
@@ -51,6 +53,8 @@ const readable=(sourceId,overrides={})=>{
     pageRecordCounts:null,
     deduplicatedRecordIdsDigest:null,
     deduplicatedRecordCount:null,
+    recordTimestampDigest:null,
+    allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
     ...overrides,
@@ -68,6 +72,14 @@ const readable=(sourceId,overrides={})=>{
     source.deduplicatedRecordCount=Object.hasOwn(
       overrides,"deduplicatedRecordCount",
     )?overrides.deduplicatedRecordCount:source.observedRecordCount;
+    source.recordTimestampDigest=Object.hasOwn(
+      overrides,"recordTimestampDigest",
+    )?overrides.recordTimestampDigest:createHash("sha256")
+      .update(sourceId+":"+source.coverageStartedAt+":"+
+        source.coverageEndedAt+":"+source.observedRecordCount).digest("hex");
+    source.allRecordsWithinCoverageWindow=Object.hasOwn(
+      overrides,"allRecordsWithinCoverageWindow",
+    )?overrides.allRecordsWithinCoverageWindow:true;
   }
   source.evidenceDigest=Object.hasOwn(overrides,"evidenceDigest")?
     overrides.evidenceDigest:evidenceDigestFor(source);
@@ -87,6 +99,8 @@ const unreadable=sourceId=>({
   pageRecordCounts:null,
   deduplicatedRecordIdsDigest:null,
   deduplicatedRecordCount:null,
+  recordTimestampDigest:null,
+  allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
   verifiedAt:null,
@@ -783,6 +797,41 @@ test("Gmail pagination proof requires the deduplicated ID count to match classif
   );
 });
 
+
+test("Gmail records must be cryptographically bound inside the declared window",()=>{
+  const missingDigest=fixture();
+  const revenue=missingDigest.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordTimestampDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingDigest),
+    /record timestamp digest required/,
+  );
+
+  const outsideWindow=fixture();
+  const personal=outsideWindow.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.allRecordsWithinCoverageWindow=false;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(outsideWindow),
+    /every Gmail record must be proven inside the declared coverage window/,
+    "a complete page traversal cannot count records outside its attested window",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.recordTimestampDigest="f".repeat(64);
+  salesDesk.allRecordsWithinCoverageWindow=true;
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+});
 
 test("Gmail pagination evidence binds ordered traversal and terminal cursor exhaustion",()=>{
   const missingTraversal=fixture();
