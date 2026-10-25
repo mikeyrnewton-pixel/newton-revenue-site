@@ -1093,3 +1093,49 @@ test("media-type gate rejects aliases, quoted parameters and duplicate header am
 
   assert.equal(reads, 0, "media-type denials and ping controls must never read the snapshot");
 });
+
+
+test("duplicate Content-Encoding fields fail despite identity case and whitespace normalization", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const statusBody = {
+    jsonrpc: "2.0", id: 321, method: "tools/call",
+    params: {name: "atlas_status", arguments: {}},
+  };
+
+  await withServer(async port => {
+    for (const encodings of [
+      ["identity", " Identity "],
+      ["IDENTITY", "\tidentity\t"],
+      [" Identity ", "iDeNtItY"],
+      ["iDeNtItY", " gzip "],
+    ]) {
+      const response = await http(port, {
+        headers: {"content-encoding": encodings},
+        body: statusBody,
+      });
+      assert.equal(response.status, 415, JSON.stringify(encodings));
+      assert.deepEqual(response.json, {
+        error: "Content encoding not allowed",
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+      assert.equal(response.raw.includes("identity"), false);
+      assert.equal(response.raw.includes("gzip"), false);
+    }
+
+    for (const encoding of ["identity", " IDENTITY ", "\tIdentity\t"]) {
+      const response = await http(port, {
+        headers: {"content-encoding": encoding},
+        body: {jsonrpc: "2.0", id: 322, method: "ping", params: {}},
+      });
+      assert.equal(response.status, 200, encoding);
+      assert.deepEqual(response.json, {
+        jsonrpc: "2.0", id: 322, result: {},
+      });
+      assert.equal(response.headers["cache-control"], "no-store");
+    }
+  }, deps);
+
+  assert.equal(reads, 0, "encoding denials and ping controls must never read the snapshot");
+});
