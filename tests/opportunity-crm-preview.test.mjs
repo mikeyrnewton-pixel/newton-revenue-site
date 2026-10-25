@@ -85,6 +85,15 @@ test("deduplicated public buyer signals map to one no-write CRM preview row",()=
   assert.equal(result.table,"public.newton_opportunities");
   assert.equal(result.state,"REVIEW_ONLY_NEEDS_AUTH_RLS_AND_SOURCE_VALIDATION");
   assert.equal(result.sourceTruth,"UNVERIFIED_PUBLIC_CLAIMS");
+  assert.equal(result.reviewedAt,"2026-10-25T11:00:00.000Z");
+  assert.match(result.previewDigest,/^sha256:[0-9a-f]{64}$/);
+  assert.equal(result.syncEnvelope.previewDigest,result.previewDigest);
+  assert.equal(result.syncEnvelope.operation,"NO_WRITE_PREVIEW");
+  assert.equal(result.syncEnvelope.recordCount,1);
+  assert.equal(result.syncEnvelope.writeAuthorised,false);
+  assert.equal(result.syncEnvelope.syncAttempted,false);
+  assert.equal(result.syncEnvelope.authenticatedReceiptRequired,true);
+  assert.match(result.syncEnvelope.release,/^HOLD_/);
   assert.equal(result.writeIntent,"NONE");
   assert.equal(result.databaseConnected,false);
   assert.equal(result.customerDataAccess,false);
@@ -105,6 +114,32 @@ test("deduplicated public buyer signals map to one no-write CRM preview row",()=
   assert.doesNotMatch(JSON.stringify(result),/example\.org|Public brief metadata/i);
   assert.ok(Object.isFrozen(result)&&Object.isFrozen(result.rows)&&
     Object.isFrozen(result.rows[0])&&Object.isFrozen(result.rows[0].evidence));
+});
+
+test("sync preview digest is deterministic, order-independent and tamper-evident",()=>{
+  const first=publicBrief();
+  const second=publicBrief({
+    sourceId:"SRC-CRMTEST002",
+    sourceUrl:"https://example.org/procurement/enquiry-brief-update",
+    observedAt:"2026-10-25T09:30:00.000Z",
+  });
+  const one=previewOfflineBuyerResearchCrmRows(
+    [first,second],"2026-10-25T11:00:00.000Z",
+  );
+  const reordered=previewOfflineBuyerResearchCrmRows(
+    [second,first],"2026-10-25T11:00:00.000Z",
+  );
+  const changed=previewOfflineBuyerResearchCrmRows(
+    [first,{...second,fit:"MEDIUM"}],"2026-10-25T11:00:00.000Z",
+  );
+  assert.equal(one.previewDigest,reordered.previewDigest);
+  assert.deepEqual(one,reordered);
+  assert.notEqual(one.previewDigest,changed.previewDigest);
+  assert.equal(one.syncEnvelope.recordCount,one.rows.length);
+  assert.equal(Object.isFrozen(one.syncEnvelope),true);
+  assert.doesNotMatch(JSON.stringify(one.syncEnvelope),/example\.org|Public brief metadata/i);
+  assert.equal(one.syncEnvelope.writeAuthorised,false);
+  assert.equal(one.syncEnvelope.syncAttempted,false);
 });
 
 test("stale, sector-only and low-fit research never enters the CRM preview",()=>{
