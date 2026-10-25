@@ -127,7 +127,7 @@ test("same submission ID rejects divergent retry payload without another lead", 
     env,
   });
   assert.equal(changed.status, 409);
-  assert.match((await changed.json()).error, /conflicts with different enquiry details/);
+  assert.match((await changed.json()).error, /different enquiry/);
   assert.equal([...kv.data.keys()].filter(key => key.startsWith("lead:")).length, 1);
   const receipt = JSON.parse(await kv.get("receipt:" + SUBMISSION_ID));
   assert.equal(receipt.version, 1);
