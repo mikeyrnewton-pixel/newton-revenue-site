@@ -321,7 +321,7 @@ test("server is restricted to private loopback and a fixed port", () => {
   assert.equal(server.headersTimeout,5000);
   assert.equal(server.keepAliveTimeout,1000);
   assert.equal(server.maxRequestsPerSocket,20);
-  assert.equal(server.maxHeadersCount,32);
+  assert.equal(server.maxHeadersCount,64); // App rejects above 32 before dispatch.
 });
 
 test("HTTP live server safely returns tool list and sanitized status", async () => {
