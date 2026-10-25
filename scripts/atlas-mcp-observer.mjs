@@ -164,10 +164,16 @@ export function createObserverServer(deps = {}) {
     // The byte cap applies to the body received by this process. Refuse
     // compression so an encoded request cannot expand beyond that reviewed
     // bound or create decoder ambiguity at the Observer trust boundary.
+    const contentEncodingCount = req.rawHeaders.reduce(
+      (count, value, index) => count +
+        (index % 2 === 0 && value.toLowerCase() === "content-encoding" ? 1 : 0),
+      0,
+    );
     const contentEncoding = req.headers["content-encoding"];
-    if (contentEncoding !== undefined &&
-        (typeof contentEncoding !== "string" ||
-         contentEncoding.trim().toLowerCase() !== "identity"))
+    if (contentEncodingCount > 1 ||
+        (contentEncoding !== undefined &&
+         (contentEncodingCount !== 1 || typeof contentEncoding !== "string" ||
+          contentEncoding.trim().toLowerCase() !== "identity")))
       return json(res, 415, {error: "Content encoding not allowed"});
     const chunks = [];
     let size = 0;
