@@ -141,3 +141,11 @@ State: **BUILT / TESTED_OFFLINE / REVIEW_BRANCH**.
 - The connected canonical commercial Sheet already records an existing Revolut payment-link capability as prepared/ready for a buyer-specific authorised request. **Do not build another payment processor.** The outstanding commercial gate is buyer-specific acceptance, final verified tax/terms, owner-approved correct payment request and independently cleared settlement; hypothetical invoice/pipeline values are not revenue. Leave spending £0 and all five existing engines unchanged.
 
 The specific count and value of prior records should NOT be reused as current facts without a fresh direct `count(*)` and dated source check. No live SQL writes, migrations, owner creation, outreach, deploy, real invoice or payment resulted from this correction.
+
+
+## Deterministic buyer-research CRM sync preview — no write
+
+- The existing `previewOfflineBuyerResearchCrmRows` boundary now emits a canonical SHA-256 `previewDigest` over the fixed review time, existing table target and privacy-safe, candidate-deduplicated rows.
+- Reordered source input and exact retries produce the same digest; any material accepted research change produces a different digest. This gives a future authenticated server-side adapter an inert value to bind to an idempotent receipt without carrying source URLs, notes or customer details across the boundary.
+- The nested sync envelope is explicitly `NO_WRITE_PREVIEW`: `writeAuthorised:false`, `syncAttempted:false`, authenticated receipt required and release held pending Auth, RLS, independent source validation and owner approval.
+- This is source-level tamper/replay evidence only. It is not an authentication token, database idempotency lock, Supabase receipt, buyer verification, outreach approval, invoice, payment or production integration.
