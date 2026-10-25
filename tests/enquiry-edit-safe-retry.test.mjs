@@ -201,3 +201,61 @@ test("No unapproved data leaves the site except the POST the user explicitly sub
   assert.match(state.status.textContent, /Please email/i);
   assert.equal(state.button.disabled, false);
 });
+
+
+test("Rapid double submission while response is pending sends only one actual request", async () => {
+  const sent = [];
+  let completeFirst;
+  const firstResponse = new Promise(resolve => { completeFirst = resolve; });
+  const state = mount(async (path, init) => {
+    sent.push({ path, body: JSON.parse(init.body) });
+    if (sent.length === 1) return firstResponse;
+    return new Response(JSON.stringify({ ok: true, received: true }), {
+      status: 201, headers: { "Content-Type": "application/json" },
+    });
+  });
+  const first = state.submit();
+  assert.equal(state.button.disabled, true);
+  const attemptedDuplicate = state.submit(); // e.g. second Enter press
+  await attemptedDuplicate;
+  assert.equal(sent.length, 1);
+  assert.equal(state.resetCount, 0);
+  assert.equal(state.button.disabled, true);
+  completeFirst(new Response(JSON.stringify({ ok: true, received: true }), {
+    status: 201, headers: { "Content-Type": "application/json" },
+  }));
+  await first;
+  assert.equal(state.status.className, "status success");
+  assert.equal(state.button.disabled, false);
+  assert.equal(state.resetCount, 1);
+
+  // A later, deliberate submission remains possible, with a fresh ID.
+  await state.submit();
+  assert.equal(sent.length, 2);
+  assert.notEqual(sent[0].body.submissionId, sent[1].body.submissionId);
+});
+
+test("Concurrent Enter press cannot duplicate a failed submission and the user can retry", async () => {
+  const sent = [];
+  let rejectFirst;
+  const pending = new Promise((_resolve, reject) => { rejectFirst = reject; });
+  const state = mount(async (_path, init) => {
+    sent.push(JSON.parse(init.body));
+    if (sent.length === 1) return pending;
+    return new Response(JSON.stringify({ ok: true, received: true }), {
+      status: 201, headers: { "Content-Type": "application/json" },
+    });
+  });
+  const first = state.submit();
+  await state.submit();
+  assert.equal(sent.length, 1);
+  assert.equal(state.button.disabled, true);
+  rejectFirst(new Error("Synthetic network failure"));
+  await first;
+  assert.equal(state.status.className, "status error");
+  assert.equal(state.button.disabled, false);
+  await state.submit();
+  assert.equal(sent.length, 2);
+  assert.equal(sent[0].submissionId, sent[1].submissionId);
+  assert.equal(state.status.className, "status success");
+});
