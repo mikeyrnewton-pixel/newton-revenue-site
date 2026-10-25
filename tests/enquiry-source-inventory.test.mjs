@@ -21,6 +21,8 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   evidenceLocator:source.evidenceLocator,
   searchScope:source.searchScope,
   paginationComplete:source.paginationComplete,
+  terminalPageTokenAbsent:source.terminalPageTokenAbsent,
+  paginationTraversalDigest:source.paginationTraversalDigest,
   pageRecordCounts:source.pageRecordCounts,
   deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
   deduplicatedRecordCount:source.deduplicatedRecordCount,
@@ -42,6 +44,10 @@ const readable=(sourceId,overrides={})=>{
       "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
     paginationComplete:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       true:null,
+    terminalPageTokenAbsent:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+      true:null,
+    paginationTraversalDigest:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+      createHash("sha256").update(sourceId+":CURSOR-CHAIN").digest("hex"):null,
     pageRecordCounts:null,
     deduplicatedRecordIdsDigest:null,
     deduplicatedRecordCount:null,
@@ -76,6 +82,8 @@ const unreadable=sourceId=>({
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   searchScope:null,
   paginationComplete:null,
+  terminalPageTokenAbsent:null,
+  paginationTraversalDigest:null,
   pageRecordCounts:null,
   deduplicatedRecordIdsDigest:null,
   deduplicatedRecordCount:null,
@@ -774,3 +782,52 @@ test("Gmail pagination proof requires the deduplicated ID count to match classif
     /non-Gmail sources cannot claim Gmail pagination proof/,
   );
 });
+
+
+test("Gmail pagination evidence binds ordered traversal and terminal cursor exhaustion",()=>{
+  const missingTraversal=fixture();
+  const missing=missingTraversal.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  missing.paginationTraversalDigest=null;
+  missing.evidenceDigest=evidenceDigestFor(missing);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingTraversal),
+    /ordered pagination traversal digest required/,
+    "page totals and an ID-set digest cannot prove that the cursor chain was traversed",
+  );
+
+  const unterminated=fixture();
+  const gmail=unterminated.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  gmail.terminalPageTokenAbsent=false;
+  gmail.evidenceDigest=evidenceDigestFor(gmail);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(unterminated),
+    /terminate without a next-page token/,
+    "a remaining next-page token means the bounded search is incomplete",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.terminalPageTokenAbsent=true;
+  salesDesk.paginationTraversalDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const unreadableProof=fixture();
+  unreadableProof.sources[0]={
+    ...unreadableProof.sources[0],
+    terminalPageTokenAbsent:true,
+    paginationTraversalDigest:"f".repeat(64),
+  };
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(unreadableProof),
+    /unreadable source cannot claim pagination proof/,
+  );
+});
+
