@@ -1351,3 +1351,40 @@ test("oversized declared Content-Length is rejected before body upload", async (
 
   assert.equal(reads, 0, "declared-size denial and ping control must never read the snapshot");
 });
+
+
+test("excess request headers fail closed instead of being silently truncated", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const paddingHeaders = Object.fromEntries(
+    Array.from({length: 40}, (_, index) => [
+      `x-padding-${index}`, `sk-HEADER-${index}`,
+    ]),
+  );
+
+  await withServer(async port => {
+    const rejected = await http(port, {
+      headers: paddingHeaders,
+      body: {
+        jsonrpc: "2.0", id: 451, method: "tools/call",
+        params: {name: "atlas_status", arguments: {}},
+      },
+    });
+    assert.equal(rejected.status, 431);
+    assert.deepEqual(rejected.json, {error: "Too many request headers"});
+    assert.equal(rejected.headers["cache-control"], "no-store");
+    assert.equal(rejected.raw.includes("sk-HEADER"), false);
+    assert.equal(rejected.raw.includes("atlas_status"), false);
+
+    const accepted = await http(port, {
+      headers: {"x-benign-fixture": "one"},
+      body: {jsonrpc: "2.0", id: 452, method: "ping", params: {}},
+    });
+    assert.equal(accepted.status, 200);
+    assert.deepEqual(accepted.json, {
+      jsonrpc: "2.0", id: 452, result: {},
+    });
+  }, deps);
+
+  assert.equal(reads, 0, "header overflow denial and ping control must never read the snapshot");
+});
