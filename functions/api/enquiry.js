@@ -4,6 +4,42 @@ import { deliverOwnerNotice } from '../../lib/owner-notifications.js';
 const MAX_BYTES = 8192;
 const TTL_SECONDS = 30 * 24 * 60 * 60;
 
+// Read small JSON bodies incrementally; reject oversized uploads before
+// buffering the rest. Checking byte size AFTER request.text() is too late.
+async function boundedBody(request) {
+  const length = request.headers.get("Content-Length");
+  if (length !== null && /^\d+$/.test(length) && Number(length) > MAX_BYTES) {
+    return { error: "too_large" };
+  }
+  if (!request.body || typeof request.body.getReader !== "function") {
+    return { raw: "" };
+  }
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  let bytes = 0;
+  let raw = "";
+  try {
+    while (true) {
+      const part = await reader.read();
+      if (part.done) break;
+      if (!(part.value instanceof Uint8Array)) return { error: "read_failed" };
+      bytes += part.value.byteLength;
+      if (bytes > MAX_BYTES) {
+        // Stop reading immediately, without waiting for remote sender closure.
+        void reader.cancel().catch(() => {});
+        return { error: "too_large" };
+      }
+      raw += decoder.decode(part.value, { stream: true });
+    }
+    raw += decoder.decode();
+    return { raw };
+  } catch {
+    return { error: "read_failed" };
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 function reply(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -50,15 +86,14 @@ export async function onRequestPost({ request, env, waitUntil }) {
   if (!(request.headers.get("Content-Type") || "").toLowerCase().includes("application/json")) {
     return reply({ error: "JSON required." }, 415);
   }
-  let raw;
-  try {
-    raw = await request.text();
-  } catch {
-    return reply({ error: "Could not read request." }, 400);
-  }
-  if (new TextEncoder().encode(raw).length > MAX_BYTES) {
+  const body = await boundedBody(request);
+  if (body.error === "too_large") {
     return reply({ error: "Submission too large." }, 413);
   }
+  if (body.error) {
+    return reply({ error: "Could not read request." }, 400);
+  }
+  const raw = body.raw;
   let p;
   try {
     p = JSON.parse(raw);
