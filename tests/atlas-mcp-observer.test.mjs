@@ -1214,3 +1214,51 @@ test("duplicate-key gate decodes complex aliases without crossing object scopes"
 
   assert.equal(reads, 0, "duplicate denials and initialize controls must never read the snapshot");
 });
+
+
+test("HTTP request target is exact and cannot smuggle SSRF-style destinations", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+  const statusBody = {
+    jsonrpc: "2.0", id: 421, method: "tools/call",
+    params: {name: "atlas_status", arguments: {}},
+  };
+  const rejectedTargets = [
+    "/mcp/",
+    "//mcp",
+    "/MCP",
+    "/mcp?url=http://127.0.0.1:8080",
+    "/mcp?path=/etc/passwd",
+    "/mcp%3furl=http%3a%2f%2f127.0.0.1%3a8080",
+    "/%6dcp",
+    "http://127.0.0.1:18788/mcp",
+    "http://169.254.169.254/latest/meta-data/",
+  ];
+
+  await withServer(async port => {
+    for (const url of rejectedTargets) {
+      const response = await http(port, {
+        url,
+        body: statusBody,
+      });
+      assert.equal(response.status, 404, url);
+      assert.deepEqual(response.json, {error: "Not found"});
+      assert.equal(response.headers["cache-control"], "no-store");
+      assert.equal(response.raw.includes("atlas_status"), false);
+      assert.equal(response.raw.includes("127.0.0.1"), false);
+      assert.equal(response.raw.includes("169.254.169.254"), false);
+      assert.equal(response.raw.includes("/etc/passwd"), false);
+    }
+
+    const exact = await http(port, {
+      url: "/mcp",
+      body: {jsonrpc: "2.0", id: 422, method: "ping", params: {}},
+    });
+    assert.equal(exact.status, 200);
+    assert.deepEqual(exact.json, {
+      jsonrpc: "2.0", id: 422, result: {},
+    });
+  }, deps);
+
+  assert.equal(reads, 0, "rejected targets and ping control must never read the snapshot");
+});
