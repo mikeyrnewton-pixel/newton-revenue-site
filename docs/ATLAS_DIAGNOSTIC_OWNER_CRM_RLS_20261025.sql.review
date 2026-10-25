@@ -1,5 +1,13 @@
 -- ATLAS / NEWTON £195 pilot — PRIVATE OWNER-ONLY CRM POLICY DESIGN
 -- REVIEW-ONLY: not a migration, do NOT execute without explicit scoped owner approval.
+-- LIVE CUTOVER PAUSED: ORIGINAL EMPTY-TABLE ASSUMPTION DISPROVEN.
+-- A direct database COUNT on 25 Oct proved pre-existing legacy opportunity records.
+-- The previously reported zero rows was inaccurate table-summary metadata.
+-- Current Auth prerequisites are also not satisfied. Do NOT remove the nonempty-
+-- table preflight guard, force ownership assignment, delete records or apply this SQL.
+-- Owner-approved, non-destructive legacy attribution and ISOLATED real PostgreSQL
+-- role testing must come first. The aggregate evidence remains in the PRIVATE
+-- PRIME INDEX, not public source files.
 -- Existing project/table only: public.newton_opportunities. NEVER apply to production by CI.
 -- Draft source under docs/ (NOT supabase/migrations). Has an INVALID UUID placeholder.
 -- Audit first: at 2026-10-25 the table had RLS ON, NO policies, broad anon and
