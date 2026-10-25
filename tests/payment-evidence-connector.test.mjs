@@ -1569,7 +1569,7 @@ test("cursor binds each observation and evidence digest to its provider transact
         invoiceEvidenceDigest:"6".repeat(64),
       },
     }],reassignedTransaction),
-    /unknown provider transaction/,
+    /observation binding commercial ownership mismatch/,
   );
 });
 
