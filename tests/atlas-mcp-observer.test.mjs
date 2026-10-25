@@ -1312,3 +1312,42 @@ test("HTTP bounds JSON nesting before parsing or snapshot access", async () => {
 
   assert.equal(reads, 0, "nesting controls and denials must never read the snapshot");
 });
+
+
+test("oversized declared Content-Length is rejected before body upload", async () => {
+  let reads = 0;
+  const deps = {readSnapshot: () => {reads++;return snap();}, now: () => NOW};
+
+  await withServer(async port => {
+    // Send headers only: a header-stage guard must answer without waiting for
+    // the announced 8 KiB+ body or executing MCP dispatch.
+    const rejected = await http(port, {
+      headers: {
+        "content-type": "application/json",
+        "content-length": "8193",
+      },
+    });
+    assert.equal(rejected.status, 413);
+    assert.deepEqual(rejected.json, {error: "Request too large"});
+    assert.equal(rejected.headers["cache-control"], "no-store");
+    assert.equal(rejected.raw.includes("content-length"), false);
+    assert.equal(rejected.raw.includes("atlas_status"), false);
+
+    const pingBody = JSON.stringify({
+      jsonrpc: "2.0", id: 441, method: "ping", params: {},
+    });
+    const accepted = await http(port, {
+      headers: {
+        "content-type": "application/json",
+        "content-length": String(Buffer.byteLength(pingBody)),
+      },
+      body: pingBody,
+    });
+    assert.equal(accepted.status, 200);
+    assert.deepEqual(accepted.json, {
+      jsonrpc: "2.0", id: 441, result: {},
+    });
+  }, deps);
+
+  assert.equal(reads, 0, "declared-size denial and ping control must never read the snapshot");
+});
