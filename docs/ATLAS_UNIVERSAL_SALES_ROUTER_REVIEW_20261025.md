@@ -52,3 +52,13 @@ The 24 October later Mac receipt records Stage 2 local Observer as verified; thi
 - Next approved implementation must address secure owner sign-in, table policy, retention, source evidence documents and deduplication before an actual CRM sync. Do not grant `anon`/all `authenticated` blanket access, use service-role credentials in the browser or treat an empty DB as a sales failure.
 
 Evidence: authenticated Supabase list_projects, list_tables verbose and read-only pg_policies metadata on 25 Oct; GitHub PR #45 review branch. No migrations, table writes, permissions, deployments or spending performed.
+
+## Authenticated evidence boundary — BUILD increment
+
+- `lib/opportunity-evidence-requirements.js` converts every valid offline offer into a deterministic, privacy-safe proof checklist for seller authority, offer source, fulfilment/availability, restrictions/jurisdiction and offer terms. Property, business, digital-asset and introduction routes also require specialist mandate/compliance review.
+- Owner-entered enum values remain declarations. Even when the intake reports `INTERNAL_SALES_PREPARATION_READY`, the evidence contract remains `AUTHENTICATED_EVIDENCE_REQUIRED`; it cannot accept evidence, permit buyer discovery, enable an external action or write storage.
+- `lib/opportunity-crm-preview.js` now carries that evidence gate and requirement codes into the existing no-write `discovered` row. It never promotes a declaration to qualified buyer, authenticated proof or cleared cash.
+- `tests/opportunity-evidence-requirements.test.mjs` and the CRM-preview regression tests enforce immutability, privacy, specialist routing and the declaration/evidence separation.
+
+Next integration gate: CAREER PRIME independently reviews the requirement coverage. A later authenticated adapter must bind dated, deduplicated proof digests to an owner-authorised source; this review code deliberately provides no bypass by accepting caller-supplied “verified” evidence.
+

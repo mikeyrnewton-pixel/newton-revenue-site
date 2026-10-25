@@ -26,6 +26,9 @@ test("existing opportunity table receives no write: only a structurally compatib
     "next_action_due","metadata"].sort());
   assert.equal(res.row.metadata.independently_authenticated,false);
   assert.equal(res.row.metadata.prospect_contact_authorised,false);
+  assert.equal(res.row.metadata.buyer_discovery_permitted,false);
+  assert.equal(res.row.metadata.evidence_gate,"AUTHENTICATED_EVIDENCE_REQUIRED");
+  assert.ok(res.row.metadata.evidence_requirement_codes.includes("SELLER_AUTHORITY_PROOF"));
   assert.ok(res.row.metadata.hold_codes.includes("SELLER_AUTHORITY_REQUIRED"));
   assert.ok(Object.isFrozen(res)&&Object.isFrozen(res.row)&&Object.isFrozen(res.row.metadata.hold_codes));
 });
@@ -35,6 +38,9 @@ test("independently unchecked declarations never turn into a live buyer or payme
     restrictions:"NONE_IDENTIFIED",sourceEvidence:"INDEPENDENTLY_VERIFIED"});
   assert.equal(passed.row.metadata.preliminary_readiness,"INTERNAL_SALES_PREPARATION_READY");
   assert.equal(passed.row.status,"discovered");
+  assert.equal(passed.row.metadata.evidence_gate,"AUTHENTICATED_EVIDENCE_REQUIRED");
+  assert.equal(passed.row.metadata.buyer_discovery_permitted,false);
+  assert.match(passed.row.next_action,/authenticated evidence/i);
   assert.equal(passed.row.metadata.buyer_verified,false);
   assert.equal(passed.row.metadata.settled_cash_verified,false);
   assert.equal(passed.clearedEvidenceGBP,0);
