@@ -1,0 +1,21 @@
+{
+  "schema": "ATLAS_PAPER_COUNCIL_REVIEW_V1",
+  "market": "BTC-USD",
+  "as_of": "2026-10-25T18:40:00Z",
+  "research_digest": "a88e26a3007deab5f434d21f71fcd07eadc806aadfeee5eeb14abbac35ea7bcd",
+  "disposition": "WAIT",
+  "blockers": [
+    "REVIEWERS_REPORT_MISSING_EVIDENCE",
+    "INSUFFICIENT_REVIEW_CONFIDENCE",
+    "DISAGREEMENT_OR_REJECTION"
+  ],
+  "human_review_required": true,
+  "model_runs_independently_verified": false,
+  "market_data_independently_verified": false,
+  "trade_execution_authorised": false,
+  "paper_order_created": false,
+  "real_order_created": false,
+  "broker_calls": 0,
+  "paid_model_calls": 0,
+  "reported_pnl_gbp": null
+}
