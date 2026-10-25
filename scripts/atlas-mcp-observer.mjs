@@ -16,6 +16,7 @@ export const OBSERVER_HOST = "127.0.0.1";
 export const OBSERVER_PORT = 18788; // Different from running atlas_ping canary.
 export const PING_REPLY = "ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS";
 const MAX_REQUEST_BYTES = 8192;
+const MAX_JSON_NESTING = 32;
 const PROTOCOL = "2025-03-26";
 const SUPPORTED = new Set(["2024-11-05", PROTOCOL, "2025-06-18"]);
 const TOOL_SCHEMA = Object.freeze({
@@ -144,17 +145,19 @@ function canonicalJsonContentType(value) {
   return parts.length === 2 &&
     /^charset\s*=\s*utf-8$/iu.test(parts[1]);
 }
-function hasDuplicateJsonObjectKeys(text) {
+function inspectJsonStructure(text) {
   const stack = [];
   for (let index = 0; index < text.length;) {
     const char = text[index];
     if (/\s/u.test(char)) {index += 1;continue;}
     if (char === "{") {
+      if (stack.length >= MAX_JSON_NESTING) return "TOO_DEEP";
       stack.push({type: "object", keys: new Set(), expectingKey: true});
       index += 1;
       continue;
     }
     if (char === "[") {
+      if (stack.length >= MAX_JSON_NESTING) return "TOO_DEEP";
       stack.push({type: "array"});
       index += 1;
       continue;
@@ -186,12 +189,12 @@ function hasDuplicateJsonObjectKeys(text) {
       let key;
       try {key = JSON.parse(text.slice(start, index));}
       catch {continue;}
-      if (current.keys.has(key)) return true;
+      if (current.keys.has(key)) return "DUPLICATE";
       current.keys.add(key);
       current.expectingKey = false;
     }
   }
-  return false;
+  return "OK";
 }
 
 export function createObserverServer(deps = {}) {
@@ -249,8 +252,11 @@ export function createObserverServer(deps = {}) {
         const body = new TextDecoder("utf-8", {fatal: true}).decode(
           Buffer.concat(chunks),
         );
-        if (hasDuplicateJsonObjectKeys(body))
+        const structure = inspectJsonStructure(body);
+        if (structure === "DUPLICATE")
           return json(res, 400, error(null, -32600, "Duplicate JSON object keys not allowed"));
+        if (structure === "TOO_DEEP")
+          return json(res, 400, error(null, -32600, "JSON nesting limit exceeded"));
         message = JSON.parse(body);
       } catch {
         return json(res, 400, error(null, -32700, "Invalid JSON"));
