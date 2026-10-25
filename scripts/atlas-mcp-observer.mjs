@@ -150,7 +150,16 @@ export function createObserverServer(deps = {}) {
       return json(res, 200, {status: "OBSERVER_PROCESS_ALIVE_ONLY"});
     if (req.url !== "/mcp") return json(res, 404, {error: "Not found"});
     if (req.method !== "POST") return json(res, 405, {error: "Method not allowed"});
-    if (!canonicalJsonContentType(req.headers["content-type"]))
+    // Node deliberately de-duplicates Content-Type in req.headers. Inspect the
+    // raw field names as well so duplicated/conflicting declarations cannot be
+    // normalized into a single allowlisted value before this trust boundary.
+    const contentTypeCount = req.rawHeaders.reduce(
+      (count, value, index) => count +
+        (index % 2 === 0 && value.toLowerCase() === "content-type" ? 1 : 0),
+      0,
+    );
+    if (contentTypeCount !== 1 ||
+        !canonicalJsonContentType(req.headers["content-type"]))
       return json(res, 415, {error: "Canonical UTF-8 JSON required"});
     // The byte cap applies to the body received by this process. Refuse
     // compression so an encoded request cannot expand beyond that reviewed
