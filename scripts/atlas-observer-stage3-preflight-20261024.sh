@@ -64,8 +64,12 @@ observer_restart=$("$DOCKER" inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$O
 observer_ports=$("$DOCKER" inspect -f '{{json .HostConfig.PortBindings}}' "$OBSERVER") ||
   hold OBSERVER_PORTS_INSPECT_FAILED
 # User string must be a numeric, nonzero uid:gid (Stage 2 launch contract).
-observer_user_ok=$("$DOCKER" inspect -f '{{if .Config.User}}{{if not (eq .Config.User "0")}}{{if not (eq .Config.User "root")}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
+observer_user=$("$DOCKER" inspect -f '{{.Config.User}}' "$OBSERVER") ||
   hold OBSERVER_USER_INSPECT_FAILED
+# The nonsecret Docker User contract is a numeric non-root uid:gid.
+# Guard root:root, 0:0, usernames and empty values (none are printed).
+[[ "$observer_user" =~ ^[1-9][0-9]*:[0-9]+$ ]] ||
+  hold OBSERVER_NONROOT_USER_NOT_VERIFIED
 observer_caps=$("$DOCKER" inspect -f '{{range .HostConfig.CapDrop}}{{if eq . "ALL"}}yes{{end}}{{end}}' "$OBSERVER") ||
   hold OBSERVER_CAPS_INSPECT_FAILED
 observer_source_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/opt/atlas-observer/scripts"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
@@ -73,7 +77,7 @@ observer_source_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination
 observer_snapshot_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/atlas-observer"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
   hold OBSERVER_SNAPSHOT_MOUNT_INSPECT_FAILED
 [ "$observer_root" = true ] && [ "$observer_priv" = false ] &&
-[ "$observer_restart" = no ] && [ "$observer_user_ok" = yes ] &&
+[ "$observer_restart" = no ] &&
 [ "$observer_caps" = yes ] &&
 { [ "$observer_ports" = null ] || [ "$observer_ports" = '{}' ]; } &&
 [ "$observer_source_ro" = yes ] && [ "$observer_snapshot_ro" = yes ] ||
