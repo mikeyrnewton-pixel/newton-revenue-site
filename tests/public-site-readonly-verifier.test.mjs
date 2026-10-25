@@ -88,5 +88,5 @@ test("probe fails closed if network fails and never attempts POST/fallback write
   assert.equal(r.checkedPaths.every(x=>x.reason==="NETWORK_OR_CONTENT_UNVERIFIED"),true);
   assert.equal(r.formsSubmitted,0);
   assert.equal(r.moneyCapturedGBP,0);
-  assert.throws(()=>probeNewtonPublicReadOnly({timeoutMs:999}),/PUBLIC_HTTP_RELEASE_HOLD/);
+  await assert.rejects(probeNewtonPublicReadOnly({timeoutMs:999}),/PUBLIC_HTTP_RELEASE_HOLD/);
 });
