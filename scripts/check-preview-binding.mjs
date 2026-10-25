@@ -19,6 +19,11 @@ async function probe(path, init) {
 }
 try {
   const home = await probe('/');
+  const diagnostic = await probe('/enquiry-diagnostic/');
+  const enquiryCheck = await probe('/enquiry-check/');
+  const enquiryGet = await probe('/api/enquiry');
+  const retryGet = await probe('/api/retry-owner-notices');
+  const erasureGet = await probe('/api/delete-lead');
   // Enquiry function checks its LEADS storage BEFORE rejecting the invalid media type.
   // This deliberately invalid request cannot create a lead, consume consent or trigger a notice.
   const intake = await probe('/api/enquiry', {
@@ -27,12 +32,17 @@ try {
   // Owner-only route; no authentication header and no lead records requested/read.
   const admin = await probe('/api/leads');
   console.log('Preview homepage HTTP:', home);
+  console.log('Preview diagnostic and enquiry-check HTTP:', diagnostic, enquiryCheck);
+  console.log('Public GET /api/enquiry HTTP:', enquiryGet, '(405 expected)');
+  console.log('Unauthorised GET /api/retry-owner-notices HTTP:', retryGet, '(405 expected)');
+  console.log('Unauthorised GET /api/delete-lead HTTP:', erasureGet, '(405 expected, never 200 homepage fallback)');
   console.log('Non-writing invalid enquiry HTTP:', intake, '(415 = KV binding active; 503 = missing binding)');
   console.log('Unauthenticated owner route HTTP:', admin, '(401 = protected; 503 = Preview ADMIN_TOKEN/binding unavailable)');
-  if (home === 403 || intake === 403 || admin === 403) {
+  if ([home, diagnostic, enquiryCheck, enquiryGet, retryGet, erasureGet, intake, admin].includes(403)) {
     console.error('BLOCKED: Cloudflare Access / edge rules or request-network policy returned 403. This is NOT evidence the Pages Function ran.');
     process.exitCode = 1;
-  } else if (home !== 200 || intake !== 415) {
+  } else if (home !== 200 || diagnostic !== 200 || enquiryCheck !== 200 ||
+             enquiryGet !== 405 || retryGet !== 405 || erasureGet !== 405 || intake !== 415) {
     console.error('FAIL: Preview is not ready. Check the exact deployment, binding and Pages Functions.');
     process.exitCode = 1;
   } else if (admin === 503) {
@@ -42,7 +52,7 @@ try {
     console.error('FAIL: Unexpected unauthenticated owner-route status.');
     process.exitCode = 1;
   } else {
-    console.log('PASS: Preview-only non-writing routing, LEADS binding and owner-route protection verified.');
+    console.log('PASS: Exact Preview public pages, GET route guards, erasure route, LEADS binding and owner-only protection verified; no customer records read.');
   }
 } catch (error) {
   console.error('FAIL: Network/TLS/redirect error:', error?.name ?? 'unknown');
