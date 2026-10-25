@@ -6,10 +6,15 @@ const button = document.querySelector("#send");
 // submission: otherwise KV's earlier receipt could falsely confirm the edit.
 let pendingSubmissionId = null;
 let pendingSubmissionFingerprint = null;
+// Do not start a second POST while the first request is still unresolved.
+// A disabled button alone does not block Enter-key or scripted submit events.
+let submissionInFlight = false;
 if (form) form.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (submissionInFlight) return;
   status.className = "status";
   if (!form.reportValidity()) return;
+  submissionInFlight = true;
   button.disabled = true;
   status.textContent = "Securely submitting your enquiry…";
   const fields = new FormData(form);
@@ -56,6 +61,7 @@ if (form) form.addEventListener("submit", async (event) => {
     status.className = "status error";
     status.textContent = "The form couldn't confirm your enquiry. Please email newtonrevenue@gmail.com instead.";
   } finally {
+    submissionInFlight = false;
     button.disabled = false;
   }
 });
