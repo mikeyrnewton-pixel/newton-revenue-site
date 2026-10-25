@@ -67,8 +67,8 @@ observer_ports=$("$DOCKER" inspect -f '{{json .HostConfig.PortBindings}}' "$OBSE
 observer_user=$("$DOCKER" inspect -f '{{.Config.User}}' "$OBSERVER") ||
   hold OBSERVER_USER_INSPECT_FAILED
 # The nonsecret Docker User contract is a numeric non-root uid:gid.
-# Guard root:root, 0:0, usernames and empty values (none are printed).
-[[ "$observer_user" =~ ^[1-9][0-9]*:[0-9]+$ ]] ||
+# Guard root uid AND root gid, usernames and empty values (none printed).
+[[ "$observer_user" =~ ^[1-9][0-9]*:[1-9][0-9]*$ ]] ||
   hold OBSERVER_NONROOT_USER_NOT_VERIFIED
 observer_caps=$("$DOCKER" inspect -f '{{range .HostConfig.CapDrop}}{{if eq . "ALL"}}yes{{end}}{{end}}' "$OBSERVER") ||
   hold OBSERVER_CAPS_INSPECT_FAILED
