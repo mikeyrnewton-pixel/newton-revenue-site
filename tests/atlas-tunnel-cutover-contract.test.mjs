@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {readFileSync} from 'node:fs';
+import {readFileSync,mkdtempSync,symlinkSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {reviewTunnelReplacement} from '../scripts/atlas-tunnel-cutover-contract-20261026.mjs';
 
@@ -90,4 +92,20 @@ test('CLI has no switch for Docker mutations, and refuses non-Mac invocation',()
       assert.doesNotMatch(r.stdout,/\/Users\/|tunnel_[a-z0-9]+|sk-/);
     }
   }
+});
+
+test('symlinked CLI entrypoint must emit a real hold receipt, never silently skip',()=>{
+  if(process.platform==='darwin')return; // no Docker introspection from test machines
+  const file=fileURLToPath(new URL('../scripts/atlas-tunnel-cutover-contract-20261026.mjs',import.meta.url));
+  const dir=mkdtempSync(join(tmpdir(),'atlas-stage4-link-'));
+  const alias=join(dir,'alias.mjs');
+  try{
+    symlinkSync(file,alias);
+    const r=spawnSync(process.execPath,[alias,'--inspect-only'],{
+      encoding:'utf8',timeout:4000,
+    });
+    assert.equal(r.status,2,r.stderr+r.stdout);
+    assert.match(r.stdout,/ATLAS_CUTOVER_CONTRACT=HOLD_MAC_OWNER_REQUIRED/);
+    assert.doesNotMatch(r.stdout,/tunnel_[a-z0-9]+|\\/Users\\/|sk-/);
+  }finally{rmSync(dir,{force:true,recursive:true})}
 });
