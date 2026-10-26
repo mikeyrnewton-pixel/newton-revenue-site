@@ -191,3 +191,28 @@ test('erasure retry trusts only a complete non-PII tombstone', async () => {
 
   assert.equal(kv.deleted.length, 0);
 });
+
+
+test('erasure retry rejects stale, future and non-canonical tombstone dates', async () => {
+  const kv = new MemoryKV();
+  const leadId = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
+  const now = Date.now();
+  const invalidDates = [
+    new Date(now - (31 * 24 * 60 * 60 * 1000)).toISOString(),
+    new Date(now + (60 * 60 * 1000)).toISOString(),
+    new Date(now).toUTCString(),
+  ];
+
+  for (const erasedAt of invalidDates) {
+    kv.values.set('erased:' + leadId, JSON.stringify({
+      version: 1, erased: true, erasedAt,
+    }));
+    const response = await erase({ request: deletionRequest(leadId), env: {
+      LEADS: kv, ADMIN_TOKEN: TOKEN,
+    } });
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: 'Lead not found.' });
+  }
+
+  assert.equal(kv.deleted.length, 0);
+});
