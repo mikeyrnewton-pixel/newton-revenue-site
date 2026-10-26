@@ -12,6 +12,13 @@ const zeroCounts=()=>({
   OUTBOUND_REPLY:0,
   UNKNOWN:0,
 });
+const gmailQueryDigestFor=source=>createHash("sha256").update(JSON.stringify({
+  sourceId:source.sourceId,
+  accountIdentityDigest:source.accountIdentityDigest,
+  coverageStartedAt:source.coverageStartedAt,
+  coverageEndedAt:source.coverageEndedAt,
+  searchScope:source.searchScope,
+})).digest("hex");
 const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   sourceId:source.sourceId,
   accessState:source.accessState,
@@ -20,13 +27,19 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   coverageEndedAt:source.coverageEndedAt,
   evidenceLocator:source.evidenceLocator,
   searchScope:source.searchScope,
+  accountIdentityDigest:source.accountIdentityDigest,
+  searchQueryDigest:source.searchQueryDigest,
   paginationComplete:source.paginationComplete,
   terminalPageTokenAbsent:source.terminalPageTokenAbsent,
   paginationTraversalDigest:source.paginationTraversalDigest,
+  paginationRecordAssignmentDigest:source.paginationRecordAssignmentDigest,
   pageRecordCounts:source.pageRecordCounts,
   deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
   deduplicatedRecordCount:source.deduplicatedRecordCount,
   recordTimestampDigest:source.recordTimestampDigest,
+  recordIdTimestampPairsDigest:source.recordIdTimestampPairsDigest,
+  recordIdClassificationPairsDigest:source.recordIdClassificationPairsDigest,
+  recordIdInboxLabelPairsDigest:source.recordIdInboxLabelPairsDigest,
   allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
@@ -43,17 +56,26 @@ const readable=(sourceId,overrides={})=>{
     coverageEndedAt:"2026-10-20T12:13:59.000Z",
     evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
     searchScope:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
-      "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
+      "INBOX_ONLY_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
+    accountIdentityDigest:null,
+    searchQueryDigest:null,
     paginationComplete:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       true:null,
     terminalPageTokenAbsent:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       true:null,
     paginationTraversalDigest:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       createHash("sha256").update(sourceId+":CURSOR-CHAIN").digest("hex"):null,
+    paginationRecordAssignmentDigest:
+      ["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+        createHash("sha256").update(sourceId+":PAGE-RECORD-ASSIGNMENTS").digest("hex"):
+        null,
     pageRecordCounts:null,
     deduplicatedRecordIdsDigest:null,
     deduplicatedRecordCount:null,
     recordTimestampDigest:null,
+    recordIdTimestampPairsDigest:null,
+    recordIdClassificationPairsDigest:null,
+    recordIdInboxLabelPairsDigest:null,
     allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
@@ -63,6 +85,11 @@ const readable=(sourceId,overrides={})=>{
     overrides.observedRecordCount:
     Object.values(source.observedCounts).reduce((total,count)=>total+count,0);
   if(["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)){
+    source.accountIdentityDigest=Object.hasOwn(overrides,"accountIdentityDigest")?
+      overrides.accountIdentityDigest:createHash("sha256")
+        .update(sourceId+":ACCOUNT").digest("hex");
+    source.searchQueryDigest=Object.hasOwn(overrides,"searchQueryDigest")?
+      overrides.searchQueryDigest:gmailQueryDigestFor(source);
     source.pageRecordCounts=Object.hasOwn(overrides,"pageRecordCounts")?
       overrides.pageRecordCounts:[source.observedRecordCount];
     source.deduplicatedRecordIdsDigest=Object.hasOwn(
@@ -77,6 +104,20 @@ const readable=(sourceId,overrides={})=>{
     )?overrides.recordTimestampDigest:createHash("sha256")
       .update(sourceId+":"+source.coverageStartedAt+":"+
         source.coverageEndedAt+":"+source.observedRecordCount).digest("hex");
+    source.recordIdTimestampPairsDigest=Object.hasOwn(
+      overrides,"recordIdTimestampPairsDigest",
+    )?overrides.recordIdTimestampPairsDigest:createHash("sha256")
+      .update(sourceId+":ID-TIMESTAMP-PAIRS:"+source.observedRecordCount).digest("hex");
+    source.recordIdClassificationPairsDigest=Object.hasOwn(
+      overrides,"recordIdClassificationPairsDigest",
+    )?overrides.recordIdClassificationPairsDigest:createHash("sha256")
+      .update(sourceId+":ID-CLASSIFICATION-PAIRS:"+
+        JSON.stringify(source.observedCounts)).digest("hex");
+    source.recordIdInboxLabelPairsDigest=Object.hasOwn(
+      overrides,"recordIdInboxLabelPairsDigest",
+    )?overrides.recordIdInboxLabelPairsDigest:createHash("sha256")
+      .update(sourceId+":ID-INBOX-LABEL-PAIRS:"+source.observedRecordCount)
+      .digest("hex");
     source.allRecordsWithinCoverageWindow=Object.hasOwn(
       overrides,"allRecordsWithinCoverageWindow",
     )?overrides.allRecordsWithinCoverageWindow:true;
@@ -93,13 +134,19 @@ const unreadable=sourceId=>({
   coverageEndedAt:null,
   evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/unreadable`,
   searchScope:null,
+  accountIdentityDigest:null,
+  searchQueryDigest:null,
   paginationComplete:null,
   terminalPageTokenAbsent:null,
   paginationTraversalDigest:null,
+  paginationRecordAssignmentDigest:null,
   pageRecordCounts:null,
   deduplicatedRecordIdsDigest:null,
   deduplicatedRecordCount:null,
   recordTimestampDigest:null,
+  recordIdTimestampPairsDigest:null,
+  recordIdClassificationPairsDigest:null,
+  recordIdInboxLabelPairsDigest:null,
   allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
@@ -319,6 +366,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
     coverageStartedAt:"2026-10-20T12:14:00.000Z",
     coverageEndedAt:"2026-10-01T00:00:00.000Z",
   };
+  backwards.sources[1].searchQueryDigest=gmailQueryDigestFor(backwards.sources[1]);
   assert.throws(()=>reconcileEnquirySourceInventory(backwards),
     /coverage window must be non-empty and move forwards/);
 
@@ -327,6 +375,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
     ...emptyWindow.sources[1],
     coverageStartedAt:emptyWindow.sources[1].coverageEndedAt,
   };
+  emptyWindow.sources[1].searchQueryDigest=gmailQueryDigestFor(emptyWindow.sources[1]);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(emptyWindow),
     /coverage window must be non-empty and move forwards/,
@@ -335,6 +384,8 @@ test("readable counts require a canonical bounded evidence window",()=>{
 
   const tinyGmailWindow=fixture();
   tinyGmailWindow.sources[1].coverageStartedAt="2026-10-20T12:13:58.000Z";
+  tinyGmailWindow.sources[1].searchQueryDigest=
+    gmailQueryDigestFor(tinyGmailWindow.sources[1]);
   tinyGmailWindow.sources[1].evidenceDigest=
     evidenceDigestFor(tinyGmailWindow.sources[1]);
   assert.throws(
@@ -347,6 +398,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
   future.sources[1]={
     ...future.sources[1],coverageEndedAt:"2026-10-20T12:14:01.000Z",
   };
+  future.sources[1].searchQueryDigest=gmailQueryDigestFor(future.sources[1]);
   assert.throws(()=>reconcileEnquirySourceInventory(future),
     /coverage cannot end after verification/);
 
@@ -361,6 +413,7 @@ test("readable counts require a canonical bounded evidence window",()=>{
 test("fresh attestation cannot disguise an obsolete source coverage window",()=>{
   const input=fixture();
   input.sources[1].coverageEndedAt="2026-10-20T11:58:59.000Z";
+  input.sources[1].searchQueryDigest=gmailQueryDigestFor(input.sources[1]);
   input.sources[1].evidenceDigest=evidenceDigestFor(input.sources[1]);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(input),
@@ -528,7 +581,7 @@ test("bounded Gmail evidence cannot narrow the sender or category scope",()=>{
 
   const nonGmailScope=fixture();
   const salesDesk=nonGmailScope.sources.find(source=>source.sourceId==="SALES_DESK");
-  salesDesk.searchScope="INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH";
+  salesDesk.searchScope="INBOX_ONLY_ALL_SENDERS_EXCLUDING_SPAM_TRASH";
   salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(nonGmailScope),
@@ -653,6 +706,57 @@ test("inventory boundaries reject hidden symbol and non-enumerable fields",()=>{
     ()=>reconcileEnquirySourceInventory(symbolCounts),
     /exact classification counts required/,
     "hidden classification buckets cannot evade record-count reconciliation",
+  );
+});
+
+test("Gmail evidence is bound to the exact account and declared search window",()=>{
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(baseline.sourceCoverage.NEWTON_REVENUE_GMAIL.accountIdentityBound,true);
+  assert.equal(baseline.sourceCoverage.NEWTON_REVENUE_GMAIL.searchQueryBound,true);
+
+  const missingAccount=fixture();
+  const revenue=missingAccount.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.accountIdentityDigest=null;
+  revenue.searchQueryDigest=gmailQueryDigestFor(revenue);
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingAccount),
+    /account identity digest required/,
+  );
+
+  const replayedWindow=fixture();
+  const personal=replayedWindow.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.coverageStartedAt="2026-10-20T10:00:00.000Z";
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(replayedWindow),
+    /search-query digest must bind account, source and coverage window/,
+    "a previously attested query cannot be replayed under another window",
+  );
+
+  const collapsedProof=fixture();
+  const collapsed=collapsedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  collapsed.searchQueryDigest=collapsed.accountIdentityDigest;
+  collapsed.evidenceDigest=evidenceDigestFor(collapsed);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedProof),
+    /independently bound/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.accountIdentityDigest="e".repeat(64);
+  salesDesk.searchQueryDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
   );
 });
 
@@ -880,3 +984,335 @@ test("Gmail pagination evidence binds ordered traversal and terminal cursor exha
   );
 });
 
+
+
+test("Gmail pagination binds every record identity to its ordered page",()=>{
+  const missingAssignment=fixture();
+  const revenue=missingAssignment.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.paginationRecordAssignmentDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingAssignment),
+    /ordered page\/record assignment digest required/,
+    "a cursor chain and separate ID set cannot prove which page returned each record",
+  );
+
+  const collapsedTraversal=fixture();
+  const personal=collapsedTraversal.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.paginationRecordAssignmentDigest=personal.paginationTraversalDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedTraversal),
+    /page\/record assignment evidence must be independently bound/,
+  );
+
+  const collapsedIds=fixture();
+  const collapsed=collapsedIds.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  collapsed.paginationRecordAssignmentDigest=collapsed.deduplicatedRecordIdsDigest;
+  collapsed.evidenceDigest=evidenceDigestFor(collapsed);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedIds),
+    /page\/record assignment evidence must be independently bound/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.paginationRecordAssignmentDigest="a".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.paginationRecordAssignmentBound,
+    true,
+  );
+});
+
+
+test("Gmail evidence binds record identities to their timestamps",()=>{
+  const missingPairDigest=fixture();
+  const revenue=missingPairDigest.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdTimestampPairsDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingPairDigest),
+    /record ID\/timestamp pair digest required/,
+    "separate ID and timestamp sets cannot prove which timestamp belongs to each message",
+  );
+
+  const collapsedPairProof=fixture();
+  const personal=collapsedPairProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdTimestampPairsDigest=personal.recordTimestampDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedPairProof),
+    /record-pair evidence must be independently bound/,
+    "a timestamp-only digest cannot also stand in for identity/timestamp pairing",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.recordIdTimestampPairsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityTimeBound,
+    true,
+  );
+});
+
+
+test("Gmail evidence binds every record identity to its classification",()=>{
+  const missingPairDigest=fixture();
+  const revenue=missingPairDigest.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdClassificationPairsDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingPairDigest),
+    /record ID\/classification pair digest required/,
+    "aggregate labels cannot prove which message received each classification",
+  );
+
+  const collapsedPairProof=fixture();
+  const personal=collapsedPairProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdClassificationPairsDigest=personal.deduplicatedRecordIdsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedPairProof),
+    /classification-pair evidence must be independently bound/,
+    "an ID-set digest cannot also stand in for per-record classification evidence",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.recordIdClassificationPairsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.NEWTON_REVENUE_GMAIL.recordIdentityClassificationBound,
+    true,
+  );
+});
+
+
+test("Gmail page assignment proof cannot be replayed across source snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Preserve the second snapshot's otherwise-valid aggregate observation and
+  // recompute its outer digest after transplanting the first snapshot's
+  // assignment proof. The inner proof must still be rejected as replayed.
+  personal.paginationRecordAssignmentDigest=
+    revenue.paginationRecordAssignmentDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /page\/record assignment digest cannot be replayed across sources/,
+    "an assignment proof from one Gmail snapshot cannot attest another",
+  );
+});
+
+
+test("distinct Gmail source roles require distinct account identities",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Recompute every outer binding after reusing the revenue account identity.
+  // One physical inbox still must not masquerade as both required source roles.
+  personal.accountIdentityDigest=revenue.accountIdentityDigest;
+  personal.searchQueryDigest=gmailQueryDigestFor(personal);
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /account identity digest cannot be reused across sources/,
+    "one Gmail account cannot satisfy both personal and revenue source coverage",
+  );
+});
+
+
+test("Gmail record ID-set proof cannot be replayed across account snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Keep the personal snapshot's own classifications and per-record
+  // classification proof, but transplant the revenue snapshot's ID-set proof
+  // and recompute the outer observation digest.
+  personal.deduplicatedRecordIdsDigest=revenue.deduplicatedRecordIdsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /record ID-set digest cannot be replayed across sources/,
+    "one Gmail snapshot's ID set cannot attest another account's records",
+  );
+});
+
+
+test("Gmail classification-pair proof cannot be replayed across account snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Keep the personal snapshot's own account, IDs and aggregate counts, but
+  // transplant the revenue snapshot's per-record classification proof and
+  // recompute the outer observation digest. The inner proof must fail closed.
+  personal.recordIdClassificationPairsDigest=
+    revenue.recordIdClassificationPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /classification-pair digest cannot be replayed across sources/,
+    "one Gmail account's per-record labels cannot attest another account",
+  );
+});
+
+
+test("Gmail ID/timestamp proof cannot be replayed across account snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Keep the personal account, coverage window, raw timestamp digest and
+  // classifications, but transplant the revenue account's ID/timestamp proof
+  // and recompute the outer observation digest.
+  personal.recordIdTimestampPairsDigest=
+    revenue.recordIdTimestampPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /ID\/timestamp-pair digest cannot be replayed across sources/,
+    "one account's record timing proof cannot attest another source window",
+  );
+});
+
+
+test("Gmail evidence rejects all-mail scope that can include sent messages and drafts",()=>{
+  const input=fixture();
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Recompute both digests after weakening the declared search scope. The
+  // allowlist must still reject evidence that can count the owner's own mail.
+  personal.searchScope="INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH";
+  personal.searchQueryDigest=gmailQueryDigestFor(personal);
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /search scope must be complete and allowlisted/,
+    "drafts and sent messages cannot support inbound buyer counts",
+  );
+});
+
+
+test("Gmail evidence binds every counted record identity to its inbox label",()=>{
+  const missingProof=fixture();
+  const revenue=missingProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdInboxLabelPairsDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingProof),
+    /record ID\/inbox-label pair digest required/,
+    "declaring inbox-only scope cannot prove that every counted message was received",
+  );
+
+  const collapsedProof=fixture();
+  const personal=collapsedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdInboxLabelPairsDigest=
+    personal.recordIdClassificationPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedProof),
+    /inbox-label-pair evidence must be independently bound/,
+  );
+
+  const replayedProof=fixture();
+  const first=replayedProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const second=replayedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  second.recordIdInboxLabelPairsDigest=first.recordIdInboxLabelPairsDigest;
+  second.evidenceDigest=evidenceDigestFor(second);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(replayedProof),
+    /inbox-label-pair digest cannot be replayed across sources/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(
+    source=>source.sourceId==="SALES_DESK",
+  );
+  salesDesk.recordIdInboxLabelPairsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityInboxLabelBound,
+    true,
+  );
+});
