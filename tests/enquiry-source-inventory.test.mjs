@@ -32,6 +32,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   paginationComplete:source.paginationComplete,
   terminalPageTokenAbsent:source.terminalPageTokenAbsent,
   paginationTraversalDigest:source.paginationTraversalDigest,
+  paginationRecordAssignmentDigest:source.paginationRecordAssignmentDigest,
   pageRecordCounts:source.pageRecordCounts,
   deduplicatedRecordIdsDigest:source.deduplicatedRecordIdsDigest,
   deduplicatedRecordCount:source.deduplicatedRecordCount,
@@ -63,6 +64,10 @@ const readable=(sourceId,overrides={})=>{
       true:null,
     paginationTraversalDigest:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
       createHash("sha256").update(sourceId+":CURSOR-CHAIN").digest("hex"):null,
+    paginationRecordAssignmentDigest:
+      ["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
+        createHash("sha256").update(sourceId+":PAGE-RECORD-ASSIGNMENTS").digest("hex"):
+        null,
     pageRecordCounts:null,
     deduplicatedRecordIdsDigest:null,
     deduplicatedRecordCount:null,
@@ -127,6 +132,7 @@ const unreadable=sourceId=>({
   paginationComplete:null,
   terminalPageTokenAbsent:null,
   paginationTraversalDigest:null,
+  paginationRecordAssignmentDigest:null,
   pageRecordCounts:null,
   deduplicatedRecordIdsDigest:null,
   deduplicatedRecordCount:null,
@@ -970,6 +976,58 @@ test("Gmail pagination evidence binds ordered traversal and terminal cursor exha
   );
 });
 
+
+
+test("Gmail pagination binds every record identity to its ordered page",()=>{
+  const missingAssignment=fixture();
+  const revenue=missingAssignment.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.paginationRecordAssignmentDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingAssignment),
+    /ordered page\/record assignment digest required/,
+    "a cursor chain and separate ID set cannot prove which page returned each record",
+  );
+
+  const collapsedTraversal=fixture();
+  const personal=collapsedTraversal.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.paginationRecordAssignmentDigest=personal.paginationTraversalDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedTraversal),
+    /page\/record assignment evidence must be independently bound/,
+  );
+
+  const collapsedIds=fixture();
+  const collapsed=collapsedIds.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  collapsed.paginationRecordAssignmentDigest=collapsed.deduplicatedRecordIdsDigest;
+  collapsed.evidenceDigest=evidenceDigestFor(collapsed);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedIds),
+    /page\/record assignment evidence must be independently bound/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.paginationRecordAssignmentDigest="a".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.paginationRecordAssignmentBound,
+    true,
+  );
+});
 
 
 test("Gmail evidence binds record identities to their timestamps",()=>{
