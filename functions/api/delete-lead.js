@@ -2,6 +2,8 @@
 // Private owner-only erasure path. Deletes idempotency and notice metadata
 // before the personal-data record so an interrupted operation is safely retryable.
 const MAX_BYTES = 1024;
+const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+const TOMBSTONE_FUTURE_SKEW_MS = 5 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 // Authenticated erasure is limited to a 1-KiB JSON body. Stop before buffering
@@ -79,9 +81,20 @@ export async function onRequestPost({ request, env }) {
       // When a successful response is lost, the owner can safely retry.
       // Absence alone is NOT success: require our server-issued tombstone.
       const tombstone = await env.LEADS.get('erased:' + leadId, 'json');
-      if (tombstone?.version === 1 && tombstone?.erased === true &&
-          typeof tombstone.erasedAt === 'string' &&
-          Number.isFinite(Date.parse(tombstone.erasedAt))) {
+      // Accept a lost-response retry ONLY with a current, exact server-format
+      // tombstone; stale/future/altered metadata must never claim erasure.
+      const erasedAtMs = typeof tombstone?.erasedAt === 'string'
+        ? Date.parse(tombstone.erasedAt) : NaN;
+      const nowMs = Date.now();
+      const validTombstone = tombstone && !Array.isArray(tombstone) &&
+        typeof tombstone === 'object' &&
+        Object.keys(tombstone).sort().join(',') === 'erased,erasedAt,version' &&
+        tombstone.version === 1 && tombstone.erased === true &&
+        Number.isFinite(erasedAtMs) &&
+        new Date(erasedAtMs).toISOString() === tombstone.erasedAt &&
+        erasedAtMs <= nowMs + TOMBSTONE_FUTURE_SKEW_MS &&
+        nowMs - erasedAtMs <= TOMBSTONE_MAX_AGE_MS;
+      if (validTombstone) {
         return reply({ ok: true, deleted: true, reference: leadId,
           alreadyDeleted: true });
       }
