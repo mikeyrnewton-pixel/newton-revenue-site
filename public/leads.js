@@ -5,6 +5,7 @@ const feedback = document.querySelector("#feedback");
 const more = document.querySelector("#next");
 let cursor = null;
 let adminToken = "";
+let seenIntegrityWarning = false;
 const el = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text !== undefined && text !== null) node.textContent = String(text);
@@ -22,7 +23,11 @@ async function getLeads(append = false) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Could not retrieve enquiries");
-    if (!append) results.replaceChildren();
+    if (!append) {
+      results.replaceChildren();
+      seenIntegrityWarning = false;
+    }
+    seenIntegrityWarning ||= data.dataIntegrityWarning === true;
     for (const lead of data.records) {
       const card = el("article");
       card.style.cssText = "border:1px solid #294050;border-radius:14px;padding:20px;margin:16px 0;background:#102231";
@@ -43,7 +48,7 @@ async function getLeads(append = false) {
       "Showing " + data.records.length + " enquiry/enquiries from this page." :
       (append ? "No more enquiries displayed on this page." : "No valid enquiries displayed on this page.");
     // Never misrepresent a partial/damaged storage page as an empty pipeline.
-    feedback.textContent = data.dataIntegrityWarning ?
+    feedback.textContent = seenIntegrityWarning ?
       summary + " WARNING: Some private records or notice states could not be verified. " +
       "Do not treat this as a complete lead count; inspect storage with authorised access." :
       summary;
