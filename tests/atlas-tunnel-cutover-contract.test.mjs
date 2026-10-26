@@ -106,6 +106,6 @@ test('symlinked CLI entrypoint must emit a real hold receipt, never silently ski
     });
     assert.equal(r.status,2,r.stderr+r.stdout);
     assert.match(r.stdout,/ATLAS_CUTOVER_CONTRACT=HOLD_MAC_OWNER_REQUIRED/);
-    assert.doesNotMatch(r.stdout,/tunnel_[a-z0-9]+|\\/Users\\/|sk-/);
+    assert.doesNotMatch(r.stdout,/\/Users\/|tunnel_[a-z0-9]+|sk-/);
   }finally{rmSync(dir,{force:true,recursive:true})}
 });
