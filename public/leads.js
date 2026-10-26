@@ -7,13 +7,15 @@ let cursor = null;
 let adminToken = "";
 let seenIntegrityWarning = false;
 let seenLeadIds = new Set();
+// A late response from a prior owner session must never repopulate private cards.
+let sessionEpoch = 0;
 const el = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text !== undefined && text !== null) node.textContent = String(text);
   if (className) node.className = className;
   return node;
 };
-async function getLeads(append = false) {
+async function getLeads(append = false, epoch = sessionEpoch) {
   feedback.textContent = "Checking enquiries…";
   more.hidden = true;
   try {
@@ -23,6 +25,7 @@ async function getLeads(append = false) {
       cache: "no-store",
     });
     const data = await res.json();
+    if (epoch !== sessionEpoch) return; // Discard response from prior login.
     if (!res.ok) throw new Error(data.error || "Could not retrieve enquiries");
     if (!append) {
       results.replaceChildren();
@@ -64,11 +67,19 @@ async function getLeads(append = false) {
       "Do not treat this as a complete lead count; inspect storage with authorised access." :
       summary;
   } catch (error) {
+    if (epoch !== sessionEpoch) return;
     feedback.textContent = error.message || "Could not load the private dashboard.";
   }
 }
 form.addEventListener("submit", event => {
   event.preventDefault();
+  sessionEpoch++;
+  // Clear private data immediately, before attempting another authentication.
+  // Incorrect tokens and network failures must not leave earlier leads visible.
+  results.replaceChildren();
+  seenIntegrityWarning = false;
+  seenLeadIds = new Set();
+  more.hidden = true;
   adminToken = tokenInput.value;
   tokenInput.value = "";
   cursor = null;
