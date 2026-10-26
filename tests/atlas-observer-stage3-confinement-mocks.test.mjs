@@ -24,6 +24,7 @@ writeFileSync(docker,[
   '  *PortBindings*) printf "%s\\n" "$MOCK_PORTS" ;;',
   '  *Config.User*) printf "%s\\n" "$MOCK_USER" ;;',
   '  *CapDrop*) printf "%s\\n" "$MOCK_CAPS" ;;',
+  '  *"len .Mounts"*) printf "%s\\n" "$MOCK_MOUNT_COUNT" ;;',
   '  *"ne .Destination"*) printf "%s\\n" "$MOCK_EXTRA_MOUNTS" ;;',
   '  *CapAdd*) printf "%s\\n" "$MOCK_ADDED_CAPS" ;;',
   '  *SecurityOpt*) printf "%s\\n" "$MOCK_NNP" ;;',
@@ -37,7 +38,7 @@ const baseline={
   MOCK_ROOT:"true",MOCK_PRIV:"false",MOCK_RESTART:"no",
   MOCK_PORTS:"null",MOCK_USER:"501:20",MOCK_CAPS:"yes",
   MOCK_SOURCE_RO:"yes",MOCK_SNAPSHOT_RO:"yes",
-  MOCK_EXTRA_MOUNTS:"",MOCK_ADDED_CAPS:"0",MOCK_NNP:"yes"
+  MOCK_EXTRA_MOUNTS:"",MOCK_MOUNT_COUNT:"2",MOCK_ADDED_CAPS:"0",MOCK_NNP:"yes"
 };
 function run(changes={}){
   return spawnSync("bash",["-c",
@@ -104,4 +105,10 @@ test("Stage3 refuses added capabilities or missing no-new-privileges",()=>{
     assert.equal(r.status,2,JSON.stringify(overrides)+r.stdout);
     assert.match(r.stdout,/HOLD_OBSERVER_RUNTIME_ISOLATION_DRIFT/);
   }
+});
+
+test("Stage3 rejects a third Observer mount even when each expected destination remains present",()=>{
+  const r=run({MOCK_MOUNT_COUNT:"3"});
+  assert.equal(r.status,2,r.stdout+r.stderr);
+  assert.match(r.stdout,/HOLD_OBSERVER_RUNTIME_ISOLATION_DRIFT/);
 });
