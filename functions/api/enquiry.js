@@ -85,6 +85,14 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const fingerprint = submissionId ? await submissionFingerprint(p, email) : null;
   if (submissionId && typeof env.LEADS.get === "function") {
     try {
+      // PR43 lawful-erasure compatibility: a stale browser retry must never
+      // recreate an enquiry after its receipt and personal record were removed.
+      const erased = await env.LEADS.get("erased-submission:" + submissionId);
+      if (erased) {
+        return reply({
+          error: "This enquiry was erased. Refresh before submitting a new enquiry.",
+        }, 410);
+      }
       const receipt = await env.LEADS.get("receipt:" + submissionId);
       if (receipt) {
         // Production and PR43 used a plain UUID receipt; TASK011's new
