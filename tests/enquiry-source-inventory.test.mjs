@@ -37,6 +37,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   deduplicatedRecordCount:source.deduplicatedRecordCount,
   recordTimestampDigest:source.recordTimestampDigest,
   recordIdTimestampPairsDigest:source.recordIdTimestampPairsDigest,
+  recordIdClassificationPairsDigest:source.recordIdClassificationPairsDigest,
   allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
@@ -67,6 +68,7 @@ const readable=(sourceId,overrides={})=>{
     deduplicatedRecordCount:null,
     recordTimestampDigest:null,
     recordIdTimestampPairsDigest:null,
+    recordIdClassificationPairsDigest:null,
     allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
@@ -99,6 +101,11 @@ const readable=(sourceId,overrides={})=>{
       overrides,"recordIdTimestampPairsDigest",
     )?overrides.recordIdTimestampPairsDigest:createHash("sha256")
       .update(sourceId+":ID-TIMESTAMP-PAIRS:"+source.observedRecordCount).digest("hex");
+    source.recordIdClassificationPairsDigest=Object.hasOwn(
+      overrides,"recordIdClassificationPairsDigest",
+    )?overrides.recordIdClassificationPairsDigest:createHash("sha256")
+      .update(sourceId+":ID-CLASSIFICATION-PAIRS:"+
+        JSON.stringify(source.observedCounts)).digest("hex");
     source.allRecordsWithinCoverageWindow=Object.hasOwn(
       overrides,"allRecordsWithinCoverageWindow",
     )?overrides.allRecordsWithinCoverageWindow:true;
@@ -125,6 +132,7 @@ const unreadable=sourceId=>({
   deduplicatedRecordCount:null,
   recordTimestampDigest:null,
   recordIdTimestampPairsDigest:null,
+  recordIdClassificationPairsDigest:null,
   allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
@@ -1001,6 +1009,48 @@ test("Gmail evidence binds record identities to their timestamps",()=>{
   const baseline=reconcileEnquirySourceInventory(fixture());
   assert.equal(
     baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityTimeBound,
+    true,
+  );
+});
+
+
+test("Gmail evidence binds every record identity to its classification",()=>{
+  const missingPairDigest=fixture();
+  const revenue=missingPairDigest.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdClassificationPairsDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingPairDigest),
+    /record ID\/classification pair digest required/,
+    "aggregate labels cannot prove which message received each classification",
+  );
+
+  const collapsedPairProof=fixture();
+  const personal=collapsedPairProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdClassificationPairsDigest=personal.deduplicatedRecordIdsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedPairProof),
+    /classification-pair evidence must be independently bound/,
+    "an ID-set digest cannot also stand in for per-record classification evidence",
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.recordIdClassificationPairsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.NEWTON_REVENUE_GMAIL.recordIdentityClassificationBound,
     true,
   );
 });
