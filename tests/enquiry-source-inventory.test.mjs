@@ -39,6 +39,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   recordTimestampDigest:source.recordTimestampDigest,
   recordIdTimestampPairsDigest:source.recordIdTimestampPairsDigest,
   recordIdClassificationPairsDigest:source.recordIdClassificationPairsDigest,
+  recordIdInboxLabelPairsDigest:source.recordIdInboxLabelPairsDigest,
   allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
@@ -74,6 +75,7 @@ const readable=(sourceId,overrides={})=>{
     recordTimestampDigest:null,
     recordIdTimestampPairsDigest:null,
     recordIdClassificationPairsDigest:null,
+    recordIdInboxLabelPairsDigest:null,
     allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
@@ -111,6 +113,11 @@ const readable=(sourceId,overrides={})=>{
     )?overrides.recordIdClassificationPairsDigest:createHash("sha256")
       .update(sourceId+":ID-CLASSIFICATION-PAIRS:"+
         JSON.stringify(source.observedCounts)).digest("hex");
+    source.recordIdInboxLabelPairsDigest=Object.hasOwn(
+      overrides,"recordIdInboxLabelPairsDigest",
+    )?overrides.recordIdInboxLabelPairsDigest:createHash("sha256")
+      .update(sourceId+":ID-INBOX-LABEL-PAIRS:"+source.observedRecordCount)
+      .digest("hex");
     source.allRecordsWithinCoverageWindow=Object.hasOwn(
       overrides,"allRecordsWithinCoverageWindow",
     )?overrides.allRecordsWithinCoverageWindow:true;
@@ -139,6 +146,7 @@ const unreadable=sourceId=>({
   recordTimestampDigest:null,
   recordIdTimestampPairsDigest:null,
   recordIdClassificationPairsDigest:null,
+  recordIdInboxLabelPairsDigest:null,
   allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
@@ -1248,5 +1256,63 @@ test("Gmail evidence rejects all-mail scope that can include sent messages and d
     ()=>reconcileEnquirySourceInventory(input),
     /search scope must be complete and allowlisted/,
     "drafts and sent messages cannot support inbound buyer counts",
+  );
+});
+
+
+test("Gmail evidence binds every counted record identity to its inbox label",()=>{
+  const missingProof=fixture();
+  const revenue=missingProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdInboxLabelPairsDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingProof),
+    /record ID\/inbox-label pair digest required/,
+    "declaring inbox-only scope cannot prove that every counted message was received",
+  );
+
+  const collapsedProof=fixture();
+  const personal=collapsedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdInboxLabelPairsDigest=
+    personal.recordIdClassificationPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedProof),
+    /inbox-label-pair evidence must be independently bound/,
+  );
+
+  const replayedProof=fixture();
+  const first=replayedProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const second=replayedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  second.recordIdInboxLabelPairsDigest=first.recordIdInboxLabelPairsDigest;
+  second.evidenceDigest=evidenceDigestFor(second);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(replayedProof),
+    /inbox-label-pair digest cannot be replayed across sources/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(
+    source=>source.sourceId==="SALES_DESK",
+  );
+  salesDesk.recordIdInboxLabelPairsDigest="f".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityInboxLabelBound,
+    true,
   );
 });
