@@ -50,6 +50,21 @@ ports=$("$DOCKER" inspect -f '{{json .HostConfig.PortBindings}}' "$TUNNEL") ||
 [ "$root" = true ] && [ "$priv" = false ] && [ "$restarts" = no ] ||
   hold TUNNEL_CONFINEMENT_MISMATCH
 [ "$ports" = null ] || [ "$ports" = '{}' ] || hold HOST_PORT_PUBLISHED
+# Keep the original tunnel sealed too: the runtime key must be the sole RO bind.
+# Inspect constants/counts only. Never expose source paths, key bytes or Docker Env.
+tunnel_mount_count=$("$DOCKER" inspect -f '{{len .Mounts}}' "$TUNNEL") ||
+  hold TUNNEL_MOUNT_COUNT_INSPECT
+tunnel_key_mount=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/secrets/runtime-key"}}{{if and (eq .Type "bind") (not .RW)}}yes{{end}}{{end}}{{end}}' "$TUNNEL") ||
+  hold TUNNEL_KEY_MOUNT_TYPE_INSPECT
+tunnel_drop=$("$DOCKER" inspect -f '{{range .HostConfig.CapDrop}}{{if eq . "ALL"}}yes{{end}}{{end}}' "$TUNNEL") ||
+  hold TUNNEL_CAP_DROP_INSPECT
+tunnel_extra_caps=$("$DOCKER" inspect -f '{{len .HostConfig.CapAdd}}' "$TUNNEL") ||
+  hold TUNNEL_CAP_ADD_INSPECT
+tunnel_nnp=$("$DOCKER" inspect -f '{{range .HostConfig.SecurityOpt}}{{if or (eq . "no-new-privileges") (eq . "no-new-privileges:true")}}yes{{end}}{{end}}' "$TUNNEL") ||
+  hold TUNNEL_NNP_INSPECT
+[ "$tunnel_mount_count" = 1 ] && [ "$tunnel_key_mount" = yes ] &&
+[ "$tunnel_drop" = yes ] && [ "$tunnel_extra_caps" = 0 ] &&
+[ "$tunnel_nnp" = yes ] || hold TUNNEL_RUNTIME_ISOLATION_DRIFT
 printf 'TUNNEL_IMAGE_AND_RUNTIME_CONFINEMENT=VERIFIED\n'
 
 # Independently validate the *existing* Stage 2 Observer's safe properties
@@ -77,6 +92,8 @@ observer_source_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination
 observer_snapshot_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/atlas-observer"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
   hold OBSERVER_SNAPSHOT_MOUNT_INSPECT_FAILED
 # The two expected RO binds must also be the ONLY Observer mounts.
+observer_mount_count=$("$DOCKER" inspect -f '{{len .Mounts}}' "$OBSERVER") ||
+  hold OBSERVER_MOUNT_COUNT_INSPECT_FAILED
 # A rogue Docker socket or unrelated host directory invalidates isolation.
 # Do not print mount destinations/sources, even on mismatch.
 observer_extra_mounts=$("$DOCKER" inspect -f '{{range .Mounts}}{{if and (ne .Destination "/opt/atlas-observer/scripts") (ne .Destination "/run/atlas-observer")}}unexpected{{end}}{{end}}' "$OBSERVER") ||
@@ -90,6 +107,7 @@ observer_nnp=$("$DOCKER" inspect -f '{{range .HostConfig.SecurityOpt}}{{if or (e
 [ "$observer_caps" = yes ] &&
 { [ "$observer_ports" = null ] || [ "$observer_ports" = '{}' ]; } &&
 [ "$observer_source_ro" = yes ] && [ "$observer_snapshot_ro" = yes ] &&
+[ "$observer_mount_count" = 2 ] &&
 [ -z "$observer_extra_mounts" ] && [ "$observer_caps_added" = 0 ] &&
 [ "$observer_nnp" = yes ] ||
   hold OBSERVER_RUNTIME_ISOLATION_DRIFT
