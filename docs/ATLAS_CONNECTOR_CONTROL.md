@@ -66,3 +66,30 @@ Before changing the already-verified canary, replacing the tunnel target, or con
 **On-device receipts, not 24/7 uptime proof:** owner-supplied 08:42 BST read-only SSH check gave observer `runs = 80`, `last exit code = 0`, snapshot age **3 seconds**, and AC power/battery 100%. At 08:46 BST another check gave `runs = 83`, `last exit code = 0`, snapshot age **59 seconds**. Overnight `pmset -g log` records repeated AC-powered maintenance sleep/DarkWake episodes, including 08:07–08:36 BST, with full Wake near 08:36 after HID user activity. Previously at 19:43 BST on 23 October a reversible 20-minute `caffeinate -s -t 1200` test had produced run count 9 and a 35-second-old snapshot. Thus the observer continues to run **when awake** and did run again after the one-off assertion expired, but this does **not** establish continuous overnight operation. `Maintenance Sleep` messages may be returns to an already-sleeping state: the initial sleep trigger remains **UNVERIFIED**.
 
 **Safety gates:** Do not assert that a broken-screen Mac can run unattended indefinitely. Check physical lid/open state, AC power, thermal ventilation and the original pre-sleep log before considering an owner-approved persistent solution. No `sudo pmset` changes, hibernation/security overrides, permanent caffeinate job, Mac install, Docker/plugin replacement, launch or private snapshot exposure are authorised by this draft documentation. Monitor with read-only status checks only until explicit separate approval. Source: owner's 23–24 Oct SSH screenshots and PR #47 audit.
+
+
+## 26 October 2026 — minute-cadence and worker-restart evidence
+
+Owner-supplied Mac SSH screenshots show launchctl registrations for
+`uk.newton.atlas-continuation`, `uk.newton.atlas-observer-snapshot`,
+`uk.newton.atlas-watchdog`, `uk.newton.atlas-local-operator`, and
+`uk.newton.atlas-local-phone`. Plist inspection shows `StartInterval=60`
+for continuation, observer snapshot and watchdog, and `StartInterval=3600`
+for local operator; the phone process is KeepAlive. This is **schedule
+configuration evidence only**, not proof every tick ran, that autonomous
+code was produced or that the Mac never slept.
+
+Another owner-supplied read-only Docker inspection found all seven named
+containers running, Activepieces app and worker marked healthy, and
+`activepieces-worker-1` with **212 cumulative restarts**. Historical
+restart counts do not reveal timing or demonstrate an active crash loop.
+
+Draft `scripts/atlas-minute-evidence-audit.mjs` and its tests consolidate
+**read-only** evidence: known LaunchAgent intervals, best-effort historical
+launchctl run counters, and the worker's restart count and health. The
+script emits only fixed labels / bounded integers, never raw logs, paths,
+configuration, tokens or private output. `--audit` is its only mode.
+Even positive counters return `HISTORICAL_RUNS_NOT_CADENCE_PROOF`.
+GitHub CI covers fake-platform logic, not owner Mac execution. No runtime
+changes, direct Mac access, staged adoption or automatic code-building
+claim is made by this change.
