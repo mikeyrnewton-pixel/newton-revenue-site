@@ -39,9 +39,14 @@ async function getLeads(append = false) {
     }
     cursor = data.nextCursor;
     more.hidden = !data.hasMore || !cursor;
-    feedback.textContent = data.records.length ?
+    const summary = data.records.length ?
       "Showing " + data.records.length + " enquiry/enquiries from this page." :
-      (append ? "No more enquiries." : "No enquiries recorded yet.");
+      (append ? "No more enquiries displayed on this page." : "No valid enquiries displayed on this page.");
+    // Never misrepresent a partial/damaged storage page as an empty pipeline.
+    feedback.textContent = data.dataIntegrityWarning ?
+      summary + " WARNING: Some private records or notice states could not be verified. " +
+      "Do not treat this as a complete lead count; inspect storage with authorised access." :
+      summary;
   } catch (error) {
     feedback.textContent = error.message || "Could not load the private dashboard.";
   }
