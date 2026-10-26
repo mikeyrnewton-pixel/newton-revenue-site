@@ -24,6 +24,9 @@ writeFileSync(docker,[
   '  *PortBindings*) printf "%s\\n" "$MOCK_PORTS" ;;',
   '  *Config.User*) printf "%s\\n" "$MOCK_USER" ;;',
   '  *CapDrop*) printf "%s\\n" "$MOCK_CAPS" ;;',
+  '  *"ne .Destination"*) printf "%s\\n" "$MOCK_EXTRA_MOUNTS" ;;',
+  '  *CapAdd*) printf "%s\\n" "$MOCK_ADDED_CAPS" ;;',
+  '  *SecurityOpt*) printf "%s\\n" "$MOCK_NNP" ;;',
   '  *"/opt/atlas-observer/scripts"*) printf "%s\\n" "$MOCK_SOURCE_RO" ;;',
   '  *"/run/atlas-observer"*) printf "%s\\n" "$MOCK_SNAPSHOT_RO" ;;',
   '  *) exit 16 ;;',
@@ -33,7 +36,8 @@ chmodSync(docker,0o700);
 const baseline={
   MOCK_ROOT:"true",MOCK_PRIV:"false",MOCK_RESTART:"no",
   MOCK_PORTS:"null",MOCK_USER:"501:20",MOCK_CAPS:"yes",
-  MOCK_SOURCE_RO:"yes",MOCK_SNAPSHOT_RO:"yes"
+  MOCK_SOURCE_RO:"yes",MOCK_SNAPSHOT_RO:"yes",
+  MOCK_EXTRA_MOUNTS:"",MOCK_ADDED_CAPS:"0",MOCK_NNP:"yes"
 };
 function run(changes={}){
   return spawnSync("bash",["-c",
@@ -81,4 +85,23 @@ test("Stage3 should inspect only, never change containers or reveal sensitive pa
   assert.doesNotMatch(fragment,/echo.*(?:observer_user|observer_root|observer_ports)/);
   const r=run({MOCK_ROOT:"false",MOCK_USER:"123:20"});
   assert.doesNotMatch(r.stdout,/123:20/);
+});
+
+
+test("Stage3 fails closed on an extra mount even when the two expected mounts remain readonly",()=>{
+  const r=run({MOCK_EXTRA_MOUNTS:"unexpected"});
+  assert.equal(r.status,2,r.stdout+r.stderr);
+  assert.match(r.stdout,/HOLD_OBSERVER_RUNTIME_ISOLATION_DRIFT/);
+  assert.doesNotMatch(r.stdout,/unexpected|docker\.sock|\/Users\//);
+});
+test("Stage3 refuses added capabilities or missing no-new-privileges",()=>{
+  for (const overrides of [
+    {MOCK_ADDED_CAPS:"1"},
+    {MOCK_NNP:""},
+    {MOCK_NNP:"false"},
+  ]) {
+    const r=run(overrides);
+    assert.equal(r.status,2,JSON.stringify(overrides)+r.stdout);
+    assert.match(r.stdout,/HOLD_OBSERVER_RUNTIME_ISOLATION_DRIFT/);
+  }
 });
