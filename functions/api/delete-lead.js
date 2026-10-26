@@ -38,7 +38,23 @@ export async function onRequestPost({ request, env }) {
 
   try {
     const record = await env.LEADS.get('lead:' + leadId, 'json');
-    if (!record) return reply({ error: 'Lead not found.' }, 404);
+    if (!record) {
+      // A completed erasure may lose its HTTP response. A repeat must not
+      // become an ambiguous 404 when the private, non-PII tombstone proves
+      // this exact lead was already erased. Malformed markers fail closed.
+      const tombstone = await env.LEADS.get('erased:' + leadId, 'json');
+      const validTombstone = tombstone && !Array.isArray(tombstone) &&
+        typeof tombstone === 'object' &&
+        Object.keys(tombstone).sort().join(',') === 'erased,erasedAt,version' &&
+        tombstone.version === 1 && tombstone.erased === true &&
+        typeof tombstone.erasedAt === 'string' &&
+        Number.isFinite(Date.parse(tombstone.erasedAt));
+      if (validTombstone) {
+        return reply({ ok: true, deleted: true, reference: leadId,
+          alreadyDeleted: true });
+      }
+      return reply({ error: 'Lead not found.' }, 404);
+    }
     if (record.id !== leadId) {
       return reply({ error: 'Stored lead identity mismatch; erasure stopped.' }, 409);
     }
