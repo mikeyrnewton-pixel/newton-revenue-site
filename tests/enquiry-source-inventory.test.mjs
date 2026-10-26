@@ -1182,3 +1182,27 @@ test("Gmail record ID-set proof cannot be replayed across account snapshots",()=
     "one Gmail snapshot's ID set cannot attest another account's records",
   );
 });
+
+
+test("Gmail classification-pair proof cannot be replayed across account snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Keep the personal snapshot's own account, IDs and aggregate counts, but
+  // transplant the revenue snapshot's per-record classification proof and
+  // recompute the outer observation digest. The inner proof must fail closed.
+  personal.recordIdClassificationPairsDigest=
+    revenue.recordIdClassificationPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /classification-pair digest cannot be replayed across sources/,
+    "one Gmail account's per-record labels cannot attest another account",
+  );
+});
