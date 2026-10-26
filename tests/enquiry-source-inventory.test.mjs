@@ -1159,3 +1159,26 @@ test("distinct Gmail source roles require distinct account identities",()=>{
     "one Gmail account cannot satisfy both personal and revenue source coverage",
   );
 });
+
+
+test("Gmail record ID-set proof cannot be replayed across account snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Keep the personal snapshot's own classifications and per-record
+  // classification proof, but transplant the revenue snapshot's ID-set proof
+  // and recompute the outer observation digest.
+  personal.deduplicatedRecordIdsDigest=revenue.deduplicatedRecordIdsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /record ID-set digest cannot be replayed across sources/,
+    "one Gmail snapshot's ID set cannot attest another account's records",
+  );
+});
