@@ -1206,3 +1206,27 @@ test("Gmail classification-pair proof cannot be replayed across account snapshot
     "one Gmail account's per-record labels cannot attest another account",
   );
 });
+
+
+test("Gmail ID/timestamp proof cannot be replayed across account snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Keep the personal account, coverage window, raw timestamp digest and
+  // classifications, but transplant the revenue account's ID/timestamp proof
+  // and recompute the outer observation digest.
+  personal.recordIdTimestampPairsDigest=
+    revenue.recordIdTimestampPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /ID\/timestamp-pair digest cannot be replayed across sources/,
+    "one account's record timing proof cannot attest another source window",
+  );
+});
