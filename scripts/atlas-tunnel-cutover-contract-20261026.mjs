@@ -3,7 +3,7 @@
 // Never reads key bytes or prints environment, tunnel identity, mounts or secrets.
 // No Docker writes, no tool discovery, and no live tunnel cutover.
 import {spawnSync} from 'node:child_process';
-import {accessSync,constants} from 'node:fs';
+import {accessSync,constants,realpathSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 
@@ -84,7 +84,10 @@ function callDocker(argv) {
   // Never expose raw Docker inspect or stderr.
   return r.stdout;
 }
-const invoked=process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url);
+const invoked=process.argv[1]&&realpathSync(resolve(process.argv[1]))===
+  realpathSync(fileURLToPath(import.meta.url));
+// macOS /tmp normally resolves to /private/tmp. Comparing textual paths
+// silently skipped the CLI when iPhone SSH staged a verified script in /tmp.
 if(invoked){
   try {
     insist(process.argv.length===3&&process.argv[2]==='--inspect-only',
