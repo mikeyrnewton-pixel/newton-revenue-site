@@ -55,7 +55,7 @@ const readable=(sourceId,overrides={})=>{
     coverageEndedAt:"2026-10-20T12:13:59.000Z",
     evidenceLocator:`private://${sourceId.toLowerCase().replaceAll("_","-")}/aggregate`,
     searchScope:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
-      "INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
+      "INBOX_ONLY_ALL_SENDERS_EXCLUDING_SPAM_TRASH":null,
     accountIdentityDigest:null,
     searchQueryDigest:null,
     paginationComplete:["NEWTON_REVENUE_GMAIL","PERSONAL_GMAIL"].includes(sourceId)?
@@ -573,7 +573,7 @@ test("bounded Gmail evidence cannot narrow the sender or category scope",()=>{
 
   const nonGmailScope=fixture();
   const salesDesk=nonGmailScope.sources.find(source=>source.sourceId==="SALES_DESK");
-  salesDesk.searchScope="INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH";
+  salesDesk.searchScope="INBOX_ONLY_ALL_SENDERS_EXCLUDING_SPAM_TRASH";
   salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(nonGmailScope),
@@ -1228,5 +1228,25 @@ test("Gmail ID/timestamp proof cannot be replayed across account snapshots",()=>
     ()=>reconcileEnquirySourceInventory(input),
     /ID\/timestamp-pair digest cannot be replayed across sources/,
     "one account's record timing proof cannot attest another source window",
+  );
+});
+
+
+test("Gmail evidence rejects all-mail scope that can include sent messages and drafts",()=>{
+  const input=fixture();
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Recompute both digests after weakening the declared search scope. The
+  // allowlist must still reject evidence that can count the owner's own mail.
+  personal.searchScope="INBOX_ALL_SENDERS_EXCLUDING_SPAM_TRASH";
+  personal.searchQueryDigest=gmailQueryDigestFor(personal);
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /search scope must be complete and allowlisted/,
+    "drafts and sent messages cannot support inbound buyer counts",
   );
 });
