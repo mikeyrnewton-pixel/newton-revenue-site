@@ -53,6 +53,20 @@ test("expired observations and unverified publication dates do not rank as ready
   const low=triageOfflineBuyerResearch([{...base(),fit:"LOW"}],asOf);
   assert.equal(low.publicBriefsForManualValidation,0);
 });
+test("old publication cannot become priority merely because observed recently",()=>{
+  const result=triageOfflineBuyerResearch([{...base(),
+    publishedAt:"2025-10-24T10:00:00.000Z"}],asOf);
+  assert.equal(result.records[0].staleObservation,false);
+  assert.equal(result.records[0].stalePublication,true);
+  assert.equal(result.records[0].triageDesk,"RESEARCH_OR_HOLD");
+  assert.equal(result.publicBriefsForManualValidation,0);
+});
+test("fresh publication exposes separate observation and publication freshness",()=>{
+  const result=triageOfflineBuyerResearch([base()],asOf);
+  assert.equal(result.records[0].staleObservation,false);
+  assert.equal(result.records[0].stalePublication,false);
+  assert.equal(result.publicBriefsForManualValidation,1);
+});
 test("exact retries dedupe but contradictory source claims and re-used URLs fail closed",()=>{
   const original=base();
   const dup=triageOfflineBuyerResearch([original,{...original}],asOf);
