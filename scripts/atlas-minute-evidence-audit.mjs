@@ -9,6 +9,7 @@ import {existsSync,realpathSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {inspectPrivateObserverSnapshot} from './atlas-observer-freshness.mjs';
 
 export const AUDITED_JOBS=Object.freeze([
   Object.freeze({label:'uk.newton.atlas-continuation',expectedSeconds:60}),
@@ -66,12 +67,15 @@ export function assessWorkerRestartHistory({count=null,health=null}={}){
 
 export function auditMinuteController({
   platform=process.platform,home=homedir(),uid=process.getuid?.()??null,
-  exists=existsSync,run=safeRun,
+  exists=existsSync,run=safeRun,nowMs=Date.now(),observerLstat=undefined,
 }={}){
   const result={
     schema:'ATLAS_MINUTE_EVIDENCE_AUDIT_V1',
     localMac:platform==='darwin'?'YES':'NO',
     jobs:[],worker:assessWorkerRestartHistory(),
+    observerSnapshot:Object.freeze({state:'NOT_VERIFIED',ageSeconds:null,
+      evidence:'FILESYSTEM_MTIME_ONLY_NOT_AUTOMATIC_CADENCE_OR_CONTENT_PROOF',
+      privateContentsRead:false,automaticRefreshVerified:false,writesPerformed:false}),
     scheduleVerdict:'NOT_VERIFIED',
     verifiedEveryMinuteExecution:false,
     verifiedAutomaticCodeBuilding:false,
@@ -79,6 +83,9 @@ export function auditMinuteController({
     noWritesPerformed:true,
   };
   if(platform!=='darwin'||uid===null)return result;
+  result.observerSnapshot=inspectPrivateObserverSnapshot({home,uid,nowMs,
+    ...(observerLstat ? {lstat:observerLstat} : {}),
+  });
   for(const job of AUDITED_JOBS){
     const filename=join(home,'Library','LaunchAgents',job.label+'.plist');
     let seconds=null;
