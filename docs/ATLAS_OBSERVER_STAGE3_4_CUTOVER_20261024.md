@@ -111,3 +111,9 @@ Official sources checked 26 October 2026:
 - https://github.com/openai/tunnel-client/blob/master/docs/permissions.md
 
 **Current execution state: STAGE3_MAC_LOCAL_VERIFIED / STAGE4_REMOTE_HOLD / ORIGINAL_CANARY_RUNNING / ZERO_SPEND / ZERO_EXTERNAL_CONTACTS.**
+
+### 26 October 2026 — connector app permissions checked, not confused with tunnel RBAC
+
+A live ChatGPT settings lookup for the exact installed app **ATLAS — Private Mac Connection** returned `App-specific: Use my default`, global default `Allow low-risk actions`. This is an app invocation consent posture; it does **not** prove the Platform tunnel runtime API key's effective permissions, whether the key is restricted to `Tunnels Read + Use`, or a validated ChatGPT workspace association. A fresh call to the installed connector `atlas_ping` still returned `ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS`. Do not change the app default setting to full access to shortcut the tunnel RBAC review.
+
+The next reviewed Mac-only check is the existing standalone `scripts/atlas-tunnel-cutover-contract-20261026.mjs --inspect-only` (Git blob `f0481f9e713c4186eafcc08fa59b4092a111e309`). It verifies more of the immutable original launch/reconstruction contract than the Stage3 property probe, and prints a bounded, redacted HOLD/REVIEW receipt only. **No service switch, Docker write or key read is allowed by this command.** Actual Mac result still pending at this entry's timestamp.
