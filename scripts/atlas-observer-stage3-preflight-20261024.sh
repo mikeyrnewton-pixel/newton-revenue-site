@@ -76,11 +76,22 @@ observer_source_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination
   hold OBSERVER_SOURCE_MOUNT_INSPECT_FAILED
 observer_snapshot_ro=$("$DOCKER" inspect -f '{{range .Mounts}}{{if eq .Destination "/run/atlas-observer"}}{{if not .RW}}yes{{end}}{{end}}{{end}}' "$OBSERVER") ||
   hold OBSERVER_SNAPSHOT_MOUNT_INSPECT_FAILED
+# The two expected RO binds must also be the ONLY Observer mounts.
+# A rogue Docker socket or unrelated host directory invalidates isolation.
+# Do not print mount destinations/sources, even on mismatch.
+observer_extra_mounts=$("$DOCKER" inspect -f '{{range .Mounts}}{{if and (ne .Destination "/opt/atlas-observer/scripts") (ne .Destination "/run/atlas-observer")}}unexpected{{end}}{{end}}' "$OBSERVER") ||
+  hold OBSERVER_MOUNT_ALLOWLIST_INSPECT_FAILED
+observer_caps_added=$("$DOCKER" inspect -f '{{len .HostConfig.CapAdd}}' "$OBSERVER") ||
+  hold OBSERVER_ADDED_CAPABILITIES_INSPECT_FAILED
+observer_nnp=$("$DOCKER" inspect -f '{{range .HostConfig.SecurityOpt}}{{if or (eq . "no-new-privileges") (eq . "no-new-privileges:true")}}yes{{end}}{{end}}' "$OBSERVER") ||
+  hold OBSERVER_NNP_INSPECT_FAILED
 [ "$observer_root" = true ] && [ "$observer_priv" = false ] &&
 [ "$observer_restart" = no ] &&
 [ "$observer_caps" = yes ] &&
 { [ "$observer_ports" = null ] || [ "$observer_ports" = '{}' ]; } &&
-[ "$observer_source_ro" = yes ] && [ "$observer_snapshot_ro" = yes ] ||
+[ "$observer_source_ro" = yes ] && [ "$observer_snapshot_ro" = yes ] &&
+[ -z "$observer_extra_mounts" ] && [ "$observer_caps_added" = 0 ] &&
+[ "$observer_nnp" = yes ] ||
   hold OBSERVER_RUNTIME_ISOLATION_DRIFT
 printf 'OBSERVER_EXISTING_READONLY_CONFINEMENT=VERIFIED\n'
 
