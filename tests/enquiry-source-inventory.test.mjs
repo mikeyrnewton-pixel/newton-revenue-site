@@ -63,6 +63,8 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   recordIdClassificationPairsDigest:source.recordIdClassificationPairsDigest,
   recordIdInboxLabelPairsDigest:source.recordIdInboxLabelPairsDigest,
   recordIdOriginClassPairsDigest:source.recordIdOriginClassPairsDigest,
+  recordIdClassificationOriginTriplesDigest:
+    source.recordIdClassificationOriginTriplesDigest,
   originClassCounts:source.originClassCounts===null?null:
     Object.fromEntries(Object.keys(zeroOriginClassCounts()).map(key=>[
       key,source.originClassCounts[key],
@@ -104,6 +106,7 @@ const readable=(sourceId,overrides={})=>{
     recordIdClassificationPairsDigest:null,
     recordIdInboxLabelPairsDigest:null,
     recordIdOriginClassPairsDigest:null,
+    recordIdClassificationOriginTriplesDigest:null,
     originClassCounts:null,
     allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
@@ -154,6 +157,12 @@ const readable=(sourceId,overrides={})=>{
       .digest("hex");
     source.originClassCounts=Object.hasOwn(overrides,"originClassCounts")?
       overrides.originClassCounts:originClassCountsFor(source);
+    source.recordIdClassificationOriginTriplesDigest=Object.hasOwn(
+      overrides,"recordIdClassificationOriginTriplesDigest",
+    )?overrides.recordIdClassificationOriginTriplesDigest:createHash("sha256")
+      .update(sourceId+":ID-CLASSIFICATION-ORIGIN-TRIPLES:"+
+        JSON.stringify(source.observedCounts)+":"+
+        JSON.stringify(source.originClassCounts)).digest("hex");
     source.allRecordsWithinCoverageWindow=Object.hasOwn(
       overrides,"allRecordsWithinCoverageWindow",
     )?overrides.allRecordsWithinCoverageWindow:true;
@@ -184,6 +193,7 @@ const unreadable=sourceId=>({
   recordIdClassificationPairsDigest:null,
   recordIdInboxLabelPairsDigest:null,
   recordIdOriginClassPairsDigest:null,
+  recordIdClassificationOriginTriplesDigest:null,
   originClassCounts:null,
   allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
@@ -1487,6 +1497,63 @@ test("Gmail origin-class aggregates must be complete, exact and Gmail-only",()=>
   assert.throws(
     ()=>reconcileEnquirySourceInventory(nonGmail),
     /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+});
+
+test("Gmail evidence jointly binds each record classification to its origin",()=>{
+  const missingProof=fixture();
+  const revenue=missingProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdClassificationOriginTriplesDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingProof),
+    /record ID\/classification\/origin triple digest required/,
+    "separate per-record classification and origin proofs can be swapped between IDs",
+  );
+
+  const collapsedProof=fixture();
+  const personal=collapsedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdClassificationOriginTriplesDigest=
+    personal.recordIdClassificationPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedProof),
+    /classification\/origin triple evidence must be independently bound/,
+  );
+
+  const replayedProof=fixture();
+  const first=replayedProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const second=replayedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  second.recordIdClassificationOriginTriplesDigest=
+    first.recordIdClassificationOriginTriplesDigest;
+  second.evidenceDigest=evidenceDigestFor(second);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(replayedProof),
+    /classification\/origin triple digest cannot be replayed across sources/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.recordIdClassificationOriginTriplesDigest="d".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL
+      .recordIdentityClassificationOriginBound,
+    true,
   );
 });
 
