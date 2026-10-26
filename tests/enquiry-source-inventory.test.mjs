@@ -40,6 +40,7 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   recordIdTimestampPairsDigest:source.recordIdTimestampPairsDigest,
   recordIdClassificationPairsDigest:source.recordIdClassificationPairsDigest,
   recordIdInboxLabelPairsDigest:source.recordIdInboxLabelPairsDigest,
+  recordIdOriginClassPairsDigest:source.recordIdOriginClassPairsDigest,
   allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
@@ -76,6 +77,7 @@ const readable=(sourceId,overrides={})=>{
     recordIdTimestampPairsDigest:null,
     recordIdClassificationPairsDigest:null,
     recordIdInboxLabelPairsDigest:null,
+    recordIdOriginClassPairsDigest:null,
     allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
@@ -118,6 +120,11 @@ const readable=(sourceId,overrides={})=>{
     )?overrides.recordIdInboxLabelPairsDigest:createHash("sha256")
       .update(sourceId+":ID-INBOX-LABEL-PAIRS:"+source.observedRecordCount)
       .digest("hex");
+    source.recordIdOriginClassPairsDigest=Object.hasOwn(
+      overrides,"recordIdOriginClassPairsDigest",
+    )?overrides.recordIdOriginClassPairsDigest:createHash("sha256")
+      .update(sourceId+":ID-ORIGIN-CLASS-PAIRS:"+source.observedRecordCount)
+      .digest("hex");
     source.allRecordsWithinCoverageWindow=Object.hasOwn(
       overrides,"allRecordsWithinCoverageWindow",
     )?overrides.allRecordsWithinCoverageWindow:true;
@@ -147,6 +154,7 @@ const unreadable=sourceId=>({
   recordIdTimestampPairsDigest:null,
   recordIdClassificationPairsDigest:null,
   recordIdInboxLabelPairsDigest:null,
+  recordIdOriginClassPairsDigest:null,
   allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
@@ -1313,6 +1321,64 @@ test("Gmail evidence binds every counted record identity to its inbox label",()=
   const baseline=reconcileEnquirySourceInventory(fixture());
   assert.equal(
     baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityInboxLabelBound,
+    true,
+  );
+});
+
+
+test("Gmail evidence binds every counted record identity to a privacy-safe origin class",()=>{
+  const missingProof=fixture();
+  const revenue=missingProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  revenue.recordIdOriginClassPairsDigest=null;
+  revenue.evidenceDigest=evidenceDigestFor(revenue);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missingProof),
+    /record ID\/origin-class pair digest required/,
+    "inbox receipt alone cannot distinguish buyer-origin mail from automated notices",
+  );
+
+  const collapsedProof=fixture();
+  const personal=collapsedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.recordIdOriginClassPairsDigest=
+    personal.recordIdClassificationPairsDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(collapsedProof),
+    /origin-class-pair evidence must be independently bound/,
+  );
+
+  const replayedProof=fixture();
+  const first=replayedProof.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const second=replayedProof.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  second.recordIdOriginClassPairsDigest=first.recordIdOriginClassPairsDigest;
+  second.evidenceDigest=evidenceDigestFor(second);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(replayedProof),
+    /origin-class-pair digest cannot be replayed across sources/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(
+    source=>source.sourceId==="SALES_DESK",
+  );
+  salesDesk.recordIdOriginClassPairsDigest="e".repeat(64);
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+
+  const baseline=reconcileEnquirySourceInventory(fixture());
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityOriginClassBound,
     true,
   );
 });
