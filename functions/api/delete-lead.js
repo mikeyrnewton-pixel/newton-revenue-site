@@ -4,6 +4,46 @@
 const MAX_BYTES = 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+// Authenticated erasure is limited to a 1-KiB JSON body. Stop before buffering
+// an oversized upload; no customer data is logged or transmitted here.
+async function readBoundedBody(request) {
+  const declared = request.headers.get('Content-Length');
+  if (declared !== null && /^\d+$/.test(declared) && Number(declared) > MAX_BYTES)
+    return { error: 'oversized' };
+  if (!request.body || typeof request.body.getReader !== 'function')
+    return { raw: '' };
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  let size = 0;
+  let raw = '';
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (!(chunk.value instanceof Uint8Array)) return { error: 'unreadable' };
+      size += chunk.value.byteLength;
+      if (size > MAX_BYTES) {
+        void reader.cancel().catch(() => {});
+        return { error: 'oversized' };
+      }
+      raw += decoder.decode(chunk.value, { stream: true });
+    }
+    raw += decoder.decode();
+    return { raw };
+  } catch {
+    return { error: 'unreadable' };
+  } finally {
+    reader.releaseLock();
+  }
+}
+function isJsonContentType(value) {
+  if (typeof value !== 'string') return false;
+  const parts = value.split(';').map(x => x.trim());
+  return parts[0].toLowerCase() === 'application/json' &&
+    (parts.length === 1 ||
+      (parts.length === 2 && /^charset\s*=\s*(?:utf-8|"utf-8")$/i.test(parts[1])));
+}
+
 function reply(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: {
     'Content-Type': 'application/json; charset=utf-8',
@@ -21,15 +61,12 @@ export async function onRequestPost({ request, env }) {
   if (request.headers.get('Authorization') !== 'Bearer ' + env.ADMIN_TOKEN) {
     return reply({ error: 'Unauthorised.' }, 401);
   }
-  if (!(request.headers.get('Content-Type') || '').toLowerCase().includes('application/json')) {
+  if (!isJsonContentType(request.headers.get('Content-Type')))
     return reply({ error: 'JSON required.' }, 415);
-  }
-  let raw;
-  try { raw = await request.text(); }
-  catch { return reply({ error: 'Could not read request.' }, 400); }
-  if (new TextEncoder().encode(raw).length > MAX_BYTES) {
-    return reply({ error: 'Request too large.' }, 413);
-  }
+  const read = await readBoundedBody(request);
+  if (read.error === 'oversized') return reply({ error: 'Request too large.' }, 413);
+  if (read.error) return reply({ error: 'Could not read request.' }, 400);
+  const raw = read.raw;
   let body;
   try { body = JSON.parse(raw); }
   catch { return reply({ error: 'Malformed request.' }, 400); }
@@ -38,7 +75,18 @@ export async function onRequestPost({ request, env }) {
 
   try {
     const record = await env.LEADS.get('lead:' + leadId, 'json');
-    if (!record) return reply({ error: 'Lead not found.' }, 404);
+    if (!record) {
+      // When a successful response is lost, the owner can safely retry.
+      // Absence alone is NOT success: require our server-issued tombstone.
+      const tombstone = await env.LEADS.get('erased:' + leadId, 'json');
+      if (tombstone?.version === 1 && tombstone?.erased === true &&
+          typeof tombstone.erasedAt === 'string' &&
+          Number.isFinite(Date.parse(tombstone.erasedAt))) {
+        return reply({ ok: true, deleted: true, reference: leadId,
+          alreadyDeleted: true });
+      }
+      return reply({ error: 'Lead not found.' }, 404);
+    }
     if (record.id !== leadId) {
       return reply({ error: 'Stored lead identity mismatch; erasure stopped.' }, 409);
     }
