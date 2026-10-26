@@ -85,3 +85,29 @@ The latest review-only Stage 3 inspector requires the **existing tunnel** to hav
 - Pinned Stage3 shell file Git blob: `3d06691eaf200e5be3669d8e35da0394c15fb628`. Only owner-run *read-only* preflight has been prepared; it has **not** been run against the actual Mac for this latest revision.
 
 **Releases still on HOLD:** owner-Mac Stage3 read-only evidence; verified Platform runtime role **Tunnels Read + Use** (not Manage); exact nonsecret original-tunnel rollback inventory; separately authorised existing-tunnel replacement targeting the local Observer; genuine ChatGPT `atlas_capabilities` / `atlas_status`; independently demonstrated fallback to original canary. Do not imply the source gate or the fixed `atlas_ping` token proves Mac connectivity. No production merge, outreach, payments, spending, active Mac changes or plugin changes occurred in this update.
+
+## 26 October 2026, 22:06 GMT — OWNER MAC STAGE 3 VERIFIED (new decisive evidence)
+
+Michael executed the **immutable pinned Stage 3 read-only preflight** from an iPhone SSH Shortcut on the actual Mac and supplied the resulting screenshot directly in conversation. The pinned code was from commit `6d5e0ba1a38aea73454c64d10fa64dcb484e360a`, with matching pinned Git blob `3d06691eaf200e5be3669d8e35da0394c15fb628` (the preceding owner command checked the blob before running). The exact visible stdout markers were:
+
+- `ATLAS_STAGE3_PREFLIGHT=STARTED`
+- `LOCAL_CONTAINERS=ALL_RUNNING_SHARED_PRIVATE_NAMESPACE`
+- `TUNNEL_IMAGE_AND_RUNTIME_CONFINEMENT=VERIFIED`
+- `OBSERVER_EXISTING_READONLY_CONFINEMENT=VERIFIED`
+- `CURRENT_TUNNEL_TARGET=ORIGINAL_CANARY_18787`
+- `RUNTIME_KEY=FILE_REFERENCED_READONLY_VALUE_NOT_READ`
+- `OBSERVER_LOCAL_ENDPOINT=SEPARATE_REVIEW_18788`
+- `PLATFORM_TUNNEL_ROLE=NOT_VERIFIED`
+- `CHATGPT_PLUGIN_TOOL_DISCOVERY=NOT_REFRESHED`
+- `CUTOVER=NOT_STARTED`
+- `ATLAS_STAGE3_PREFLIGHT=LOCAL_TOPOLOGY_VERIFIED`
+
+**Interpretation:** The **actual current Mac** passed the exact Stage 3 Docker topology/security inspection: all three local containers present/running, expected shared private namespace, sealed tunnel and review-only observer confinement, original target still on 18787, alternate observer target 18788, read-only file-reference key mount. No credential content was accessed. The receipt independently confirms **no live tunnel cutover**. This upgrades `STAGE3_LOCAL_TOPOLOGY` from *source/test only* to **MAC_LOCAL_VERIFIED**, superseding prior outstanding Stage 3 local inspection references above. The separate Platform principal runtime key RBAC **Tunnels Read + Use (not Manage)** and ChatGPT workspace association, connector tool discovery, an owner-authorized reversible target switch, fresh remote `atlas_status` and demonstrated fallback are STILL UNVERIFIED/BLOCKED. Do not upgrade Stage4 or unattended Mac uptime solely from this receipt.
+
+**Next minimum user-only step:** Check the *existing* runtime key's effective permissions/role and intended tunnel/ChatGPT workspace association in Platform UI **without opening, copying, rotating or showing any key values**. The official permissions documentation distinguishes `Read`, `Use` and `Manage`. The assistant has no connected Platform permission-inspection authority. A redacted permissions screenshot or a simple user answer about the role is sufficient to plan the separate, reversible Stage4 cutover. No Mac runtime or GitHub production release changes are authorized by this read-only verification.
+
+Official sources checked 26 October 2026:
+- https://developers.openai.com/api/docs/guides/secure-mcp-tunnels
+- https://github.com/openai/tunnel-client/blob/master/docs/permissions.md
+
+**Current execution state: STAGE3_MAC_LOCAL_VERIFIED / STAGE4_REMOTE_HOLD / ORIGINAL_CANARY_RUNNING / ZERO_SPEND / ZERO_EXTERNAL_CONTACTS.**
