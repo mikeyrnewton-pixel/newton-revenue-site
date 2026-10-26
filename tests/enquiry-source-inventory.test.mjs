@@ -1136,3 +1136,26 @@ test("Gmail page assignment proof cannot be replayed across source snapshots",()
     "an assignment proof from one Gmail snapshot cannot attest another",
   );
 });
+
+
+test("distinct Gmail source roles require distinct account identities",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Recompute every outer binding after reusing the revenue account identity.
+  // One physical inbox still must not masquerade as both required source roles.
+  personal.accountIdentityDigest=revenue.accountIdentityDigest;
+  personal.searchQueryDigest=gmailQueryDigestFor(personal);
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /account identity digest cannot be reused across sources/,
+    "one Gmail account cannot satisfy both personal and revenue source coverage",
+  );
+});
