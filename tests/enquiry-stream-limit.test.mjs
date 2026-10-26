@@ -145,3 +145,26 @@ test('only canonical application/json media declarations may reach the request b
     assert.equal(env.LEADS.records.size,1);
   }
 });
+
+
+test('duplicate JSON object keys are rejected before any KV state is created',async()=>{
+  const base=JSON.stringify(fixture());
+  const cases=[
+    base.replace('"name":"FICTIONAL CUSTOMER"',
+      '"name":"FIRST VALUE","name":"LAST VALUE"'),
+    base.replace('"name":"FICTIONAL CUSTOMER"',
+      '"name":"FIRST VALUE","na\\u006de":"ESCAPED DUPLICATE"'),
+    base.replace('"website":""',
+      '"website":"bot bait","website":""'),
+    base.replace('"contactPermission":true',
+      '"contactPermission":false,"contactPermission":true'),
+    base.slice(0,-1)+',"metadata":{"source":"first","source":"second"}}',
+  ];
+  for(const body of cases){
+    const env=environment();
+    const response=await submit({request:sent({body}),env});
+    assert.equal(response.status,400,body);
+    assert.equal((await response.json()).error,'Ambiguous submission.');
+    assert.equal(env.LEADS.records.size,0,'ambiguous JSON must never reach KV');
+  }
+});
