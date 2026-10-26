@@ -1112,3 +1112,27 @@ test("Gmail evidence binds every record identity to its classification",()=>{
     true,
   );
 });
+
+
+test("Gmail page assignment proof cannot be replayed across source snapshots",()=>{
+  const input=fixture();
+  const revenue=input.sources.find(
+    source=>source.sourceId==="NEWTON_REVENUE_GMAIL",
+  );
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+
+  // Preserve the second snapshot's otherwise-valid aggregate observation and
+  // recompute its outer digest after transplanting the first snapshot's
+  // assignment proof. The inner proof must still be rejected as replayed.
+  personal.paginationRecordAssignmentDigest=
+    revenue.paginationRecordAssignmentDigest;
+  personal.evidenceDigest=evidenceDigestFor(personal);
+
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /page\/record assignment digest cannot be replayed across sources/,
+    "an assignment proof from one Gmail snapshot cannot attest another",
+  );
+});
