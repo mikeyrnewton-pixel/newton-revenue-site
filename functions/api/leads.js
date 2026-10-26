@@ -29,8 +29,15 @@ export async function onRequestGet({ request, env }) {
     const opts = { prefix: "lead:", limit: 100 };
     if (cursor) opts.cursor = cursor;
     const page = await env.LEADS.list(opts);
+    // A malformed, oversized or replayed cursor could otherwise leave the
+    // private owner stuck on one page while apparently browsing all leads.
+    // Never advertise incomplete storage as complete or trust unsafe cursors.
+    const nextCursor = page?.list_complete ? null : page?.cursor;
     if (!Array.isArray(page?.keys) || typeof page.list_complete !== "boolean" ||
-        (!page.list_complete && (typeof page.cursor !== "string" || !page.cursor))) {
+        (!page.list_complete &&
+          (typeof nextCursor !== "string" || nextCursor.length === 0 ||
+           nextCursor.length > 1024 || !/^[A-Za-z0-9_+\\/=.-]+$/.test(nextCursor) ||
+           nextCursor === cursor))) {
       return reply({ error: "Invalid private storage page. No completeness claim made." }, 503);
     }
     // Damaged legacy rows must not hide valid customer enquiries. Never delete,
@@ -80,7 +87,7 @@ export async function onRequestGet({ request, env }) {
     }
     records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return reply({
-      records, hasMore: !page.list_complete, nextCursor: page.cursor || null,
+      records, hasMore: !page.list_complete, nextCursor,
       dataIntegrityWarning: skippedInvalidRecords > 0 || unavailableKeyCount > 0 ||
         unverifiedNoticeCount > 0,
       skippedInvalidRecords, unavailableKeyCount, unverifiedNoticeCount,
