@@ -140,3 +140,39 @@ test("multiple evidence pages for one organisation remain one validation candida
   assert.equal(result.outreachApproved,false);
   assert.equal(result.externalContact,false);
 });
+
+test("research batches must be dense inert arrays before any record is read",()=>{
+  const sparse=new Array(1);
+  assert.throws(
+    ()=>triageOfflineBuyerResearch(sparse,asOf),
+    /inert dense public research records required/,
+  );
+
+  const extra=[base()];
+  extra.hiddenMetadata=true;
+  assert.throws(
+    ()=>triageOfflineBuyerResearch(extra,asOf),
+    /inert dense public research records required/,
+  );
+
+  const subclassed=new (class extends Array {})();
+  subclassed.push(base());
+  assert.throws(
+    ()=>triageOfflineBuyerResearch(subclassed,asOf),
+    /inert dense public research records required/,
+  );
+
+  let executed=0;
+  const accessor=[];
+  Object.defineProperty(accessor,"0",{
+    enumerable:true,
+    get(){executed++;return base();},
+  });
+  accessor.length=1;
+  assert.throws(
+    ()=>triageOfflineBuyerResearch(accessor,asOf),
+    /inert dense public research records required/,
+  );
+  assert.equal(executed,0);
+});
+
