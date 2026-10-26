@@ -38,6 +38,7 @@ const completePreviewStatuses = () => ({
   "GET /api/enquiry":405,
   "GET /api/retry-owner-notices":405,
   "GET /api/delete-lead":405,
+  "POST /api/delete-lead":401,
   "POST /api/enquiry":415,
   "GET /api/leads":401,
 });
@@ -52,7 +53,9 @@ function fakePreviewRun(overrides={}) {
     '  const key=method+" "+target.pathname;',
     '  if(!Object.hasOwn(map,key)) throw Error("unknown request "+key);',
     '  if(options.headers?.Authorization) throw Error("auth disclosure");',
-    '  if(method==="POST"&&(options.body!==""||options.headers["Content-Type"]!=="text/plain")) throw Error("unsafe POST");',
+    '  if(method==="POST"&&target.pathname==="/api/enquiry"&&(options.body!==""||options.headers["Content-Type"]!=="text/plain")) throw Error("unsafe enquiry POST");',
+    '  if(method==="POST"&&target.pathname==="/api/delete-lead"&&(options.body!=="{}"||options.headers["Content-Type"]!=="application/json")) throw Error("unsafe erasure POST");',
+    '  if(method==="POST"&&!["/api/enquiry","/api/delete-lead"].includes(target.pathname)) throw Error("unknown POST");',
     '  console.log("FIXTURE_CALL "+key);',
     '  return {status:map[key]};',
     '};',
@@ -63,12 +66,12 @@ function fakePreviewRun(overrides={}) {
     encoding:"utf8",timeout:5000
   });
 }
-test("Preview checker accepts eight exact staging responses, without private data",()=>{
+test("Preview checker accepts nine exact staging responses, without private data",()=>{
   const run=fakePreviewRun();
   assert.equal(run.status,0,run.stderr);
   assert.match(run.stdout,/PASS: Exact Preview/);
   const calls=run.stdout.split("\n").filter(x=>x.startsWith("FIXTURE_CALL "));
-  assert.equal(calls.length,8);
+  assert.equal(calls.length,9);
   assert.deepEqual(new Set(calls.map(x=>x.slice("FIXTURE_CALL ".length))),
                    new Set(Object.keys(completePreviewStatuses())));
 });
@@ -89,6 +92,13 @@ test("Cloudflare Access 403 never looks like verified function execution",()=>{
 });
 test("Unauthorised GET returning 200 cannot pass retry isolation",()=>{
   const run=fakePreviewRun({"GET /api/retry-owner-notices":200});
+  assert.equal(run.status,1);
+  assert.match(run.stderr,/FAIL: Preview is not ready/);
+});
+
+
+test("Unauthenticated erasure POST must reach the owner-auth gate",()=>{
+  const run=fakePreviewRun({"POST /api/delete-lead":200});
   assert.equal(run.status,1);
   assert.match(run.stderr,/FAIL: Preview is not ready/);
 });
