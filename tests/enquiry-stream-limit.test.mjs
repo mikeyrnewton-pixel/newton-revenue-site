@@ -168,3 +168,25 @@ test('duplicate JSON object keys are rejected before any KV state is created',as
     assert.equal(env.LEADS.records.size,0,'ambiguous JSON must never reach KV');
   }
 });
+
+
+test('stored enquiry remains acknowledged when runtime waitUntil registration throws',async()=>{
+  const env=environment();
+  let registrations=0;
+  const response=await submit({
+    request:sent({body:JSON.stringify(fixture())}),
+    env,
+    waitUntil(){
+      registrations++;
+      throw new Error('synthetic runtime registration failure');
+    },
+  });
+  assert.equal(registrations,1);
+  assert.equal(response.status,201);
+  assert.equal((await response.json()).received,true);
+  assert.equal(
+    [...env.LEADS.records.keys()].filter(key=>key.startsWith('lead:')).length,
+    1,
+    'the durable lead must not be misreported as a failed submission',
+  );
+});
