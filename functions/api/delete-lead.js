@@ -103,8 +103,17 @@ export async function onRequestPost({ request, env }) {
     if (record.id !== leadId) {
       return reply({ error: 'Stored lead identity mismatch; erasure stopped.' }, 409);
     }
-    const submissionId = typeof record.submissionId === 'string' &&
-      UUID.test(record.submissionId) ? record.submissionId : null;
+    const hasSubmissionId = Object.hasOwn(record, 'submissionId');
+    if (hasSubmissionId && (typeof record.submissionId !== 'string' ||
+        !UUID.test(record.submissionId))) {
+      // A corrupted submission identity cannot be treated as "no receipt".
+      // Doing so could delete the lead while leaving a retry path able to
+      // recreate the erased personal-data record.
+      return reply({
+        error: 'Stored submission identity is invalid; erasure stopped.',
+      }, 409);
+    }
+    const submissionId = hasSubmissionId ? record.submissionId : null;
     // Non-PII tombstone closes the race with a notice already in flight.
     // It expires with the original maximum personal-data retention window.
     const erasedAt = new Date().toISOString();

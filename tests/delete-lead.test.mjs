@@ -216,3 +216,37 @@ test('erasure retry rejects stale, future and non-canonical tombstone dates', as
 
   assert.equal(kv.deleted.length, 0);
 });
+
+
+test('erasure stops before mutation when stored submission identity is malformed', async () => {
+  const leadId = 'dddddddd-eeee-4fff-8aaa-bbbbbbbbbbbb';
+  for (const submissionId of [
+    null,
+    'not-a-submission-id',
+    '11111111-2222-4333-8444-55555555555Z',
+  ]) {
+    const kv = new MemoryKV();
+    kv.values.set('lead:' + leadId, JSON.stringify({
+      id: leadId,
+      submissionId,
+      createdAt: new Date().toISOString(),
+      source: 'enquiry-check',
+    }));
+    kv.values.set('notice:' + leadId, JSON.stringify({
+      version: 1, status: 'pending',
+    }));
+
+    const response = await erase({
+      request: deletionRequest(leadId),
+      env: { LEADS: kv, ADMIN_TOKEN: TOKEN },
+    });
+    assert.equal(response.status, 409);
+    assert.deepEqual(await response.json(), {
+      error: 'Stored submission identity is invalid; erasure stopped.',
+    });
+    assert.deepEqual(kv.deleted, []);
+    assert.equal(kv.values.has('lead:' + leadId), true);
+    assert.equal(kv.values.has('notice:' + leadId), true);
+    assert.equal(kv.values.has('erased:' + leadId), false);
+  }
+});
