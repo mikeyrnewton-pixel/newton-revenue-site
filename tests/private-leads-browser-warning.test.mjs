@@ -67,3 +67,19 @@ test('New, clean owner dashboard request resets previous-page warning after fres
   assert.match(h.elements['#feedback'].textContent,/No valid enquiries displayed on this page/);
   assert.equal(h.elements['#results'].children.length,0);
 });
+
+
+test('Overlapping pagination pages cannot render the same enquiry twice',async()=>{
+  const duplicate=structuredClone(second.records[0]);
+  duplicate.id=first.records[0].id.toUpperCase();
+  const h=renderHarness([
+    {...structuredClone(first),dataIntegrityWarning:false},
+    {records:[duplicate],dataIntegrityWarning:false,hasMore:false,nextCursor:null},
+  ]);
+  await h.submit();
+  assert.equal(h.elements['#results'].children.length,1);
+  await h.next();
+  assert.equal(h.elements['#results'].children.length,1);
+  assert.match(h.elements['#feedback'].textContent,/WARNING: Some private records/);
+  assert.match(h.elements['#feedback'].textContent,/No more enquiries displayed on this page/);
+});

@@ -121,3 +121,20 @@ test('Invalid page structure fails closed rather than pretending complete',async
   assert.equal(r.status,503);
   assert.match((await r.json()).error,/Invalid private storage page/);
 });
+
+
+test('Duplicate and case-variant KV keys cannot inflate private enquiry count',async()=>{
+  const a=record(ID_A);
+  const upper='lead:'+ID_A.toUpperCase();
+  const f=fixture({
+    ['lead:'+ID_A]:a,
+    [upper]:a,
+  },{keys:['lead:'+ID_A,upper,'lead:'+ID_A]});
+  const res=await getLeads({request:f.request(),env:f.env});
+  const body=await res.json();
+  assert.equal(res.status,200);
+  assert.deepEqual(body.records.map(item=>item.id),[ID_A]);
+  assert.equal(body.skippedInvalidRecords,2);
+  assert.equal(body.dataIntegrityWarning,true);
+  assert.deepEqual(f.reads,['lead:'+ID_A,'notice:'+ID_A]);
+});

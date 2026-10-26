@@ -6,6 +6,7 @@ const more = document.querySelector("#next");
 let cursor = null;
 let adminToken = "";
 let seenIntegrityWarning = false;
+let seenLeadIds = new Set();
 const el = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text !== undefined && text !== null) node.textContent = String(text);
@@ -26,9 +27,19 @@ async function getLeads(append = false) {
     if (!append) {
       results.replaceChildren();
       seenIntegrityWarning = false;
+      seenLeadIds = new Set();
     }
     seenIntegrityWarning ||= data.dataIntegrityWarning === true;
+    let displayedThisPage = 0;
     for (const lead of data.records) {
+      const canonicalId = typeof lead?.id === "string" ? lead.id.toLowerCase() : "";
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(canonicalId) ||
+          seenLeadIds.has(canonicalId)) {
+        seenIntegrityWarning = true;
+        continue;
+      }
+      seenLeadIds.add(canonicalId);
+      displayedThisPage++;
       const card = el("article");
       card.style.cssText = "border:1px solid #294050;border-radius:14px;padding:20px;margin:16px 0;background:#102231";
       card.append(el("h3", lead.company || "Business enquiry"));
@@ -44,8 +55,8 @@ async function getLeads(append = false) {
     }
     cursor = data.nextCursor;
     more.hidden = !data.hasMore || !cursor;
-    const summary = data.records.length ?
-      "Showing " + data.records.length + " enquiry/enquiries from this page." :
+    const summary = displayedThisPage ?
+      "Showing " + displayedThisPage + " new enquiry/enquiries from this page." :
       (append ? "No more enquiries displayed on this page." : "No valid enquiries displayed on this page.");
     // Never misrepresent a partial/damaged storage page as an empty pipeline.
     feedback.textContent = seenIntegrityWarning ?

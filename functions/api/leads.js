@@ -36,6 +36,7 @@ export async function onRequestGet({ request, env }) {
     // Damaged legacy rows must not hide valid customer enquiries. Never delete,
     // rewrite, echo raw keys, or claim that skipped records mean zero leads.
     const validKey = /^lead:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+    const seenLeadKeys = new Set();
     let skippedInvalidRecords = 0;
     let unavailableKeyCount = 0;
     let unverifiedNoticeCount = 0;
@@ -43,6 +44,12 @@ export async function onRequestGet({ request, env }) {
     for (const item of page.keys) {
       const match = typeof item?.name === "string" && item.name.match(validKey);
       if (!match) { skippedInvalidRecords++; continue; }
+      const canonicalLeadKey = "lead:" + match[1].toLowerCase();
+      if (seenLeadKeys.has(canonicalLeadKey)) {
+        skippedInvalidRecords++;
+        continue;
+      }
+      seenLeadKeys.add(canonicalLeadKey);
       let record;
       try { record = await env.LEADS.get(item.name, "json"); }
       catch { skippedInvalidRecords++; continue; }
