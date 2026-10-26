@@ -53,6 +53,14 @@ function reply(body, status = 200) {
 function validText(value, max) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
 }
+function validJsonContentType(value) {
+  if (typeof value !== "string") return false;
+  const parts = value.split(";").map(part => part.trim());
+  if (parts[0].toLowerCase() !== "application/json") return false;
+  if (parts.length === 1) return true;
+  if (parts.length !== 2) return false;
+  return /^charset\s*=\s*(?:utf-8|"utf-8")$/i.test(parts[1]);
+}
 function normalisedSource(value) {
   return ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(value)
     ? value : "newton-revenue-site";
@@ -83,7 +91,7 @@ export async function onRequestPost({ request, env, waitUntil }) {
   if (origin && origin !== new URL(request.url).origin) {
     return reply({ error: "Cross-origin submission is not allowed." }, 403);
   }
-  if (!(request.headers.get("Content-Type") || "").toLowerCase().includes("application/json")) {
+  if (!validJsonContentType(request.headers.get("Content-Type"))) {
     return reply({ error: "JSON required." }, 415);
   }
   const body = await boundedBody(request);
