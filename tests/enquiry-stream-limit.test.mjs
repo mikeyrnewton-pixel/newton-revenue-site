@@ -103,3 +103,45 @@ test('origin denial and invalid content type never read any stream',async()=>{
   assert.equal(wrongType.status,415);
   assert.equal(env.LEADS.records.size,0);
 });
+
+
+test('only canonical application/json media declarations may reach the request body',async()=>{
+  const invalidTypes=[
+    'application/jsonp',
+    'text/application/json',
+    'application/problem+json',
+    'application/json; charset=iso-8859-1',
+    'application/json; charset=utf-8; boundary=x',
+    'application/json, application/json',
+  ];
+  for(const contentType of invalidTypes){
+    let reads=0;
+    const body=new ReadableStream({
+      pull(controller){
+        reads++;
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(fixture())));
+        controller.close();
+      }
+    },{highWaterMark:0});
+    const env=environment();
+    const response=await submit({
+      request:sent({body,headers:{'Content-Type':contentType}}),env,
+    });
+    assert.equal(response.status,415,contentType);
+    assert.equal(reads,0,contentType+' must be rejected before stream access');
+    assert.equal(env.LEADS.records.size,0);
+  }
+
+  for(const contentType of ['application/json','Application/JSON; Charset="UTF-8"']){
+    const env=environment();
+    const response=await submit({
+      request:sent({
+        body:JSON.stringify(fixture()),
+        headers:{'Content-Type':contentType},
+      }),
+      env,
+    });
+    assert.equal(response.status,201,contentType);
+    assert.equal(env.LEADS.records.size,1);
+  }
+});
