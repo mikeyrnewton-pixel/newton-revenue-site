@@ -73,3 +73,15 @@ The Website quality workflow completed successfully for this code. **No Mac Stag
 ## 26 October 2026 — extra mount and privilege safety (source review only)
 
 Strengthened the existing read-only Stage 3 Mac topology inspector without accessing or changing the actual Mac or any tunnel. It now rejects an existing Observer container if Docker inspection finds **any host mount beyond the two expected read-only destinations**, any added Linux capability despite CapDrop=ALL, or missing `no-new-privileges`. This closes a gap where a valid expected mount could conceal an *additional* Docker socket/host mount. It inspects only boolean/equality evidence; does not print secret values, mount paths, environment or container identities. Commits `cf7ea28645024cd851151e7842ba3903eb47f5e6` and `a62cc61abfd6cc0497be5e0603037a6cc482903e`; **278/278** Node tests passed on GitHub Actions run `40316322183`. Owner Mac Stage 2 was previously locally verified; Stage 3 was not run on the actual Mac during this update. Exact safe `atlas_ping` canary and Tailscale/SSH existing connection are not equivalent to authorised ChatGPT `atlas_status`. Stage 3 local inspection, Platform role verification, reversible tunnel cutover, fresh remote status and rollback remain HOLD until separately approved and independently executed.
+
+
+## 26 October 2026 — final tunnel confinement regression gate, current source
+
+The latest review-only Stage 3 inspector requires the **existing tunnel** to have **exactly one** mount: the reviewed, read-only file-backed runtime key at the fixed container destination. The tunnel must retain `CapDrop=ALL`, no extra capabilities and `no-new-privileges`; the review Observer must have **exactly two** previously reviewed read-only mounts. Any mismatch fails closed before connection changes. It does not read or print key material, source paths, credentials or Docker configuration, and never changes running services. This supplements—not replaces—the separate Platform permission and workspace-auth checks.
+
+- Source guard commit: `afe46316663565f246cc4b02ab6a6ae7ee6aff2a`.
+- Regression coverage: `tests/atlas-observer-stage3-confinement-mocks.test.mjs` and new `tests/atlas-observer-stage3-tunnel-confinement.test.mjs`.
+- Reviewed head `6d5e0ba1a38aea73454c64d10fa64dcb484e360a`: **302 of 302** GitHub Node tests passed, workflow ID `40408349099`.
+- Pinned Stage3 shell file Git blob: `3d06691eaf200e5be3669d8e35da0394c15fb628`. Only owner-run *read-only* preflight has been prepared; it has **not** been run against the actual Mac for this latest revision.
+
+**Releases still on HOLD:** owner-Mac Stage3 read-only evidence; verified Platform runtime role **Tunnels Read + Use** (not Manage); exact nonsecret original-tunnel rollback inventory; separately authorised existing-tunnel replacement targeting the local Observer; genuine ChatGPT `atlas_capabilities` / `atlas_status`; independently demonstrated fallback to original canary. Do not imply the source gate or the fixed `atlas_ping` token proves Mac connectivity. No production merge, outreach, payments, spending, active Mac changes or plugin changes occurred in this update.
