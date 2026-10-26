@@ -89,6 +89,19 @@ test('private erasure removes receipt, notice and lead in retry-safe order', asy
   const submissionTombstone = await kv.get('erased-submission:' + SUBMISSION, 'json');
   assert.equal(submissionTombstone.erased, true);
 
+  // Simulate a lost HTTP success response: the same authorised erasure must
+  // acknowledge the valid tombstone without recreating or deleting anything.
+  const deletesAfterCompletion = [...kv.deleted];
+  const repeated = await erase({ request: deletionRequest(reference), env: {
+    LEADS: kv, ADMIN_TOKEN: TOKEN,
+  } });
+  assert.equal(repeated.status, 200);
+  assert.deepEqual(await repeated.json(), {
+    ok: true, deleted: true, reference, alreadyDeleted: true,
+  });
+  assert.deepEqual(kv.deleted, deletesAfterCompletion);
+  assert.equal(kv.values.has('lead:' + reference), false);
+
   const staleRetry = new Request(ORIGIN + '/api/enquiry', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Origin: ORIGIN },
@@ -156,4 +169,50 @@ test('erasure tombstone prevents an in-flight owner notice from recreating metad
   const tombstone = await kv.get('erased:' + leadId, 'json');
   assert.equal(tombstone.erased, true);
   assert.deepEqual(Object.keys(tombstone).sort(), ['erased', 'erasedAt', 'version']);
+});
+
+
+test('erasure retry trusts only a complete non-PII tombstone', async () => {
+  const kv = new MemoryKV();
+  const leadId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+
+  for (const malformed of [
+    { version: 1, erased: true },
+    { version: 1, erased: true, erasedAt: 'not-a-date' },
+    { version: 1, erased: true, erasedAt: new Date().toISOString(), leak: 'customer' },
+  ]) {
+    kv.values.set('erased:' + leadId, JSON.stringify(malformed));
+    const response = await erase({ request: deletionRequest(leadId), env: {
+      LEADS: kv, ADMIN_TOKEN: TOKEN,
+    } });
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: 'Lead not found.' });
+  }
+
+  assert.equal(kv.deleted.length, 0);
+});
+
+
+test('erasure retry rejects stale, future and non-canonical tombstone dates', async () => {
+  const kv = new MemoryKV();
+  const leadId = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
+  const now = Date.now();
+  const invalidDates = [
+    new Date(now - (31 * 24 * 60 * 60 * 1000)).toISOString(),
+    new Date(now + (60 * 60 * 1000)).toISOString(),
+    new Date(now).toUTCString(),
+  ];
+
+  for (const erasedAt of invalidDates) {
+    kv.values.set('erased:' + leadId, JSON.stringify({
+      version: 1, erased: true, erasedAt,
+    }));
+    const response = await erase({ request: deletionRequest(leadId), env: {
+      LEADS: kv, ADMIN_TOKEN: TOKEN,
+    } });
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: 'Lead not found.' });
+  }
+
+  assert.equal(kv.deleted.length, 0);
 });
