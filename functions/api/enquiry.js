@@ -61,6 +61,65 @@ function validJsonContentType(value) {
   if (parts.length !== 2) return false;
   return /^charset\s*=\s*(?:utf-8|"utf-8")$/i.test(parts[1]);
 }
+
+// JSON.parse silently keeps the last occurrence of a duplicate object key.
+// Reject such payloads before validation/storage so consent, honeypot and
+// identity fields have one unambiguous meaning across every intermediary.
+function hasAmbiguousJsonObject(raw) {
+  let ambiguous = false;
+  const skipSpace = i => {
+    while (i < raw.length && /\s/.test(raw[i])) i++;
+    return i;
+  };
+  const scanString = i => {
+    i++;
+    while (i < raw.length) {
+      if (raw[i] === "\\") i += 2;
+      else if (raw[i++] === '"') break;
+    }
+    return i;
+  };
+  const scanValue = (start, depth = 0) => {
+    let i = skipSpace(start);
+    if (depth > 64) {
+      ambiguous = true;
+      return raw.length;
+    }
+    if (raw[i] === '"') return scanString(i);
+    if (raw[i] === '{') {
+      const keys = new Set();
+      i = skipSpace(i + 1);
+      if (raw[i] === '}') return i + 1;
+      while (i < raw.length) {
+        const keyStart = i;
+        const keyEnd = scanString(keyStart);
+        const key = JSON.parse(raw.slice(keyStart, keyEnd));
+        if (keys.has(key)) ambiguous = true;
+        keys.add(key);
+        i = skipSpace(keyEnd);
+        i = skipSpace(i + 1); // colon; JSON syntax was already validated
+        i = skipSpace(scanValue(i, depth + 1));
+        if (raw[i] === '}') return i + 1;
+        i = skipSpace(i + 1); // comma
+      }
+      return i;
+    }
+    if (raw[i] === '[') {
+      i = skipSpace(i + 1);
+      if (raw[i] === ']') return i + 1;
+      while (i < raw.length) {
+        i = skipSpace(scanValue(i, depth + 1));
+        if (raw[i] === ']') return i + 1;
+        i = skipSpace(i + 1); // comma
+      }
+      return i;
+    }
+    while (i < raw.length && !/[\s,\]}]/.test(raw[i])) i++;
+    return i;
+  };
+  scanValue(0);
+  return ambiguous;
+}
 function normalisedSource(value) {
   return ["ai-profit-brief", "newton-reset", "autopilot-8", "enquiry-check"].includes(value)
     ? value : "newton-revenue-site";
@@ -107,6 +166,9 @@ export async function onRequestPost({ request, env, waitUntil }) {
     p = JSON.parse(raw);
   } catch {
     return reply({ error: "Malformed submission." }, 400);
+  }
+  if (hasAmbiguousJsonObject(raw)) {
+    return reply({ error: "Ambiguous submission." }, 400);
   }
   if (!p || Array.isArray(p) || typeof p !== "object") {
     return reply({ error: "Invalid submission." }, 400);
