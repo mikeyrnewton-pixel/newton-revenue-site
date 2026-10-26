@@ -12,6 +12,28 @@ const zeroCounts=()=>({
   OUTBOUND_REPLY:0,
   UNKNOWN:0,
 });
+const zeroOriginClassCounts=()=>({
+  DIRECT_INBOUND:0,
+  REPLY_TO_OUTBOUND:0,
+  SYSTEM_AUTOMATION:0,
+  MARKETING_OR_NEWSLETTER:0,
+  SUPPORT_OR_TRANSACTIONAL:0,
+  UNKNOWN_ORIGIN:0,
+});
+const originClassCountsFor=source=>{
+  const directInbound=source.observedCounts.GENUINE+
+    source.observedCounts.CANDIDATE;
+  const replyToOutbound=source.observedCounts.OUTBOUND_REPLY;
+  const systemAutomation=source.observedCounts.NON_ENQUIRY_ACTIVITY;
+  return {
+    ...zeroOriginClassCounts(),
+    DIRECT_INBOUND:directInbound,
+    REPLY_TO_OUTBOUND:replyToOutbound,
+    SYSTEM_AUTOMATION:systemAutomation,
+    UNKNOWN_ORIGIN:source.observedRecordCount-directInbound-
+      replyToOutbound-systemAutomation,
+  };
+};
 const gmailQueryDigestFor=source=>createHash("sha256").update(JSON.stringify({
   sourceId:source.sourceId,
   accountIdentityDigest:source.accountIdentityDigest,
@@ -41,6 +63,10 @@ const evidenceDigestFor=source=>createHash("sha256").update(JSON.stringify({
   recordIdClassificationPairsDigest:source.recordIdClassificationPairsDigest,
   recordIdInboxLabelPairsDigest:source.recordIdInboxLabelPairsDigest,
   recordIdOriginClassPairsDigest:source.recordIdOriginClassPairsDigest,
+  originClassCounts:source.originClassCounts===null?null:
+    Object.fromEntries(Object.keys(zeroOriginClassCounts()).map(key=>[
+      key,source.originClassCounts[key],
+    ])),
   allRecordsWithinCoverageWindow:source.allRecordsWithinCoverageWindow,
   observedRecordCount:source.observedRecordCount,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[
@@ -78,6 +104,7 @@ const readable=(sourceId,overrides={})=>{
     recordIdClassificationPairsDigest:null,
     recordIdInboxLabelPairsDigest:null,
     recordIdOriginClassPairsDigest:null,
+    originClassCounts:null,
     allRecordsWithinCoverageWindow:null,
     observedCounts:zeroCounts(),
     verifiedAt:"2026-10-20T12:14:00.000Z",
@@ -125,6 +152,8 @@ const readable=(sourceId,overrides={})=>{
     )?overrides.recordIdOriginClassPairsDigest:createHash("sha256")
       .update(sourceId+":ID-ORIGIN-CLASS-PAIRS:"+source.observedRecordCount)
       .digest("hex");
+    source.originClassCounts=Object.hasOwn(overrides,"originClassCounts")?
+      overrides.originClassCounts:originClassCountsFor(source);
     source.allRecordsWithinCoverageWindow=Object.hasOwn(
       overrides,"allRecordsWithinCoverageWindow",
     )?overrides.allRecordsWithinCoverageWindow:true;
@@ -155,6 +184,7 @@ const unreadable=sourceId=>({
   recordIdClassificationPairsDigest:null,
   recordIdInboxLabelPairsDigest:null,
   recordIdOriginClassPairsDigest:null,
+  originClassCounts:null,
   allRecordsWithinCoverageWindow:null,
   observedRecordCount:null,
   observedCounts:Object.fromEntries(Object.keys(zeroCounts()).map(key=>[key,null])),
@@ -496,6 +526,10 @@ test("readable source digest binds counts and timestamps to the exact observatio
   changedCount.sources[1].observedRecordCount=1;
   changedCount.sources[1].pageRecordCounts=[1];
   changedCount.sources[1].deduplicatedRecordCount=1;
+  changedCount.sources[1].originClassCounts={
+    ...zeroOriginClassCounts(),
+    DIRECT_INBOUND:1,
+  };
   assert.throws(
     ()=>reconcileEnquirySourceInventory(changedCount),
     /evidence digest does not bind the exact source observation/,
@@ -521,6 +555,7 @@ test("aggregate source counts cannot overflow the safe integer range",()=>{
     source.observedRecordCount=Number.MAX_SAFE_INTEGER;
     source.pageRecordCounts=[Number.MAX_SAFE_INTEGER];
     source.deduplicatedRecordCount=Number.MAX_SAFE_INTEGER;
+    source.originClassCounts=originClassCountsFor(source);
     source.evidenceDigest=evidenceDigestFor(source);
   }
   assert.throws(
@@ -543,11 +578,13 @@ test("combined unresolved classifications cannot overflow the safe integer range
   revenue.observedRecordCount=Number.MAX_SAFE_INTEGER;
   revenue.pageRecordCounts=[Number.MAX_SAFE_INTEGER];
   revenue.deduplicatedRecordCount=Number.MAX_SAFE_INTEGER;
+  revenue.originClassCounts=originClassCountsFor(revenue);
   revenue.evidenceDigest=evidenceDigestFor(revenue);
   personal.observedCounts={...zeroCounts(),UNKNOWN:1};
   personal.observedRecordCount=1;
   personal.pageRecordCounts=[1];
   personal.deduplicatedRecordCount=1;
+  personal.originClassCounts=originClassCountsFor(personal);
   personal.evidenceDigest=evidenceDigestFor(personal);
   assert.throws(
     ()=>reconcileEnquirySourceInventory(input),
@@ -1381,4 +1418,75 @@ test("Gmail evidence binds every counted record identity to a privacy-safe origi
     baseline.sourceCoverage.PERSONAL_GMAIL.recordIdentityOriginClassBound,
     true,
   );
+  assert.equal(
+    baseline.sourceCoverage.PERSONAL_GMAIL.originClassCountsBound,
+    true,
+  );
 });
+
+test("Gmail buyer classifications require matching direct-inbound origin counts",()=>{
+  const input=fixture();
+  const personal=input.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  personal.observedCounts={...zeroCounts(),CANDIDATE:1};
+  personal.recordIdClassificationPairsDigest=createHash("sha256")
+    .update("PERSONAL_GMAIL:RELABELLED-AS-CANDIDATE").digest("hex");
+  personal.originClassCounts={
+    ...zeroOriginClassCounts(),
+    REPLY_TO_OUTBOUND:1,
+  };
+  personal.evidenceDigest=evidenceDigestFor(personal);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(input),
+    /buyer classifications require direct-inbound origin evidence/,
+    "a reply to our outreach cannot be relabelled as buyer-origin evidence",
+  );
+
+  const accepted=fixture();
+  const direct=accepted.sources.find(
+    source=>source.sourceId==="PERSONAL_GMAIL",
+  );
+  direct.observedCounts={...zeroCounts(),CANDIDATE:1};
+  direct.recordIdClassificationPairsDigest=createHash("sha256")
+    .update("PERSONAL_GMAIL:DIRECT-CANDIDATE").digest("hex");
+  direct.originClassCounts={
+    ...zeroOriginClassCounts(),
+    DIRECT_INBOUND:1,
+  };
+  direct.evidenceDigest=evidenceDigestFor(direct);
+  const result=reconcileEnquirySourceInventory(accepted);
+  assert.equal(result.accessibleCandidateObservations,1);
+  assert.equal(result.genuineEnquiries,null);
+});
+
+test("Gmail origin-class aggregates must be complete, exact and Gmail-only",()=>{
+  const missing=fixture();
+  missing.sources[1].originClassCounts=null;
+  missing.sources[1].evidenceDigest=evidenceDigestFor(missing.sources[1]);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(missing),
+    /exact Gmail origin-class counts required/,
+  );
+
+  const incomplete=fixture();
+  incomplete.sources[2].originClassCounts={
+    ...zeroOriginClassCounts(),
+    REPLY_TO_OUTBOUND:0,
+  };
+  incomplete.sources[2].evidenceDigest=evidenceDigestFor(incomplete.sources[2]);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(incomplete),
+    /each Gmail record must have exactly one origin class/,
+  );
+
+  const nonGmail=fixture();
+  const salesDesk=nonGmail.sources.find(source=>source.sourceId==="SALES_DESK");
+  salesDesk.originClassCounts=zeroOriginClassCounts();
+  salesDesk.evidenceDigest=evidenceDigestFor(salesDesk);
+  assert.throws(
+    ()=>reconcileEnquirySourceInventory(nonGmail),
+    /non-Gmail sources cannot claim Gmail pagination proof/,
+  );
+});
+
