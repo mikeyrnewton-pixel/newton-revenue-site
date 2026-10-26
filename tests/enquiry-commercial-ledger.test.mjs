@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {toFictionalDeliveryHandoff} from "../lib/enquiry-handoff.js";
 import {toFictionalCrmEvent} from "../lib/enquiry-crm-adapter.js";
 import {buildOfflineCrmExport} from "../lib/enquiry-crm-export.js";
-import {buildOfflineCommercialLeadExport} from "../lib/enquiry-commercial-ledger.js";
+import {buildOfflineCommercialLeadExport,consolidateOfflineCommercialLeadExports,emptySyntheticCommercialLeadCursor} from "../lib/enquiry-commercial-ledger.js";
 
 const crmConfig=()=>({
   schema:"NEWTON_CRM_EXPORT_CONFIG_V1",
@@ -17,6 +18,9 @@ const ledgerConfig=()=>({
   target:"COMMERCIAL_LEDGER_PLACEHOLDER",
   table:"commercial_leads",
 });
+function consolidate(exports,priorCursor=emptySyntheticCommercialLeadCursor()){
+  return consolidateOfflineCommercialLeadExports(exports,priorCursor);
+}
 function record(overrides={}){
   return {
     id:"11111111-1111-4111-8111-111111111111",
@@ -176,6 +180,45 @@ test("fails closed on altered CRM evidence metadata",()=>{
 });
 
 
+test("final ledger rejects two event keys claiming one enquiry reference",()=>{
+  const original=exportFor();
+  const secondRow={
+    ...original.rows[0],
+    event_key:"crm:enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    handoff_id:"enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  };
+  const rows=[original.rows[0],secondRow];
+  const forged={
+    ...original,
+    rowCount:rows.length,
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify(rows)).digest("hex"),
+    rows,
+  };
+  assert.throws(
+    ()=>buildOfflineCommercialLeadExport(forged,ledgerConfig()),
+    /one enquiry reference cannot map to multiple CRM event keys/,
+    "a valid batch digest cannot override canonical enquiry ownership",
+  );
+});
+
+
+test("rejects malformed submission UUIDs at the final ledger boundary",()=>{
+  const original=exportFor();
+  const nil="00000000-0000-0000-0000-000000000000";
+  const malformed={
+    ...original.rows[0],
+    event_key:"crm:enquiry:"+nil,
+    handoff_id:"enquiry:"+nil,
+  };
+  assert.throws(
+    ()=>buildOfflineCommercialLeadExport({...original,rows:[malformed]},ledgerConfig()),
+    /canonical event key required/,
+    "a digest mismatch must not be the only protection against malformed submission IDs",
+  );
+});
+
+
 test("rejects source UUIDs incompatible with the PR29 commercial contract",()=>{
   const original=exportFor();
   const invalidVersion={
@@ -194,5 +237,176 @@ test("rejects source UUIDs incompatible with the PR29 commercial contract",()=>{
     ()=>buildOfflineCommercialLeadExport({...original,rows:[uppercaseAlias]},ledgerConfig()),
     /canonical enquiry identifiers required/,
     "uppercase UUID aliases must fail at the final ledger boundary",
+  );
+});
+
+
+test("cross-batch consolidation is idempotent and remains enquiry-only",()=>{
+  const batch=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  const result=consolidate([batch,batch]);
+  assert.equal(result.state,"STAGED_OFFLINE_ONLY");
+  assert.equal(result.connectionState,"NEEDS_CONNECTION");
+  assert.equal(result.writeIntent,"NONE");
+  assert.equal(result.sourceBatchCount,2);
+  assert.equal(result.uniqueLeadCount,1);
+  assert.match(result.batchDigest,/^sha256:[0-9a-f]{64}$/);
+  assert.equal(result.commercialTruth,"ENQUIRIES_ONLY_NOT_REVENUE");
+  assert.equal(result.recordedPaymentEvidenceGBP,0);
+  assert.equal(result.clearedEvidenceGBP,0);
+  assert.equal(result.customerDelivery,"HOLD");
+});
+
+test("cross-batch consolidation rejects changed enquiry ownership",()=>{
+  const firstCrm=exportFor();
+  const first=buildOfflineCommercialLeadExport(firstCrm,ledgerConfig());
+  const changedRow={
+    ...firstCrm.rows[0],
+    event_key:"crm:enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    handoff_id:"enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  };
+  const changedCrm={
+    ...firstCrm,
+    rows:[changedRow],
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify([changedRow])).digest("hex"),
+  };
+  const second=buildOfflineCommercialLeadExport(changedCrm,ledgerConfig());
+  assert.throws(
+    ()=>consolidate([first,second]),
+    /one enquiry reference cannot change CRM event ownership across batches/,
+    "separate valid batch digests cannot reassign an enquiry",
+  );
+  assert.throws(
+    ()=>consolidate([{
+      ...first,batchDigest:"sha256:"+"0".repeat(64),
+    }]),
+    /rows do not match batch evidence digest/,
+  );
+});
+
+test("cross-batch source evidence cannot be reused for different leads",()=>{
+  const first=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  const secondOriginal=buildOfflineCommercialLeadExport(exportFor({
+    id:"22222222-2222-4222-8222-222222222222",
+    submissionId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  }),ledgerConfig());
+  const aliasedRow={
+    ...secondOriginal.rows[0],
+    source_evidence_digest:first.rows[0].source_evidence_digest,
+  };
+  const second={
+    ...secondOriginal,
+    rows:[aliasedRow],
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify([aliasedRow])).digest("hex"),
+  };
+  assert.throws(
+    ()=>consolidate([first,second]),
+    /one source evidence digest cannot prove multiple commercial leads/,
+    "a fresh batch digest cannot authorise cross-lead source evidence reuse",
+  );
+});
+
+
+test("cumulative commercial lead cursor is frozen and makes a later retry idempotent",()=>{
+  const batch=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  const first=consolidate([batch]);
+  assert.deepEqual(first.reconciliationCursor,{
+    version:1,
+    synthetic:true,
+    rows:[batch.rows[0]],
+  });
+  assert.ok(Object.isFrozen(first.reconciliationCursor));
+  assert.ok(Object.isFrozen(first.reconciliationCursor.rows));
+  assert.ok(Object.isFrozen(first.reconciliationCursor.rows[0]));
+
+  const retry=consolidate([batch],first.reconciliationCursor);
+  assert.equal(retry.uniqueLeadCount,1);
+  assert.deepEqual(retry.reconciliationCursor,first.reconciliationCursor);
+});
+
+test("commercial lead consolidation fails closed without an explicit prior cursor",()=>{
+  const batch=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  assert.throws(
+    ()=>consolidateOfflineCommercialLeadExports([batch]),
+    /exact prior commercial lead cursor required/,
+  );
+  assert.throws(
+    ()=>consolidate([batch],{version:1,synthetic:true,rows:[],extra:true}),
+    /exact prior commercial lead cursor required/,
+  );
+});
+
+test("cumulative cursor rejects changed enquiry ownership in a later invocation",()=>{
+  const firstCrm=exportFor();
+  const first=buildOfflineCommercialLeadExport(firstCrm,ledgerConfig());
+  const staged=consolidate([first]);
+  const changedRow={
+    ...firstCrm.rows[0],
+    event_key:"crm:enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    handoff_id:"enquiry:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  };
+  const changedCrm={
+    ...firstCrm,
+    rows:[changedRow],
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify([changedRow])).digest("hex"),
+  };
+  const second=buildOfflineCommercialLeadExport(changedCrm,ledgerConfig());
+  assert.throws(
+    ()=>consolidate([second],staged.reconciliationCursor),
+    /one enquiry reference cannot change CRM event ownership across batches/,
+  );
+});
+
+test("cumulative cursor rejects source evidence reuse by a later lead",()=>{
+  const first=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  const staged=consolidate([first]);
+  const secondOriginal=buildOfflineCommercialLeadExport(exportFor({
+    id:"22222222-2222-4222-8222-222222222222",
+    submissionId:"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  }),ledgerConfig());
+  const aliasedRow={
+    ...secondOriginal.rows[0],
+    source_evidence_digest:first.rows[0].source_evidence_digest,
+  };
+  const second={
+    ...secondOriginal,
+    rows:[aliasedRow],
+    batchDigest:"sha256:"+createHash("sha256")
+      .update(JSON.stringify([aliasedRow])).digest("hex"),
+  };
+  assert.throws(
+    ()=>consolidate([second],staged.reconciliationCursor),
+    /one source evidence digest cannot prove multiple commercial leads/,
+  );
+});
+
+
+test("cumulative cursor fails closed before exceeding its validated capacity",()=>{
+  const seed=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig()).rows[0];
+  const rows=Array.from({length:1000},(_,index)=>{
+    const suffix=index.toString(16).padStart(12,"0");
+    const eventId=`30000000-0000-4000-8000-${suffix}`;
+    const enquiryId=`40000000-0000-4000-8000-${suffix}`;
+    return Object.freeze({
+      ...seed,
+      lead_key:"commercial:enquiry:"+eventId,
+      source_event_key:"crm:enquiry:"+eventId,
+      enquiry_ref:enquiryId,
+      source_record_id:enquiryId,
+      source_evidence_digest:index.toString(16).padStart(64,"0"),
+    });
+  });
+  const fullCursor=Object.freeze({
+    version:1,
+    synthetic:true,
+    rows:Object.freeze(rows),
+  });
+  const next=buildOfflineCommercialLeadExport(exportFor(),ledgerConfig());
+  assert.throws(
+    ()=>consolidate([next],fullCursor),
+    /commercial lead cursor capacity exceeded/,
+    "a valid full cursor must not emit an oversized cursor rejected on the next run",
   );
 });

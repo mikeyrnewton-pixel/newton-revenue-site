@@ -1,0 +1,125 @@
+-- ATLAS / NEWTON £195 pilot — PRIVATE OWNER-ONLY CRM POLICY DESIGN
+-- REVIEW-ONLY: not a migration, do NOT execute without explicit scoped owner approval.
+-- LIVE CUTOVER PAUSED: ORIGINAL EMPTY-TABLE ASSUMPTION DISPROVEN.
+-- A direct database COUNT on 25 Oct proved pre-existing legacy opportunity records.
+-- The previously reported zero rows was inaccurate table-summary metadata.
+-- Current Auth prerequisites are also not satisfied. Do NOT remove the nonempty-
+-- table preflight guard, force ownership assignment, delete records or apply this SQL.
+-- Owner-approved, non-destructive legacy attribution and ISOLATED real PostgreSQL
+-- role testing must come first. The aggregate evidence remains in the PRIVATE
+-- PRIME INDEX, not public source files.
+-- Existing project/table only: public.newton_opportunities. NEVER apply to production by CI.
+-- Draft source under docs/ (NOT supabase/migrations). Has an INVALID UUID placeholder.
+-- Audit first: at 2026-10-25 the table had RLS ON, NO policies, broad anon and
+-- authenticated PostgreSQL GRANTS (RLS currently blocks row access).
+-- This single-owner policy is a *proposal* for the existing private Sales Desk.
+--
+-- GATES BEFORE APPLYING:
+-- 1. Confirm the Supabase project/account and verified owner's immutable auth.users.id
+--    privately (do NOT put account/email/UUID/tokens in public GitHub or chat).
+-- 2. Confirm login and MFA/strong authentication, anonymous Auth sign-in disabled for
+--    this workspace, privacy notices/retention, owner-only use and backup/rollback.
+-- 3. Confirm no existing access path expects the current grants or policies.
+-- 4. Confirm table remains empty and the intended app uses an authenticated session.
+-- 5. Owner separately approves this exact SQL/identity binding/security change.
+-- 6. Stage on an isolated test database first. Add actual SQL-level owner/other/anon
+--    permission tests and readback before any production change.
+-- 7. Replace BOTH invalid placeholders below with the SAME independently verified
+--    owner's UUID only in the private deployment workflow; never commit substituted SQL.
+--
+-- BEGIN OWNER-APPROVED STAGED MIGRATION CANDIDATE (NOT RUN)
+BEGIN;
+
+DO $gate$
+DECLARE
+  owner_uid uuid := '__VERIFIED_OWNER_AUTH_UUID__'::uuid;
+  present_rows boolean;
+  policy_count integer;
+BEGIN
+  IF owner_uid IS NULL THEN
+    RAISE EXCEPTION 'OWNER_AUTH_REQUIRED';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = owner_uid) THEN
+    RAISE EXCEPTION 'OWNER_AUTH_ACCOUNT_NOT_VERIFIED';
+  END IF;
+  SELECT EXISTS(SELECT 1 FROM public.newton_opportunities LIMIT 1) INTO present_rows;
+  IF present_rows THEN
+    RAISE EXCEPTION 'EXISTING_CRM_ROWS_REQUIRE_REVIEW_AND_DATA_MIGRATION';
+  END IF;
+  SELECT count(*) INTO policy_count
+  FROM pg_policies
+  WHERE schemaname = 'public' AND tablename = 'newton_opportunities';
+  IF policy_count <> 0 THEN
+    RAISE EXCEPTION 'CRM_POLICIES_CHANGED_SINCE_REVIEW';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public' AND c.relname = 'newton_opportunities'
+      AND c.relrowsecurity = true
+  ) THEN
+    RAISE EXCEPTION 'CRM_RLS_NOT_ENABLED';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='newton_opportunities'
+      AND column_name='owner_user_id'
+  ) THEN
+    RAISE EXCEPTION 'OWNERSHIP_COLUMN_ALREADY_EXISTS';
+  END IF;
+END $gate$;
+
+-- Allowlist only this owner's records. No blanket authenticated-user rule.
+ALTER TABLE public.newton_opportunities
+  ADD COLUMN owner_user_id uuid NOT NULL;
+ALTER TABLE public.newton_opportunities ENABLE ROW LEVEL SECURITY;
+
+-- Grants are independent from RLS. Remove previous broad grants first.
+REVOKE ALL PRIVILEGES ON TABLE public.newton_opportunities FROM anon, authenticated;
+-- No anonymous access, no DELETE/TRUNCATE/REFERENCES/TRIGGER grant.
+GRANT SELECT, INSERT, UPDATE ON TABLE public.newton_opportunities TO authenticated;
+
+CREATE POLICY atlas_owner_only_select ON public.newton_opportunities
+  FOR SELECT TO authenticated
+  USING (
+    owner_user_id = (select auth.uid())
+    AND (select auth.uid()) = '__VERIFIED_OWNER_AUTH_UUID__'::uuid
+    AND coalesce((select auth.jwt()) ->> 'is_anonymous', 'false') <> 'true'
+  );
+
+CREATE POLICY atlas_owner_only_insert ON public.newton_opportunities
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    owner_user_id = (select auth.uid())
+    AND (select auth.uid()) = '__VERIFIED_OWNER_AUTH_UUID__'::uuid
+    AND coalesce((select auth.jwt()) ->> 'is_anonymous', 'false') <> 'true'
+  );
+
+CREATE POLICY atlas_owner_only_update ON public.newton_opportunities
+  FOR UPDATE TO authenticated
+  USING (
+    owner_user_id = (select auth.uid())
+    AND (select auth.uid()) = '__VERIFIED_OWNER_AUTH_UUID__'::uuid
+    AND coalesce((select auth.jwt()) ->> 'is_anonymous', 'false') <> 'true'
+  )
+  WITH CHECK (
+    owner_user_id = (select auth.uid())
+    AND (select auth.uid()) = '__VERIFIED_OWNER_AUTH_UUID__'::uuid
+    AND coalesce((select auth.jwt()) ->> 'is_anonymous', 'false') <> 'true'
+  );
+
+COMMIT;
+-- END DRAFT
+
+-- RELEASE VERIFICATION (not executed by repo CI):
+-- Authenticated OWNER: create one synthetic private test record bound to own auth UID,
+-- read it back, update it, verify ownership cannot be reassigned, remove fixture using
+-- an independently approved administrative cleanup (DELETE is intentionally denied).
+-- Non-owner authenticated test account: SELECT/INSERT/UPDATE all denied.
+-- Anonymous signed-out & Supabase anonymous-auth users: all denied.
+-- Owner: INSERT with a different owner_user_id denied; a forged app-side user UUID
+-- never suffices because auth.uid() is resolved server-side.
+-- A service-role key bypasses RLS: NEVER deliver it to browser, GitHub or mobile app.
+-- Only after live auth/client QA and owner approval may a private app persist data.
+-- This grants *database row access*, NOT permission for external outreach, invoice,
+-- quote, payment, moving customer records or declaring a cleared sale.
+-- No automatic rollback. Review a private backup/restoration plan first.

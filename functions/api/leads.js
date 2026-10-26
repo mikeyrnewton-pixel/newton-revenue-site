@@ -29,15 +29,69 @@ export async function onRequestGet({ request, env }) {
     const opts = { prefix: "lead:", limit: 100 };
     if (cursor) opts.cursor = cursor;
     const page = await env.LEADS.list(opts);
-    const records = (await Promise.all(
-      page.keys.map(key => env.LEADS.get(key.name, "json"))
-    )).filter(Boolean).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    await Promise.all(records.map(async record => {
-      if (record.notification?.version !== 1) return;
-      const notice = await env.LEADS.get('notice:' + record.id, 'json');
-      if (notice) record.notification = notice;
-    }));
-    return reply({ records, hasMore: !page.list_complete, nextCursor: page.cursor || null });
+    // A malformed, oversized or replayed cursor could otherwise leave the
+    // private owner stuck on one page while apparently browsing all leads.
+    // Never advertise incomplete storage as complete or trust unsafe cursors.
+    const nextCursor = page?.list_complete ? null : page?.cursor;
+    if (!Array.isArray(page?.keys) || typeof page.list_complete !== "boolean" ||
+        (!page.list_complete &&
+          (typeof nextCursor !== "string" || nextCursor.length === 0 ||
+           nextCursor.length > 1024 || !/^[A-Za-z0-9_+\/=.-]+$/.test(nextCursor) ||
+           nextCursor === cursor))) {
+      return reply({ error: "Invalid private storage page. No completeness claim made." }, 503);
+    }
+    // Damaged legacy rows must not hide valid customer enquiries. Never delete,
+    // rewrite, echo raw keys, or claim that skipped records mean zero leads.
+    const validKey = /^lead:([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+    const seenLeadKeys = new Set();
+    let skippedInvalidRecords = 0;
+    let unavailableKeyCount = 0;
+    let unverifiedNoticeCount = 0;
+    const records = [];
+    for (const item of page.keys) {
+      const match = typeof item?.name === "string" && item.name.match(validKey);
+      if (!match) { skippedInvalidRecords++; continue; }
+      const canonicalLeadKey = "lead:" + match[1].toLowerCase();
+      if (seenLeadKeys.has(canonicalLeadKey)) {
+        skippedInvalidRecords++;
+        continue;
+      }
+      seenLeadKeys.add(canonicalLeadKey);
+      let record;
+      try { record = await env.LEADS.get(item.name, "json"); }
+      catch { skippedInvalidRecords++; continue; }
+      if (record === null) { unavailableKeyCount++; continue; }
+      if (!record || typeof record !== "object" || Array.isArray(record) ||
+          record.id !== match[1].toLowerCase() ||
+          typeof record.createdAt !== "string" ||
+          !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(record.createdAt) ||
+          !Number.isFinite(Date.parse(record.createdAt))) {
+        skippedInvalidRecords++;
+        continue;
+      }
+      if (record.notification?.version === 1) {
+        try {
+          const notice = await env.LEADS.get("notice:" + record.id, "json");
+          if (notice && typeof notice === "object" && !Array.isArray(notice) &&
+              notice.version === 1 &&
+              ["pending", "delivered"].includes(notice.status)) {
+            record.notification = notice;
+          } else if (notice) {
+            unverifiedNoticeCount++;
+          }
+        } catch {
+          unverifiedNoticeCount++;
+        }
+      }
+      records.push(record);
+    }
+    records.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return reply({
+      records, hasMore: !page.list_complete, nextCursor,
+      dataIntegrityWarning: skippedInvalidRecords > 0 || unavailableKeyCount > 0 ||
+        unverifiedNoticeCount > 0,
+      skippedInvalidRecords, unavailableKeyCount, unverifiedNoticeCount,
+    });
   } catch {
     return reply({ error: "Could not retrieve leads." }, 503);
   }

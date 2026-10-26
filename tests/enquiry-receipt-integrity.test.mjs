@@ -41,6 +41,33 @@ test("Same submission ID and same payload is acknowledged without duplicate lead
   assert.equal([...kv.records.keys()].filter(k => k.startsWith("lead:")).length, 1);
 });
 
+test("Receipt is content-bound, corrupted receipts fail closed, and legacy UUIDs remain migration-safe", async () => {
+  const kv = new MemoryKV(); const env = { LEADS: kv };
+  const first = await send(env, payload());
+  assert.equal(first.status, 201);
+  const { reference } = await first.json();
+
+  const receiptKey = "receipt:" + ID;
+  const storedReceipt = JSON.parse(kv.records.get(receiptKey));
+  assert.deepEqual(Object.keys(storedReceipt).sort(), ["fingerprint", "reference", "version"]);
+  assert.equal(storedReceipt.version, 1);
+  assert.equal(storedReceipt.reference, reference);
+  assert.match(storedReceipt.fingerprint, /^[0-9a-f]{64}$/);
+
+  kv.records.set(receiptKey, "{not-json");
+  const corrupted = await send(env, payload());
+  assert.equal(corrupted.status, 503);
+  assert.equal((await corrupted.json()).received, undefined);
+
+  // Existing plain UUID receipts can be drained safely during a staged rollout,
+  // but still require an intact, matching original lead.
+  kv.records.set(receiptKey, reference);
+  const legacy = await send(env, payload());
+  assert.equal(legacy.status, 200);
+  assert.equal((await legacy.json()).reference, reference);
+  assert.equal([...kv.records.keys()].filter(k => k.startsWith("lead:")).length, 1);
+});
+
 test("Reusing an ID for a changed enquiry never reports success", async () => {
   const kv = new MemoryKV(); const env = { LEADS: kv };
   assert.equal((await send(env, payload())).status, 201);
