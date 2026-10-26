@@ -294,8 +294,16 @@ export async function onRequestPost({ request, env, waitUntil }) {
   const notice = deliverOwnerNotice(record, env).catch(() => {
     // The original pending lead remains available if the delivery-state write fails.
   });
-  if (typeof waitUntil === 'function') waitUntil(notice);
-  else await notice;
+  if (typeof waitUntil === 'function') {
+    try {
+      waitUntil(notice);
+    } catch {
+      // The lead is already durable. If runtime task registration fails,
+      // finish the redacted notice attempt inline instead of returning a
+      // false submission failure that invites a duplicate customer retry.
+      await notice;
+    }
+  } else await notice;
   return reply({ ok: true, received: true, reference: record.id }, 201);
 }
 export async function onRequest() {
