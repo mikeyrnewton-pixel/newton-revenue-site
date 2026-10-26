@@ -56,6 +56,33 @@ test('Mac screenshot cadence is assessed without claiming minute execution',()=>
     '/Applications/Docker.app/Contents/Resources/bin/docker'].includes(bin)));
   assert.equal(JSON.stringify(out).includes('private_token'),false);
 });
+test('minute audit incorporates recent private snapshot metadata without opening it',()=>{
+  const nowMs=1_800_000_000_000;
+  let probes=0;
+  const out=auditMinuteController({
+    platform:'darwin',home:'/Users/fixture',uid:501,nowMs,
+    exists:()=>false,run:()=>({ok:false,output:''}),
+    observerLstat:path=>{
+      probes++;
+      if(path==='/Users/fixture/.atlas-observer')
+        return {uid:501,mode:0o700,isDirectory:()=>true};
+      if(path==='/Users/fixture/.atlas-observer/status.json')
+        return {uid:501,mode:0o600,size:454,mtimeMs:nowMs-40_000,isFile:()=>true};
+      throw Error('Unexpected path');
+    },
+  });
+  assert.equal(probes,2);
+  assert.equal(out.observerSnapshot.state,'RECENT_PRIVATE_SNAPSHOT_PRESENT');
+  assert.equal(out.observerSnapshot.ageSeconds,40);
+  assert.equal(out.observerSnapshot.privateContentsRead,false);
+  assert.equal(out.observerSnapshot.automaticRefreshVerified,false);
+  assert.equal(out.verifiedEveryMinuteExecution,false);
+  assert.equal(out.verifiedAutomaticCodeBuilding,false);
+  assert.equal(out.directChatGPTMacControl,false);
+  assert.equal(out.noWritesPerformed,true);
+  assert.equal(out.scheduleVerdict,'CONFIGURATION_REQUIRES_REVIEW');
+  assert.doesNotMatch(JSON.stringify(out),/Users\\/fixture|secret|token/i);
+});
 test('config drift cannot be masked by a successful launchctl exit',()=>{
   const label=AUDITED_JOBS[0].label;
   const {out}=fixture({intervalOverride:{[label]:300}});
