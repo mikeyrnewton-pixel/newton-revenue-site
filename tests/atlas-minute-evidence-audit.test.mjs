@@ -81,7 +81,7 @@ test('minute audit incorporates recent private snapshot metadata without opening
   assert.equal(out.directChatGPTMacControl,false);
   assert.equal(out.noWritesPerformed,true);
   assert.equal(out.scheduleVerdict,'CONFIGURATION_REQUIRES_REVIEW');
-  assert.doesNotMatch(JSON.stringify(out),/Users\\/fixture|secret|token/i);
+  assert.doesNotMatch(JSON.stringify(out),/Users|fixture|secret|token/i);
 });
 test('config drift cannot be masked by a successful launchctl exit',()=>{
   const label=AUDITED_JOBS[0].label;
