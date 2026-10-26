@@ -36,7 +36,7 @@ export async function onRequestGet({ request, env }) {
     if (!Array.isArray(page?.keys) || typeof page.list_complete !== "boolean" ||
         (!page.list_complete &&
           (typeof nextCursor !== "string" || nextCursor.length === 0 ||
-           nextCursor.length > 1024 || !/^[A-Za-z0-9_+\\/=.-]+$/.test(nextCursor) ||
+           nextCursor.length > 1024 || !/^[A-Za-z0-9_+\/=.-]+$/.test(nextCursor) ||
            nextCursor === cursor))) {
       return reply({ error: "Invalid private storage page. No completeness claim made." }, 503);
     }
