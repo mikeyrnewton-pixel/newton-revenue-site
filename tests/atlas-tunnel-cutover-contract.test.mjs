@@ -68,7 +68,19 @@ test('all added mounts or privilege regressions halt',()=>{
   denied(x=>x[1].HostConfig.Privileged=true,'CONFINEMENT_DRIFT');
   denied(x=>x[1].HostConfig.CapAdd=['NET_ADMIN'],'CONFINEMENT_DRIFT');
   denied(x=>x[1].HostConfig.SecurityOpt=[],'CONFINEMENT_DRIFT');
-  denied(x=>x[1].HostConfig.AutoRemove=false,'STOP_REMOVAL_CONTRACT_UNKNOWN');
+  // AutoRemove=false is legitimate, but it requires a different, explicit
+  // stopped-container name and rollback plan. It is never a live cutover.
+  const retained=fixture();
+  retained[1].HostConfig.AutoRemove=false;
+  const receipt=reviewTunnelReplacement(retained);
+  assert.equal(receipt.stage,'REVIEW_READY_NO_MAC_CHANGES');
+  assert.equal(receipt.dockerWrites,0);
+  assert.equal(receipt.remoteAtlasStatus,'NOT_VERIFIED');
+  assert.equal(receipt.rollback,'STOP_RETAINS_ORIGINAL_CONTAINER_NAME_COLLISION_REVIEW_REQUIRED');
+  assert.doesNotMatch(JSON.stringify(receipt),/tunnel_[a-z0-9]+|\/private\/|sk-/);
+  denied(x=>delete x[1].HostConfig.AutoRemove,'STOP_REMOVAL_CONTRACT_UNKNOWN');
+  denied(x=>x[1].HostConfig.AutoRemove='false','STOP_REMOVAL_CONTRACT_UNKNOWN');
+  denied(x=>x[1].HostConfig.AutoRemove=null,'STOP_REMOVAL_CONTRACT_UNKNOWN');
   denied(x=>x[2].Config.User='0:0','OBSERVER_USER_NOT_NONROOT');
 });
 test('file-based key and non-overridden endpoint are required',()=>{
