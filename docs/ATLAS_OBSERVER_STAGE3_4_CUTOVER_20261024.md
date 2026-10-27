@@ -133,7 +133,7 @@ New source/test commits `e376f14c30efd81eff59e32eab89a96fc14db41a` and `7cc956b0
 
 **Hard holds unchanged:** OpenAI Platform runtime principal Tunnels Read + Use and intended ChatGPT workspace association not verified; actual effective rollback/reconstruction not rehearsed; original canary still presumed running, live tunnel cutover not attempted; ChatGPT `atlas_capabilities` / `atlas_status` unavailable until explicit scoped and reversible activation. In particular, review-ready is NOT cutover approval or proof of remote Mac access. Do not run a second tunnel against the same identity or stop the original until these gates and scoped user approval are complete.
 
-## 27 October 2026 10:03 BST — REAL MAC revised Stage4 inspection PASS; live cutover still HOLD
+## 27 October 2026 10:03 GMT — REAL MAC revised Stage4 inspection PASS; live cutover still HOLD
 
 The owner ran the revised **Git-blob-pinned, read-only** `scripts/atlas-tunnel-cutover-contract-20261026.mjs` from commit `7cc956b01accb4744d5f6885a56b869c0bb709dc`, file blob `cabb212c842bc482cdfb5f4cead7fe8b1f9a5e6d`, via the existing functioning iPhone SSH Shortcut on the actual Mac. The screenshot's exact diagnostic values (private conversation, 10:03 UK) are:
 
