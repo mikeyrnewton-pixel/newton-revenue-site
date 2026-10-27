@@ -63,12 +63,20 @@ export function reviewTunnelReplacement(containers){
   insist(!args.some(x=>x.startsWith('--mcp.server-url')||
     x.includes('CONTROL_PLANE_API_KEY=')||x.includes('OPENAI_ADMIN_KEY=')),
     'COMMAND_OVERRIDES_TARGET_OR_EMBEDS_KEY');
-  insist(tunnel.HostConfig.AutoRemove===true,'STOP_REMOVAL_CONTRACT_UNKNOWN');
+  // An owner Mac can legitimately run the tunnel with AutoRemove=false (the
+  // normal Docker default). This *retains* the original stopped container,
+  // including its name: any separately authorised replacement must preserve
+  // that original through a name-aware rollback, not assume it disappears.
+  // Keep unknown/non-boolean values on HOLD; never infer a cutover is safe.
+  const autoRemove=tunnel.HostConfig.AutoRemove;
+  insist(autoRemove===true||autoRemove===false,'STOP_REMOVAL_CONTRACT_UNKNOWN');
   return Object.freeze({
     stage:'REVIEW_READY_NO_MAC_CHANGES',
     current:'CANARY_18787',
     desired:'OBSERVER_18788',
-    rollback:'STOP_AUTO_REMOVES_OLD_CONTAINER_RECREATE_REQUIRED',
+    rollback:autoRemove===true
+      ? 'STOP_AUTO_REMOVES_OLD_CONTAINER_RECREATE_REQUIRED'
+      : 'STOP_RETAINS_ORIGINAL_CONTAINER_NAME_COLLISION_REVIEW_REQUIRED',
     key:'READONLY_FILE_REFERENCE_ONLY',
     environment:'EXACT_RECONSTRUCTION_ALLOWLIST',
     dockerWrites:0,
