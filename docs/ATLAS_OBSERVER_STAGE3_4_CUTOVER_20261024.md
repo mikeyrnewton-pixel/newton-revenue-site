@@ -132,3 +132,28 @@ The Stage4 inspection script was therefore patched on this SAME draft PR47 branc
 New source/test commits `e376f14c30efd81eff59e32eab89a96fc14db41a` and `7cc956b01accb4744d5f6885a56b869c0bb709dc`; **exact head `7cc956b01accb4744d5f6885a56b869c0bb709dc` passed website-quality CI workflow `40484259047`**. The revised inspector has *no Docker writes, stop/start, host shell exposure, credential values, plugin changes or live cutover*. Its on-Mac result is PENDING owner-run read-only verification.
 
 **Hard holds unchanged:** OpenAI Platform runtime principal Tunnels Read + Use and intended ChatGPT workspace association not verified; actual effective rollback/reconstruction not rehearsed; original canary still presumed running, live tunnel cutover not attempted; ChatGPT `atlas_capabilities` / `atlas_status` unavailable until explicit scoped and reversible activation. In particular, review-ready is NOT cutover approval or proof of remote Mac access. Do not run a second tunnel against the same identity or stop the original until these gates and scoped user approval are complete.
+
+## 27 October 2026 10:03 BST — REAL MAC revised Stage4 inspection PASS; live cutover still HOLD
+
+The owner ran the revised **Git-blob-pinned, read-only** `scripts/atlas-tunnel-cutover-contract-20261026.mjs` from commit `7cc956b01accb4744d5f6885a56b869c0bb709dc`, file blob `cabb212c842bc482cdfb5f4cead7fe8b1f9a5e6d`, via the existing functioning iPhone SSH Shortcut on the actual Mac. The screenshot's exact diagnostic values (private conversation, 10:03 UK) are:
+
+- `ATLAS_STAGE4_RECHECK`
+- `SOURCE_VERIFIED`
+- `ATLAS_CUTOVER_STAGE=REVIEW_READY_NO_MAC_CHANGES`
+- `ATLAS_CUTOVER_CURRENT=CANARY_18787`
+- `ATLAS_CUTOVER_DESIRED=OBSERVER_18788`
+- `ATLAS_CUTOVER_ROLLBACK=STOP_RETAINS_ORIGINAL_CONTAINER_NAME_COLLISION_REVIEW_REQUIRED`
+- `ATLAS_CUTOVER_KEY=READONLY_FILE_REFERENCE_ONLY`
+- `ATLAS_CUTOVER_ENVIRONMENT=EXACT_RECONSTRUCTION_ALLOWLIST`
+- `ATLAS_CUTOVER_DOCKERWRITES=0`
+- `ATLAS_CUTOVER_REMOTEATLASSTATUS=NOT_VERIFIED`
+- `ATLAS_CUTOVER_CONTRACT=REVIEW_READY_NO_CHANGES`
+- `ATLAS_STAGE4_RECHECK_FINISHED`
+
+**Evidence classification:** `STAGE4_MAC_LOCAL_INSPECTION=PASS`; `AUTOREMOVE=false` for the current tunnel, meaning stopping the original tunnel would **retain the container and its name**. An approved replacement would need a carefully reviewed, name-safe procedure, immutable reconstruction inputs and an independent rollback demonstration; the source inspector does not provide or authorise that procedure. The current tunnel is still directed at original canary `18787`, Observer local target `18788`; read-only key file reference, expected environment allowlist and confinement pass. **There were zero Docker writes.** The old Stage4 `HOLD_STOP_REMOVAL_CONTRACT_UNKNOWN` was resolved by correcting the overly narrow script assumption; it is no longer a blocker.
+
+**Next two independent gates:** (1) In existing Platform organization, inspect current tunnel's ChatGPT workspace association and current runtime API key principal's **Tunnels Read + Use** privilege (not Manage), *without showing, exporting, changing or rotating key bytes*. ChatGPT app default permission does not substitute for the Platform RBAC role. (2) Independently document exact restoration of the retained original Docker tunnel with its original name and single polling process before separately authorised cutover. Do not run a parallel client on the same tunnel identity, remove old containers or modify private mounts just to test.
+
+**Definition of completion unchanged:** approved and reversible switch to the Observer, genuine ChatGPT `atlas_capabilities` and `atlas_status` with fresh, redacted, matching Mac-local evidence; negative checks and tested restoration to the original canary token. Current ChatGPT connector `atlas_ping` still yielded `ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS` after this inspection, so **remote Mac access is NOT achieved**. Observer read-only scope does not confer broad Mac command or Activepieces access. Existing runner PR31, revenue PR45, all five P0 automations, £0 spending and no unapproved outbound remain unchanged.
+
+Official documentation: https://developers.openai.com/api/docs/guides/secure-mcp-tunnels and https://github.com/openai/tunnel-client/blob/master/docs/permissions.md.
