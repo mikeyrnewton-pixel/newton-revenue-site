@@ -14,22 +14,24 @@ import path from 'node:path';
 export const QUEUE_SCHEMA='atlas.local.review.ticket.v1';
 export const QUEUE_FOLDER='.atlas-internal-review';
 const MAX_TICKET_BYTES=2048;
+// Full policy invariants: an untrusted caller may not relabel a harmless
+// category into a different security state or disguise a source-integrity HOLD.
 const allowedKinds=new Map([
-  ['REVIEW_PINNED_SOURCE_INTEGRITY','BUILD'],
-  ['REVIEW_SNAPSHOT_FRESHNESS','QA'],
-  ['REVIEW_DOCKER_STATUS','QA'],
-  ['REVIEW_CORE_HEALTH','QA'],
-  ['REVIEW_PRIVATE_TUNNEL','QA'],
-  ['REVIEW_ACTIVEPIECES_HEALTH','QA'],
-  ['REVIEW_WATCHDOG_HEARTBEAT','QA'],
-  ['REVIEW_WATCHDOG_AGENT','QA'],
-  ['REVIEW_UNVERIFIED_HEALTH','QA'],
+  ['REVIEW_PINNED_SOURCE_INTEGRITY',{lane:'BUILD',risk:'HOLD_SOURCE_INTEGRITY',urgency:'SECURITY_HOLD'}],
+  ['REVIEW_SNAPSHOT_FRESHNESS',{lane:'QA',risk:'HOLD_UNTRUSTED_SNAPSHOT',urgency:'REVIEW'}],
+  ['REVIEW_DOCKER_STATUS',{lane:'QA',risk:'HOLD_DOCKER',urgency:'REVIEW'}],
+  ['REVIEW_CORE_HEALTH',{lane:'QA',risk:'HOLD_CORE_SERVICES',urgency:'REVIEW'}],
+  ['REVIEW_PRIVATE_TUNNEL',{lane:'QA',risk:'HOLD_TUNNEL',urgency:'REVIEW'}],
+  ['REVIEW_ACTIVEPIECES_HEALTH',{lane:'QA',risk:'HOLD_WORKER',urgency:'REVIEW'}],
+  ['REVIEW_WATCHDOG_HEARTBEAT',{lane:'QA',risk:'HOLD_WATCHDOG',urgency:'REVIEW'}],
+  ['REVIEW_WATCHDOG_AGENT',{lane:'QA',risk:'HOLD_WATCHDOG',urgency:'REVIEW'}],
+  ['REVIEW_UNVERIFIED_HEALTH',{lane:'QA',risk:'HOLD_UNVERIFIED',urgency:'REVIEW'}],
 ]);
 const fixedKeys=[
   'id','kind','lane','risk','observedTimeBucket','urgency',
   'permissions','currentExecution','futureAction','retryPolicy','source',
 ].sort();
-const acceptable=(st,uid,dir)=>Boolean(st)&&st.uid===uid&&st.nlink===(dir?st.nlink:1)&&
+const acceptable=(st,uid,dir)=>Boolean(st)&&st.uid===uid&&(dir||st.nlink===1)&&
   (dir?st.isDirectory():st.isFile())&&
   !st.isSymbolicLink()&&(st.mode&0o777)===(dir?0o700:0o600);
 const hold=(reason)=>Object.freeze({
@@ -41,7 +43,9 @@ function safeCandidate(c) {
   if(!c||typeof c!=='object'||Array.isArray(c)||
      Object.keys(c).sort().join('|')!==fixedKeys.join('|')||
      !/^atlas-work-[a-f0-9]{24}$/.test(c.id)||
-     !allowedKinds.has(c.kind)||allowedKinds.get(c.kind)!==c.lane||
+     !allowedKinds.has(c.kind)||allowedKinds.get(c.kind).lane!==c.lane||
+     allowedKinds.get(c.kind).risk!==c.risk||
+     allowedKinds.get(c.kind).urgency!==c.urgency||
      !Number.isSafeInteger(c.observedTimeBucket)||c.observedTimeBucket<0||
      !['SECURITY_HOLD','REVIEW'].includes(c.urgency)||
      c.permissions!=='OWNER_REVIEW_REQUIRED'||
