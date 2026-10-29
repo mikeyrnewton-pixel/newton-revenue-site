@@ -250,8 +250,10 @@ export function apply(docker,{run=invokeDocker,home=os.homedir(),
   // A candidate with this name might be someone else's container.
   // Unlike "inspect" on a missing name, "container ls" succeeds with an
   // empty result; a daemon/permission error MUST NOT be swallowed as absence.
-  const present=run(docker,['container','ls','-a','--filter',
-    'name=^/'+NAMES.candidate+'
+  const present=run(docker,['container','ls','-a','--format','{{.Names}}']);
+  assert(typeof present==='string'&&
+    !present.split(String.fromCharCode(10)).includes(NAMES.candidate),
+    'CANDIDATE_NAME_ALREADY_EXISTS');
 
   let created=false,guardWritten=false,stopped=false;
   let state;
