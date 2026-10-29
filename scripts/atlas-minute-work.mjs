@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /**
- * ATLAS minute worker v0.1 — owner-local, one-shot, read-only.
- * Inspect the fixed private health snapshot and integrity of already-pinned
- * offline Observer sources. Never launches shell/Node tests, writes files,
- * downloads code, makes AI/API calls, changes services or creates a scheduler.
+ * ATLAS minute worker v0.2 — owner-local, one-shot health review.
+ * --run-once stays strictly READ-ONLY. Explicit --queue-review may create
+ * ONE private, idempotent INTERNAL REVIEW TICKET, never perform the task.
+ * Neither mode launches shell/tests, models/API calls, contacts customers,
+ * changes existing Mac services or creates a scheduler.
  * Owner approval needed before staging/running/scheduling on the Mac.
  */
 import {createHash} from "node:crypto";
@@ -13,6 +14,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {triageOwnerSnapshot} from "./atlas-observer-triage-cli.mjs";
 import {proposeWatchdogWork} from "./atlas-watchdog-work-policy.mjs";
+import {storeReviewTicket} from "./atlas-private-review-queue.mjs";
 
 export const MINUTE_SCHEMA="atlas.minute.work.v1";
 export const STAGE="ATLAS-OBSERVER-MCP-REVIEW-20261024";
@@ -111,17 +113,29 @@ export function minuteWork({home=homedir(),uid=process.getuid?.(),now=Date.now()
 }
 const invoked=process.argv[1] && path.resolve(process.argv[1])===fileURLToPath(import.meta.url);
 if(invoked){
-  if(process.argv.length===3&&process.argv[2]==="--run-once"){
-    if(process.platform!=="darwin" || !process.getuid || process.getuid()===0){
-      process.stderr.write("HOLD: owner Mac required.\n");
+  const mode=process.argv.length===3?process.argv[2]:'';
+  if(mode==='--run-once'||mode==='--queue-review'){
+    if(process.platform!=='darwin'||!process.getuid||process.getuid()===0){
+      process.stderr.write('HOLD: owner Mac required.\n');
       process.exitCode=2;
     } else {
-      process.stdout.write(JSON.stringify(minuteWork())+"\n");
+      const report=minuteWork();
+      if(mode==='--run-once'){
+        process.stdout.write(JSON.stringify(report)+'\n');
+      } else if(report.reviewCandidate.candidate){
+        const receipt=storeReviewTicket({candidate:report.reviewCandidate.candidate});
+        process.stdout.write(JSON.stringify({...report,privateReviewTicket:receipt})+'\n');
+        if(receipt.status==='HOLD')process.exitCode=2;
+      }else{
+        process.stdout.write(JSON.stringify({...report,privateReviewTicket:{
+          status:'NO_CANDIDATE_NO_WRITE',ticketsCreated:0,ticketsExecuted:0
+        }})+'\n');
+      }
     }
-  }else if(process.argv.length===3&&process.argv[2]==="--help"){
-    process.stdout.write("ATLAS minute worker: --run-once (private read-only triage and source integrity); no service changes or built-in scheduler.\n");
+  }else if(mode==='--help'){
+    process.stdout.write('ATLAS minute worker: --run-once (read-only) | --queue-review (one private pending-review ticket only); no service changes or built-in scheduler.\n');
   }else{
-    process.stderr.write("HOLD: --run-once or --help only.\n");
+    process.stderr.write('HOLD: --run-once | --queue-review | --help only.\n');
     process.exitCode=2;
   }
 }
