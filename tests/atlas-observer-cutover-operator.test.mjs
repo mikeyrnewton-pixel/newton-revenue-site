@@ -71,6 +71,9 @@ function dockerMock(home,{failCandidateStart=false}={}){
     if(section==='container'&&verb==='inspect'){
       return JSON.stringify(rest.map(name=>get(name)));
     }
+    if(section==='container'&&verb==='ls'){
+      return state.candidate?NAMES.candidate+'\n':'';
+    }
     if(section==='container'&&verb==='create'){
       assert.equal(state.candidate,null);
       assert.equal(args.includes('--read-only'),true);
