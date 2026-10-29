@@ -161,9 +161,9 @@ function invokeDocker(bin,args){
   return result.stdout||'';
 }
 const names=[NAMES.canary,NAMES.original,NAMES.observer];
-const inspectThree=(docker)=>JSON.parse(invokeDocker(docker,
+const inspectThree=(docker,run=invokeDocker)=>JSON.parse(run(docker,
   ['container','inspect',...names]));
-const inspectOne=(docker,name)=>JSON.parse(invokeDocker(docker,
+const inspectOne=(docker,name,run=invokeDocker)=>JSON.parse(run(docker,
   ['container','inspect',name]))[0];
 function confirmOwnerMac(){
   assert(process.platform==='darwin'&&typeof process.getuid==='function'&&
@@ -206,58 +206,58 @@ function readGuard(file,uid){
 function matchesId(c,id,name){
   return c&&c.Name==='/'+name&&c.Id===id;
 }
-function safeRollback(docker,guard){
-  const old=inspectOne(docker,NAMES.original);
-  const candidate=inspectOne(docker,NAMES.candidate);
-  const canary=inspectOne(docker,NAMES.canary);
+function safeRollback(docker,guard,run=invokeDocker){
+  const old=inspectOne(docker,NAMES.original,run);
+  const candidate=inspectOne(docker,NAMES.candidate,run);
+  const canary=inspectOne(docker,NAMES.canary,run);
   assert(matchesId(old,guard.originalId,NAMES.original)&&
     matchesId(candidate,guard.candidateId,NAMES.candidate)&&
     matchesId(canary,guard.canaryId,NAMES.canary)&&
     canary.State.Running===true,'ROLLBACK_IDENTITY_DRIFT');
   if(candidate.State.Running===true)
-    invokeDocker(docker,['container','stop','--time','10',NAMES.candidate]);
-  if(inspectOne(docker,NAMES.original).State.Running!==true)
-    invokeDocker(docker,['container','start',NAMES.original]);
-  assert(inspectOne(docker,NAMES.original).State.Running===true,
+    run(docker,['container','stop','--time','10',NAMES.candidate]);
+  if(inspectOne(docker,NAMES.original,run).State.Running!==true)
+    run(docker,['container','start',NAMES.original]);
+  assert(inspectOne(docker,NAMES.original,run).State.Running===true,
     'ROLLBACK_ORIGINAL_NOT_RUNNING');
-  assert(inspectOne(docker,NAMES.candidate).State.Running!==true,
+  assert(inspectOne(docker,NAMES.candidate,run).State.Running!==true,
     'ROLLBACK_CANDIDATE_STILL_RUNNING');
   return true;
 }
-function runPreflight(docker){
-  invokeDocker(docker,['info']);
-  const inspected=inspectThree(docker);
+function runPreflight(docker,{run=invokeDocker,uid=process.getuid()}={}){
+  run(docker,['info']);
+  const inspected=inspectThree(docker,run);
   const plan=makeCutoverPlan(inspected);
-  checkLocalKeyFile(plan,process.getuid());
+  checkLocalKeyFile(plan,uid);
   return plan;
 }
-function preflight(docker){
-  const plan=runPreflight(docker);
+export function preflight(docker,options={}){
+  const plan=runPreflight(docker,options);
   return sanitizedPlan(plan);
 }
 
-function apply(docker){
+export function apply(docker,{run=invokeDocker,home=os.homedir(),
+  uid=process.getuid?.(),roleVerified=process.env.ATLAS_REVIEWED_KEY_MATCH==='YES',
+  workspaceVerified=process.env.ATLAS_WORKSPACE_MATCH==='YES'}={}){
   // Explicit owner attestation; authorization to cut over is NOT proof that
   // the UI's reviewed key matches the actual mounted runtime key.
-  assert(process.env.ATLAS_REVIEWED_KEY_MATCH==='YES'&&
-    process.env.ATLAS_WORKSPACE_MATCH==='YES',
+  assert(roleVerified===true&&workspaceVerified===true,
     'ROLE_AND_WORKSPACE_IDENTITY_CONFIRMATION_REQUIRED');
-  const plan=runPreflight(docker);
-  const uid=process.getuid();
-  const dir=guardDir(os.homedir(),uid);
+  const plan=runPreflight(docker,{run,uid});
+  const dir=guardDir(home,uid);
   const guardFile=path.join(dir,GUARD_FILE);
   assert(!fs.existsSync(guardFile),'PRIOR_CUTOVER_GUARD_EXISTS');
   // A candidate with the same name might be someone else's container.
   let oldCandidate=null;
-  try{oldCandidate=inspectOne(docker,NAMES.candidate)}catch{}
+  try{oldCandidate=inspectOne(docker,NAMES.candidate,run)}catch{}
   assert(!oldCandidate,'CANDIDATE_NAME_ALREADY_EXISTS');
 
   let created=false,guardWritten=false,stopped=false;
   let state;
   try{
-    invokeDocker(docker,plan.argv);
+    run(docker,plan.argv);
     created=true;
-    const c=inspectOne(docker,NAMES.candidate);
+    const c=inspectOne(docker,NAMES.candidate,run);
     assert(validId(c.Id)&&c.State.Running===false&&
       c.Name==='/'+NAMES.candidate&&
       c.Image===plan.sourceImageId&&
@@ -271,7 +271,7 @@ function apply(docker){
       c.Config.Env.includes('MCP_SERVER_URL='+OBSERVER_URL),
       'CANDIDATE_RECONSTRUCTION_DRIFT');
     // Confirm original identities immediately before any disruptive action.
-    const before=inspectThree(docker);
+    const before=inspectThree(docker,run);
     assert(before[0].Id===plan.canaryId&&before[0].State.Running===true&&
       before[1].Id===plan.originalId&&before[1].State.Running===true&&
       before[2].Id===plan.observerId&&before[2].State.Running===true,
@@ -283,15 +283,15 @@ function apply(docker){
     guardWritten=true;
     // Single runtime client per tunnel ID. The candidate is only *created*
     // above; it has not run or polled while the original is live.
-    invokeDocker(docker,['container','stop','--time','10',NAMES.original]);
+    run(docker,['container','stop','--time','10',NAMES.original]);
     stopped=true;
-    assert(inspectOne(docker,NAMES.original).State.Running===false,
+    assert(inspectOne(docker,NAMES.original,run).State.Running===false,
       'ORIGINAL_DID_NOT_STOP');
-    invokeDocker(docker,['container','start',NAMES.candidate]);
-    const running=inspectOne(docker,NAMES.candidate);
+    run(docker,['container','start',NAMES.candidate]);
+    const running=inspectOne(docker,NAMES.candidate,run);
     assert(matchesId(running,c.Id,NAMES.candidate)&&running.State.Running===true,
       'CANDIDATE_DID_NOT_START');
-    assert(inspectOne(docker,NAMES.original).State.Running===false,
+    assert(inspectOne(docker,NAMES.original,run).State.Running===false,
       'ORIGINAL_UNEXPECTEDLY_RUNNING');
     return Object.freeze({
       status:'LOCAL_CUTOVER_STARTED_REMOTE_STATUS_NOT_VERIFIED',
@@ -304,33 +304,36 @@ function apply(docker){
     // Best effort restore by exact Docker identities; do NOT remove old
     // container. If an interrupt occurs, the guard remains for --rollback.
     if(guardWritten){
-      try{safeRollback(docker,state);fs.unlinkSync(guardFile)}
+      try{safeRollback(docker,state,run);fs.unlinkSync(guardFile)}
       catch{hold('CUTOVER_FAILED_ROLLBACK_REQUIRES_OWNER')}
     }else if(stopped){
-      try{invokeDocker(docker,['container','start',NAMES.original])}
+      try{run(docker,['container','start',NAMES.original])}
       catch{hold('CUTOVER_FAILED_MANUAL_ROLLBACK_REQUIRED')}
     }
     if(created){
       try{
-        if(inspectOne(docker,NAMES.candidate).State.Running===false)
-          invokeDocker(docker,['container','rm',NAMES.candidate]);
+        if(inspectOne(docker,NAMES.candidate,run).State.Running===false)
+          run(docker,['container','rm',NAMES.candidate]);
       }catch{}
     }
     hold('CUTOVER_FAILED_OR_BLOCKED_NO_SUCCESS_CLAIM');
   }
 }
-function rollback(docker){
-  invokeDocker(docker,['info']);
-  const uid=process.getuid();
-  const dir=path.join(os.homedir(),GUARD_DIR);
+export function rollback(docker,{run=invokeDocker,home=os.homedir(),
+  uid=process.getuid?.()}={}){
+  run(docker,['info']);
+  const dir=path.join(home,GUARD_DIR);
+  const dirSt=fs.lstatSync(dir);
+  assert(dirSt.isDirectory()&&!dirSt.isSymbolicLink()&&dirSt.uid===uid&&
+    (dirSt.mode&0o777)===0o700,'GUARD_DIR_UNSAFE');
   const state=readGuard(path.join(dir,GUARD_FILE),uid);
-  safeRollback(docker,state);
+  safeRollback(docker,state,run);
   // Candidate remains preserved stopped; clean it only after original
   // is independently verified running and exact candidate identity matched.
-  const c=inspectOne(docker,NAMES.candidate);
+  const c=inspectOne(docker,NAMES.candidate,run);
   assert(matchesId(c,state.candidateId,NAMES.candidate)&&
     c.State.Running===false,'CANDIDATE_NOT_SAFE_TO_REMOVE');
-  invokeDocker(docker,['container','rm',NAMES.candidate]);
+  run(docker,['container','rm',NAMES.candidate]);
   fs.unlinkSync(path.join(dir,GUARD_FILE));
   return Object.freeze({
     status:'LOCAL_ROLLBACK_ORIGINAL_CANARY_RUNNING',
