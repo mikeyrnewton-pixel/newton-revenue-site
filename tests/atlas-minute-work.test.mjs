@@ -65,6 +65,9 @@ test("One-shot minute work verifies only private source integrity and health, wi
     assert.equal(result.networkCalls,false);
     assert.equal(result.moneySpentGBP,0);
     assert.equal(result.autoRepair,false);
+    assert.equal(result.reviewCandidate.status,"NO_WORK_REQUIRED");
+    assert.equal(result.proposedReviewWorkItems,0);
+    assert.equal(result.reviewItemsActuallyEnqueued,0);
   });
 });
 test("Tampered or missing stage file fails closed without printing its contents",async()=>{
@@ -101,6 +104,8 @@ test("A stale health snapshot never becomes healthy just because source integrit
     assert.equal(result.state,"REVIEW_REQUIRED");
     assert.equal(result.triage.state,"BLOCKED_UNVERIFIED_SNAPSHOT");
     assert.equal(result.next,"REVIEW_SNAPSHOT_FRESHNESS");
+    assert.equal(result.reviewCandidate.candidate.kind,"REVIEW_SNAPSHOT_FRESHNESS");
+    assert.equal(result.reviewItemsActuallyEnqueued,0);
   });
 });
 test("Review finding creates no actual repair or provider request",async()=>{
@@ -113,6 +118,9 @@ test("Review finding creates no actual repair or provider request",async()=>{
     assert.equal(r.changesApplied,false);
     assert.equal(r.autoRepair,false);
     assert.equal(r.networkCalls,false);
+    assert.equal(r.reviewCandidate.candidate.kind,"REVIEW_CORE_HEALTH");
+    assert.equal(r.reviewCandidate.dispatchExecuted,false);
+    assert.equal(r.reviewItemsActuallyEnqueued,0);
   });
 });
 test("Minute worker CLI has no daemon/start/repair action",()=>{
