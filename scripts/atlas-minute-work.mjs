@@ -12,6 +12,7 @@ import {homedir} from "node:os";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {triageOwnerSnapshot} from "./atlas-observer-triage-cli.mjs";
+import {proposeWatchdogWork} from "./atlas-watchdog-work-policy.mjs";
 
 export const MINUTE_SCHEMA="atlas.minute.work.v1";
 export const STAGE="ATLAS-OBSERVER-MCP-REVIEW-20261024";
@@ -82,9 +83,10 @@ export function auditPinnedSources({home=homedir(),uid=process.getuid?.(),manife
 }
 
 /** Safe to invoke once per minute; never assumes the host will stay awake. */
-export function minuteWork({home=homedir(),uid=process.getuid?.(),now=Date.now(),manifest=PINNED}={}){
+export function minuteWork({home=homedir(),uid=process.getuid?.(),now=Date.now(),manifest=PINNED, recentOrderIds=[]}={}){
   const triage=triageOwnerSnapshot({home,uid,now});
   const sources=auditPinnedSources({home,uid,manifest});
+  const reviewCandidate=proposeWatchdogWork({triage,sourceAudit:sources,now,recentOrderIds});
   const healthNeedsReview=triage.state!=="NO_REVIEW_SIGNAL";
   const integrityNeedsReview=sources.state!=="PINNED_SOURCES_VERIFIED";
   const next=integrityNeedsReview?"REVIEW_PINNED_SOURCE_INTEGRITY":
@@ -95,6 +97,9 @@ export function minuteWork({home=homedir(),uid=process.getuid?.(),now=Date.now()
     next,
     triage,
     sourceAudit:sources,
+    reviewCandidate,
+    proposedReviewWorkItems:reviewCandidate.candidate===null?0:1,
+    reviewItemsActuallyEnqueued:0,
     workPerformed:Object.freeze(["PRIVATE_STATUS_TRIAGE","PINNED_SOURCE_INTEGRITY_AUDIT"]),
     scheduling:"EXTERNAL_OWNER_APPROVAL_REQUIRED",
     newBuildsCreated:0,
