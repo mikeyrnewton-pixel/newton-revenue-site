@@ -53,6 +53,26 @@ test('a single accepted Watchdog candidate becomes ONE private pending-review ti
   });
 });
 
+test('source integrity HOLD keeps its exact high-priority security label',()=>{
+  withHome(home=>{
+    const result=proposeWatchdogWork({
+      triage:{schema:'atlas.observer.triage.v1',
+        state:'NO_REVIEW_SIGNAL',findings:[]},
+      sourceAudit:{state:'SOURCE_HASH_MISMATCH',checked:1,expected:3},
+      now:NOW
+    });
+    const ticket=storeReviewTicket({home,uid,candidate:result.candidate});
+    assert.equal(ticket.status,'CREATED_PENDING_REVIEW');
+    const payload=JSON.parse(fs.readFileSync(path.join(
+      home,QUEUE_FOLDER,result.candidate.id+'.json'),'utf8'));
+    assert.equal(payload.kind,'REVIEW_PINNED_SOURCE_INTEGRITY');
+    assert.equal(payload.lane,'BUILD');
+    assert.equal(payload.risk,'HOLD_SOURCE_INTEGRITY');
+    assert.equal(payload.urgency,'SECURITY_HOLD');
+    assert.equal(payload.workerExecuted,false);
+  });
+});
+
 test('consecutive duplicate events do not create duplicate tickets',()=>{
   withHome(home=>{
     const item=candidate();
@@ -126,6 +146,8 @@ test('unapproved kinds, extra fields or unsupported code instructions never ente
       {...item,id:'../../secrets'},
       {...item,permissions:'AUTO_RUN'},
       {...item,retryPolicy:'DOCKER_AUTO_RESTART'},
+      {...item,risk:'HOLD_UNRELATED'},
+      {...item,urgency:'SECURITY_HOLD'},
       {...item,observedTimeBucket:NaN},
     ]){
       const r=storeReviewTicket({home,uid,candidate:altered});
