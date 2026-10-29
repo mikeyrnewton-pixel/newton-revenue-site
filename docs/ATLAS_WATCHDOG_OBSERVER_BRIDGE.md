@@ -59,3 +59,67 @@ This new `scripts/atlas-observer-publisher.mjs` is the missing **local, private 
 **The earlier “not installed/not scheduled” release statements above describe the original source-only state and are superseded for two Mac-local components.** On 23 October the owner approved and installed the fixed local snapshot publisher and dedicated `uk.newton.atlas-observer-snapshot` LaunchAgent (60-second interval). Owner-supplied SSH receipt at 24 October 08:42 BST: `runs = 80`, last exit `0`, snapshot age 3 seconds on AC 100%. At 08:46 BST: `runs = 83`, exit `0`, snapshot age 59 seconds. macOS power logs around 08:07–08:36 document maintenance sleep/DarkWake; **full-night minute-by-minute uptime is not verified**. The observer schedule and Mac-local file are therefore `OWNER_INSTALLED_AND_REFRESHING_WHEN_AWAKE`, not `NOT_INSTALLED` or `FULL_UPTIME_VERIFIED`.
 
 **Remote side:** the original isolated `atlas_ping` canary and official secured tunnel were invoked from ChatGPT again 24 October, returning the constant marker `ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS`. Thus `LIVE_VERIFIED_CANARY` is truthful; no remote Docker, Mac filesystem, private snapshot or Activepieces data is available. The **separate** Observer MCP Docker runtime, private read-only snapshot-directory mount, replacement tunnel target and revised ChatGPT plugin scope remain **NOT DEPLOYED / REQUIRE EXPLICIT SCOPED OWNER APPROVAL after independent QA**. Do not broaden tools, install anything, restart Docker/tunnel, or change macOS power settings from this document. Keep the Mac on AC, lid open and safely ventilated for owner-authorised tests. See latest PR #47 audit and `docs/ATLAS_OBSERVER_REVIEW.md`.
+
+
+
+## 29 October 2026 — Existing minute worker now produces safe, durable review candidates (source-only)
+
+**Work done in draft PR #47, NOT installed on the owner's Mac:** Rather
+than creating a sixth scheduler or another agent, the **existing**
+`scripts/atlas-minute-work.mjs` now uses
+`atlas-watchdog-work-policy.mjs` to convert its already-sanitary Observer
+health and pinned-source integrity results into ONE deterministic,
+non-executing internal review candidate.
+
+- Source integrity failure takes priority over any green health value.
+- Stale/invalid status is treated as a **HOLD**, never proof of a healthy Mac.
+- Fixed allowed issue IDs route only to QA or BUILD review kinds (no open-ended
+  instructions, arbitrary shell, container restart, emails or payments).
+- A five-minute deterministic work ID allows a future authorised dispatcher to
+  suppress duplicate minutes. The decision engine itself never persists,
+  enqueues or executes; it clearly says `REVIEW_CANDIDATE_NOT_ENQUEUED`.
+- The original `--run-once` mode **remains read-only and zero writes**.
+
+**New, separately opt-in stage:** `--queue-review` calls the same existing
+minute worker and can store ONE pending-review ticket in
+`~/.atlas-internal-review/`. It uses private owner-controlled directory
+permissions `0700`, file permissions `0600`, exclusive create, bounded
+known fields, symlink/ownership checks and strict existing-ticket
+comparison. Repeating the same event reports `DUPLICATE_SKIPPED`, not
+another ticket. The ticket contains no client data, credentials, commands,
+webhook URLs, copied logs, instructions to invoke models or authority to
+run repairs. It is a **pending review record only**, not autonomous action.
+No new launchd job, cron task, network listener or Docker container.
+
+GitHub CI tests cover synthetic healthy/failing/stale snapshots, source
+tampering, fixed priority, known alert mapping, replay IDs, private
+file writes in temporary mock directories, duplicate suppression, symlink
+and unsafe-permission denial, no Mac service changes, and no-cloud/no-send.
+These CI results do not prove deployment, 60-second completion, 24/7
+availability or an operational remote ChatGPT status connection.
+
+**Release path to actual owner-Mac integration:**
+
+1. Confirm on the *Mac itself* that the original 60-second Watchdog,
+   Observer Snapshot and Continuation jobs are loaded/running and that
+   the snapshot is fresh; avoid repeated ad hoc installs.
+2. Preserve the owner-verified Stage2 read-only Observer and existing
+   `atlas_ping` canary. Verify tunnel client key scope, exact original
+   launch/rollback metadata and permissions **before** any separate
+   owner-approved cutover from 18787 (canary) to 18788 (Observer).
+3. After approved, pinned and separately staged source, run a **single**
+   private `--run-once` diagnostic. Then separately authorise exactly
+   `--queue-review` for a non-consequential internal ticket; inspect that
+   repeated calls create one file, without installing another scheduler.
+4. Independently review and authorise any future consumer of those tickets
+   before connecting Activepieces/SQLite/AI. It must persist consumed IDs,
+   implement bounded retries, handle Mac sleep, preserve human approvals,
+   and distinguish review work from actual external actions.
+5. Only call remote observability LIVE after ChatGPT's actual `atlas_status`
+   tool returns a fresh allowlisted Mac status, rather than the current
+   fixed canary `ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS`.
+
+There is still **no auto-repair, direct ChatGPT-to-Mac shell, automatically
+queued sales job, new AI subscription or live tunnel cutover** in this
+source change. It is intended to remove duplicate hourly-planning work
+without falsely claiming unattended automation is already operational.
