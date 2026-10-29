@@ -124,12 +124,21 @@ if(invoked){
         process.stdout.write(JSON.stringify(report)+'\n');
       } else if(report.reviewCandidate.candidate){
         const receipt=storeReviewTicket({candidate:report.reviewCandidate.candidate});
-        process.stdout.write(JSON.stringify({...report,privateReviewTicket:receipt})+'\n');
+        const wrote=receipt.status==='CREATED_PENDING_REVIEW';
+        // This opt-in mode CAN create one private file, unlike --run-once.
+        // Never misreport it as a zero-write run or as execution of the task.
+        process.stdout.write(JSON.stringify({...report,
+          reviewItemsActuallyEnqueued:wrote?1:0,
+          localReviewTicketWritten:wrote,
+          changesApplied:receipt.status==='HOLD'?'PRIVATE_QUEUE_STATE_UNVERIFIED':wrote,
+          existingMacServicesModified:false,
+          privateReviewTicket:receipt,
+        })+'\n');
         if(receipt.status==='HOLD')process.exitCode=2;
       }else{
         process.stdout.write(JSON.stringify({...report,privateReviewTicket:{
           status:'NO_CANDIDATE_NO_WRITE',ticketsCreated:0,ticketsExecuted:0
-        }})+'\n');
+        },localReviewTicketWritten:false,existingMacServicesModified:false})+'\n');
       }
     }
   }else if(mode==='--help'){
