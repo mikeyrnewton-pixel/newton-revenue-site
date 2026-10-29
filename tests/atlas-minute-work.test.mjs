@@ -9,6 +9,7 @@ import {spawnSync} from "node:child_process";
 import {fileURLToPath} from "node:url";
 import {makeSnapshot} from "../scripts/atlas-observer-snapshot.mjs";
 import {minuteWork,auditPinnedSources,PINNED,STAGE,MINUTE_SCHEMA} from "../scripts/atlas-minute-work.mjs";
+import {storeReviewTicket,QUEUE_FOLDER} from "../scripts/atlas-private-review-queue.mjs";
 
 const NOW=Date.UTC(2026,9,24,22,0,0);
 const sourceNames=Object.keys(PINNED);
@@ -123,6 +124,37 @@ test("Review finding creates no actual repair or provider request",async()=>{
     assert.equal(r.reviewItemsActuallyEnqueued,0);
   });
 });
+test("Full synthetic Observer fault -> one private review ticket -> duplicate suppressed, never executed",async()=>{
+  await fixture(async({go,home,statusPath,writeStatus})=>{
+    const bad=baseStatus();
+    bad.containers.activepiecesWorker="NOT_RUNNING";
+    await writeStatus(bad);
+    const input=await fs.readFile(statusPath);
+    const report=go();
+    assert.equal(report.reviewCandidate.status,"REVIEW_CANDIDATE_NOT_ENQUEUED");
+    assert.equal(report.reviewCandidate.candidate.kind,"REVIEW_CORE_HEALTH");
+    assert.equal(report.reviewItemsActuallyEnqueued,0);
+    const first=storeReviewTicket({home,uid:process.getuid(),
+      candidate:report.reviewCandidate.candidate});
+    const again=storeReviewTicket({home,uid:process.getuid(),
+      candidate:go().reviewCandidate.candidate});
+    assert.equal(first.status,"CREATED_PENDING_REVIEW");
+    assert.equal(again.status,"DUPLICATE_SKIPPED");
+    assert.equal(first.ticketsCreated,1);
+    assert.equal(first.ticketsExecuted,0);
+    assert.equal(first.customerMessagesSent,0);
+    const queue=path.join(home,QUEUE_FOLDER);
+    const names=await fs.readdir(queue);
+    assert.deepEqual(names,[report.reviewCandidate.candidate.id+".json"]);
+    const ticket=JSON.parse(await fs.readFile(path.join(queue,names[0]),"utf8"));
+    assert.equal(ticket.state,"PENDING_OWNER_REVIEW_ONLY");
+    assert.equal(ticket.workerExecuted,false);
+    assert.equal(ticket.externalCommunication,false);
+    assert.equal(ticket.servicesChanged,false);
+    assert.deepEqual(await fs.readFile(statusPath),input);
+  });
+});
+
 test("Minute worker CLI has no daemon/start/repair action",()=>{
   const p=fileURLToPath(new URL("../scripts/atlas-minute-work.mjs",import.meta.url));
   for(const args of [[],["--daemon"],["--repair"],["--install"],["--schedule"],["--run-once","--write"]]){
