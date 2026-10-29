@@ -85,7 +85,27 @@ for f in atlas-observer-cutover-operator.mjs atlas-tunnel-cutover-contract-20261
 done
 test "$(git hash-object "$d/atlas-observer-cutover-operator.mjs")" = "411451b0312db462c9dbc1e9bfc8f8c1fe99c1db"
 test "$(git hash-object "$d/atlas-tunnel-cutover-contract-20261026.mjs")" = "cabb212c842bc482cdfb5f4cead7fe8b1f9a5e6d"
-NODE="$(command -v node || printf /opt/homebrew/bin/node)"
+# iPhone SSH sessions can have a minimal PATH and Node can live under NVM,
+# Volta, Mise or FNM rather than /opt/homebrew/bin.
+PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
+NODE="$(command -v node 2>/dev/null || true)"
+if [ -z "$NODE" ]; then
+  for p in "$HOME/.volta/bin/node" "$HOME/.n/bin/node" "/usr/local/opt/node/bin/node"; do
+    if [ -x "$p" ]; then NODE="$p"; break; fi
+  done
+fi
+if [ -z "$NODE" ]; then
+  for dir in "$HOME/.nvm/versions/node" "$HOME/.local/share/mise/installs/node" "$HOME/.fnm/node-versions"; do
+    if [ -d "$dir" ]; then
+      NODE="$(find "$dir" -type f -name node -print -quit 2>/dev/null || true)"
+      if [ -n "$NODE" ]; then break; fi
+    fi
+  done
+fi
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  echo "NODE_NOT_FOUND_NO_MAC_CHANGE"
+  exit 2
+fi
 "$NODE" "$d/atlas-observer-cutover-operator.mjs" --preflight
 ~~~
 
@@ -104,7 +124,27 @@ unknown or unsafe key. The separate fact that a Platform screenshot showed
 ~~~bash
 set -eu
 d="$HOME/.atlas-observer-cutover-code"
-NODE="$(command -v node || printf /opt/homebrew/bin/node)"
+# iPhone SSH sessions can have a minimal PATH and Node can live under NVM,
+# Volta, Mise or FNM rather than /opt/homebrew/bin.
+PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
+NODE="$(command -v node 2>/dev/null || true)"
+if [ -z "$NODE" ]; then
+  for p in "$HOME/.volta/bin/node" "$HOME/.n/bin/node" "/usr/local/opt/node/bin/node"; do
+    if [ -x "$p" ]; then NODE="$p"; break; fi
+  done
+fi
+if [ -z "$NODE" ]; then
+  for dir in "$HOME/.nvm/versions/node" "$HOME/.local/share/mise/installs/node" "$HOME/.fnm/node-versions"; do
+    if [ -d "$dir" ]; then
+      NODE="$(find "$dir" -type f -name node -print -quit 2>/dev/null || true)"
+      if [ -n "$NODE" ]; then break; fi
+    fi
+  done
+fi
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  echo "NODE_NOT_FOUND_NO_MAC_CHANGE"
+  exit 2
+fi
 ATLAS_REVIEWED_KEY_MATCH=YES ATLAS_WORKSPACE_MATCH=YES   "$NODE" "$d/atlas-observer-cutover-operator.mjs" --apply-readonly-observer
 ~~~
 
@@ -137,7 +177,27 @@ connection fails, use the independently working iPhone SSH shortcut:
 ~~~bash
 set -eu
 d="$HOME/.atlas-observer-cutover-code"
-NODE="$(command -v node || printf /opt/homebrew/bin/node)"
+# iPhone SSH sessions can have a minimal PATH and Node can live under NVM,
+# Volta, Mise or FNM rather than /opt/homebrew/bin.
+PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
+NODE="$(command -v node 2>/dev/null || true)"
+if [ -z "$NODE" ]; then
+  for p in "$HOME/.volta/bin/node" "$HOME/.n/bin/node" "/usr/local/opt/node/bin/node"; do
+    if [ -x "$p" ]; then NODE="$p"; break; fi
+  done
+fi
+if [ -z "$NODE" ]; then
+  for dir in "$HOME/.nvm/versions/node" "$HOME/.local/share/mise/installs/node" "$HOME/.fnm/node-versions"; do
+    if [ -d "$dir" ]; then
+      NODE="$(find "$dir" -type f -name node -print -quit 2>/dev/null || true)"
+      if [ -n "$NODE" ]; then break; fi
+    fi
+  done
+fi
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  echo "NODE_NOT_FOUND_NO_MAC_CHANGE"
+  exit 2
+fi
 "$NODE" "$d/atlas-observer-cutover-operator.mjs" --rollback
 ~~~
 
@@ -163,3 +223,54 @@ the same checks.
 
 Tests use mocked Docker and temp directories. Current evidence does not
 include actual execution of this new operator on the owner's Mac.
+
+
+## 29 October 2026, 09:26 UK — iPhone SSH Node PATH correction
+
+The owner ran the pinned original preflight staging Shortcut. It reached
+`zsh:17: no such file or directory: /opt/homebrew/bin/node`. Because
+`set -eu` was active and the fallback Node executable was the final
+step, source downloads and preceding `git hash-object` assertions appear
+to have passed; **there was no Node execution, no Docker inspection and
+no cutover**. SSH transport itself was working. No keys or passwords are
+needed for troubleshooting.
+
+Corrective action: re-run only the short existing-directory read-only
+preflight with the robust Node lookup below. Do **not** re-download or
+overwrite verified sources.
+
+~~~bash
+set -eu
+d="$HOME/.atlas-observer-cutover-code"
+test "$(git hash-object "$d/atlas-observer-cutover-operator.mjs")" = "411451b0312db462c9dbc1e9bfc8f8c1fe99c1db"
+test "$(git hash-object "$d/atlas-tunnel-cutover-contract-20261026.mjs")" = "cabb212c842bc482cdfb5f4cead7fe8b1f9a5e6d"
+# iPhone SSH sessions can have a minimal PATH and Node can live under NVM,
+# Volta, Mise or FNM rather than /opt/homebrew/bin.
+PATH="/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
+NODE="$(command -v node 2>/dev/null || true)"
+if [ -z "$NODE" ]; then
+  for p in "$HOME/.volta/bin/node" "$HOME/.n/bin/node" "/usr/local/opt/node/bin/node"; do
+    if [ -x "$p" ]; then NODE="$p"; break; fi
+  done
+fi
+if [ -z "$NODE" ]; then
+  for dir in "$HOME/.nvm/versions/node" "$HOME/.local/share/mise/installs/node" "$HOME/.fnm/node-versions"; do
+    if [ -d "$dir" ]; then
+      NODE="$(find "$dir" -type f -name node -print -quit 2>/dev/null || true)"
+      if [ -n "$NODE" ]; then break; fi
+    fi
+  done
+fi
+if [ -z "$NODE" ] || [ ! -x "$NODE" ]; then
+  echo "NODE_NOT_FOUND_NO_MAC_CHANGE"
+  exit 2
+fi
+"$NODE" "$d/atlas-observer-cutover-operator.mjs" --preflight
+~~~
+
+If `NODE_NOT_FOUND_NO_MAC_CHANGE` appears, stop; locate or install a
+trusted local Node runtime as a separate software decision. Do not
+replace this check with a random remote script, broaden Docker privileges,
+or try the `--apply-readonly-observer` mode until preflight passes and
+the *mounted* runtime key is actually matched to the reviewed restricted
+permission record and workspace.
