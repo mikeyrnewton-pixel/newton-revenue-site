@@ -30,9 +30,12 @@ fmt(){
     *) exit 15;;
   esac
 }
+exercise(){
 ${fragment}
 printf 'VERIFIED_CMD_COUNT=%s\\n' "\${#cmdargs[@]}"
 printf 'VERIFIED_CMD=%s\\n' "\${cmdargs[*]}"
+}
+exercise
 `;
   return spawnSync('bash',['-c',shell],{encoding:'utf8',timeout:4000,env:{...process.env,...fixture}});
 }
