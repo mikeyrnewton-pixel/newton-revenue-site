@@ -60,8 +60,34 @@ localcheck(){
   actual_entry="$("$D" image inspect "$image" --format '{{json .Config.Entrypoint}}' 2>/dev/null)" ||
     hold IMAGE_ENTRYPOINT_UNAVAILABLE
   [ "$existing_entry" = "$actual_entry" ] || hold CUSTOM_ENTRYPOINT
-  [ "$(fmt '{{json .Config.Cmd}}' "$OLD")" = '["run","--control-plane.api-key=file:/run/secrets/runtime-key"]' ] ||
-    hold CUSTOM_COMMAND
+  # Docker can place 'run' in the IMAGE entrypoint and keep only the
+  # file-backed key in Cmd (actual owner-reported 31 Oct shape).
+  # Require exact known-safe layouts and the resulting Args; never accept
+  # unknown extra flags, an overwritten entrypoint or a second 'run'.
+  local entrycount cmdtext argstext entrysecond
+  entrycount="$(fmt '{{len .Config.Entrypoint}}' "$OLD")"
+  cmdtext="$(fmt '{{json .Config.Cmd}}' "$OLD")"
+  argstext="$(fmt '{{json .Args}}' "$OLD")"
+  cmdargs=()
+  if [ "$entrycount" = 2 ]; then
+    entrysecond="$(fmt '{{index .Config.Entrypoint 1}}' "$OLD")"
+    [ "$entrysecond" = run ] || hold CUSTOM_ENTRYPOINT_LAYOUT
+    [ "$cmdtext" = '["--control-plane.api-key=file:/run/secrets/runtime-key"]' ] ||
+      hold CUSTOM_COMMAND
+    [ "$argstext" = '["run","--control-plane.api-key=file:/run/secrets/runtime-key"]' ] ||
+      hold CUSTOM_ARGS
+    cmdargs=(--control-plane.api-key=file:/run/secrets/runtime-key)
+    echo "ATLAS_COMMAND_LAYOUT=ENTRYPOINT_RUN_EXACT"
+  elif [ "$entrycount" = 1 ]; then
+    [ "$cmdtext" = '["run","--control-plane.api-key=file:/run/secrets/runtime-key"]' ] ||
+      hold CUSTOM_COMMAND
+    [ "$argstext" = '["run","--control-plane.api-key=file:/run/secrets/runtime-key"]' ] ||
+      hold CUSTOM_ARGS
+    cmdargs=(run --control-plane.api-key=file:/run/secrets/runtime-key)
+    echo "ATLAS_COMMAND_LAYOUT=COMMAND_RUN_EXACT"
+  else
+    hold CUSTOM_ENTRYPOINT_LAYOUT
+  fi
   echo "ATLAS=LOCAL_PREFLIGHT_VERIFIED_NODE_NOT_NEEDED"
   echo "ATLAS_KEY_ROLE=EXTERNAL_IDENTITY_ATTESTATION_REQUIRED"
   echo "ATLAS_TUNNEL=ORIGINAL_UNTOUCHED"
@@ -153,14 +179,16 @@ case "$MODE" in
       [[ "$user" =~ ^[1-9][0-9]*:[1-9][0-9]*$ ]] || hold UNREVIEWED_TUNNEL_USER
       userarg=(--user "$user")
     fi
-    # No Docker socket shared; only the incumbent's sole RO key mount.
+    # Mirror the exact verified original image/entrypoint + command layout.
+    # Image-entrypoint 'run' MUST NOT be passed a second time.
+    [ "${#cmdargs[@]}" -ge 1 ] || hold COMMAND_LAYOUT_NOT_VERIFIED
     "$D" container create --name "$NEW" --network "container:$CANARY" \
       --volumes-from "$OLD:ro" --read-only --cap-drop ALL \
       --security-opt no-new-privileges:true --restart no \
       --pids-limit 64 --memory 128m \
       --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
       "${userarg[@]}" "${envargs[@]}" \
-      "$img" run --control-plane.api-key=file:/run/secrets/runtime-key >/dev/null 2>&1 ||
+      "$img" "${cmdargs[@]}" >/dev/null 2>&1 ||
         hold CANDIDATE_CREATION_FAILED
     cid="$(fmt '{{.Id}}' "$NEW")";validid "$cid"
     [ "$(fmt '{{.State.Running}}' "$NEW")" = false ] &&
