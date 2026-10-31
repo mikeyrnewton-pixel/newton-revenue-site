@@ -31,8 +31,8 @@ fmt(){
   esac
 }
 ${fragment}
-printf 'VERIFIED_CMD_COUNT=%s\\n' "${#cmdargs[@]}"
-printf 'VERIFIED_CMD=%s\\n' "${cmdargs[*]}"
+printf 'VERIFIED_CMD_COUNT=%s\\n' "\${#cmdargs[@]}"
+printf 'VERIFIED_CMD=%s\\n' "\${cmdargs[*]}"
 `;
   return spawnSync('bash',['-c',shell],{encoding:'utf8',timeout:4000,env:{...process.env,...fixture}});
 }
