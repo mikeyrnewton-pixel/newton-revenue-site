@@ -20,6 +20,7 @@ function check(overrides={}){
     ...overrides,
   };
   const shell=`set -euo pipefail
+OLD=atlas-tunnel-client-canary
 hold(){ printf 'ATLAS=HOLD_%s\\n' "$1"; exit 2; }
 fmt(){
   case "$1" in
