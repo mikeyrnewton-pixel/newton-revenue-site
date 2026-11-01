@@ -41,6 +41,8 @@ test('No arbitrary execution, external network activity, or root image upgrades'
   assert.match(body,/--security-opt no-new-privileges:true/);
   assert.match(body,/--restart no/);
   assert.match(body,/--network "container:\$CANARY"/);
+  assert.match(body, /userarg\[@\]\+/);
+  assert.match(body, /envargs\[@\]\+/);
 });
 
 test('Cutover explicitly requires separately verified restricted key and workspace',()=>{
