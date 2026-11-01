@@ -27,6 +27,36 @@ for audit only.
 - The connected ChatGPT app still exposes ONLY fixed `atlas_ping`, returning
   `ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS`; no fresh `atlas_status`.
 
+## Recovered original key-provisioning chain — 1 November 2026
+
+Previously recorded owner-side actions (not a newly read secret):
+
+- **22 Oct:** user created the restricted named `ATLAS Tunnel Runtime`
+  key. Existing setup script used `umask 077` and an owner-private directory,
+  read the key from stdin, saved it to
+  `~/.atlas-tunnel/runtime-key` with mode 0600,
+  and produced `METADATA_OK_KEY_CONTENT_NOT_READ`.
+- **23 Oct:** the original `atlas-tunnel-client-canary` was launched
+  from `ghcr.io/openai/tunnel-client:v0.0.17` with
+  `~/.atlas-tunnel/runtime-key` file-backed mounted read-only at
+  `/run/secrets/runtime-key`.
+- **27 Oct:** the key UI and intended tunnel/workspace were reviewed as
+  restricted **Tunnels Read+Use, Manage OFF**.
+- **1 Nov:** the actual Mac still reports that same Docker target running,
+  a read-only owner-restricted runtime-key mount, and an exact corrected
+  observer cutover **preflight pass**.
+- **No intervening key rotation or file replacement is recorded.**
+
+**Evidence grade:** substantial continuity of provisioning, *not*
+cryptographic proof that the file's current secret bytes equal the
+previously reviewed Platform credential. Since the owner explicitly
+said they were unsure which key is mounted, do not convert the absence
+of a rotation record into a categorical assertion. No need to
+repeat the already-completed generic Tunnels Read+Use/workspace UI review.
+Seek only a safe, supported confirmation of present-day identity or a
+record of file replacement before applying. Do not print, hash, rotate,
+upload or copy the secret. Always keep independent SSH rollback.
+
 **Next owner-controlled action:** confirm locally (or from documented secure
 provisioning evidence) that the existing mounted runtime credential is the
 previously reviewed restricted **ATLAS Tunnel Runtime** key and is not a
