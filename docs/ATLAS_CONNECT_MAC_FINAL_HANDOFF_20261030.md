@@ -1,3 +1,48 @@
+# STATUS UPDATE — 1 November 2026 (supersedes earlier steps)
+
+**DO NOT rerun the 30 October iPhone bootstrap below.** Its source pin
+stages the pre-correction operator and would undo the verified command-layout
+fix if run again. The remaining historical instructions are retained below
+for audit only.
+
+**Owner-Mac checks actually completed in screenshots by 01:15–01:33 GMT:**
+- Original canary tunnel still running; installed runtime-key mount is a
+  regular file with restrictive owner-only metadata.
+- The correctly pinned entrypoint-aware operator was already staged on Mac
+  through `atlas-observer-owner-entryfix-preflight-20261031.sh` (Git blob
+  `092ad6a1375be16c69f04fedd5a2a23d67ef04e7`).
+- Read-only preflight **PASSED**, including
+  `ATLAS_COMMAND_LAYOUT=ENTRYPOINT_RUN_EXACT`,
+  `ATLAS=LOCAL_PREFLIGHT_VERIFIED_NODE_NOT_NEEDED` and
+  `ATLAS_ENTRYFIX=READ_ONLY_PREFLIGHT_PASS`.
+- The operator on disk must still be checked against corrected Git blob
+  `aff88a85b5cac2d93958ce4aca6d333fae6e8196` before executing apply.
+- Owner previously reviewed a separate Platform credential called
+  **ATLAS Tunnel Runtime** as Restricted, Tunnels Read+Use, Manage off,
+  and selected the intended organization/tunnel/ChatGPT workspace.
+- **Only unresolved identity fact:** whether the credential bytes presently
+  in the existing file-backed Mac tunnel are the same previously reviewed
+  restricted runtime key. File permissions do NOT establish this binding.
+  Do not request secret bytes, secret-hashes, pasted tokens or key rotation.
+- The connected ChatGPT app still exposes ONLY fixed `atlas_ping`, returning
+  `ATLAS_TUNNEL_CANARY_OK_NO_MAC_ACCESS`; no fresh `atlas_status`.
+
+**Next owner-controlled action:** confirm locally (or from documented secure
+provisioning evidence) that the existing mounted runtime credential is the
+previously reviewed restricted **ATLAS Tunnel Runtime** key and is not a
+substituted/general-purpose key. A simple unverified variable `YES` is
+not proof. If identity can be attested, proceed with already-authorised
+reversible `--apply-readonly-observer` using exact corrected blob only,
+verify ChatGPT plugin tool refresh and a fresh timestamped read-only
+`atlas_status`; otherwise retain canary and request the minimum
+account-side credential binding evidence. Rollback must use independent
+owner iPhone SSH, not the ATLAS app.
+
+**Do not add more preflight questions or repeat old bootstrap.** The remaining
+work is a scoped cutover and final remote proof, not a new project.
+
+---
+
 # ATLAS — finish the Mac ↔ ChatGPT read-only Observer connection
 
 **Status, 30 October 2026:** Source-only upgrade. No Mac-side switch has
