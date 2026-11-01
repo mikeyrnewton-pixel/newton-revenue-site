@@ -12,13 +12,17 @@ const changed=readFileSync(fixed,'utf8');
 test('Bash32 variant is valid Bash and is strictly one-line change from baseline',()=>{
   const r=spawnSync('bash',['-n',fixed],{encoding:'utf8',timeout:5000});
   assert.equal(r.status,0,r.stderr);
-  const a=original.split('\n'),b=changed.split('\n');
-  assert.equal(a.length,b.length);
-  const differences=a.map((x,i)=>({x,y:b[i]})).filter(({x,y})=>x!==y);
-  assert.equal(differences.length,1);
-  assert.match(differences[0].x,/userarg\[@\]/);
-  assert.match(differences[0].y,/userarg\[@\]\+/);
-  assert.match(differences[0].y,/envargs\[@\]\+/);
+  // Current review branch already contains the same safe one-line fix, but
+  // has three accidentally embedded explanatory comments in the Docker
+  // continuation. The standalone release variant omits only those comments.
+  const clean = original.split('\n').filter(line=>
+    !line.trim().startsWith('# macOS ships Bash 3.2:') &&
+    !line.trim().startsWith('# as "')
+    && !line.trim().startsWith('# expansions keep zero optional')
+  ).join('\n');
+  assert.equal(changed,clean);
+  assert.match(changed,/userarg\[@\]\+/);
+  assert.match(changed,/envargs\[@\]\+/);
   assert.match(changed,/^set -euo pipefail$/m);
   assert.match(changed,/ATLAS=LOCAL_CUTOVER_STARTED_REMOTE_NOT_VERIFIED/);
   assert.match(changed,/ORIGINAL_CANARY_RESTORED/);
