@@ -187,7 +187,10 @@ case "$MODE" in
       --security-opt no-new-privileges:true --restart no \
       --pids-limit 64 --memory 128m \
       --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
-      "${userarg[@]}" "${envargs[@]}" \
+      # macOS ships Bash 3.2: under `set -u`, an empty array expanded
+      # as "${userarg[@]}" can throw "unbound variable". Conditional
+      # expansions keep zero optional --user args without broadening scope.
+      "${userarg[@]+"${userarg[@]}"}" "${envargs[@]+"${envargs[@]}"}" \
       "$img" "${cmdargs[@]}" >/dev/null 2>&1 ||
         hold CANDIDATE_CREATION_FAILED
     cid="$(fmt '{{.Id}}' "$NEW")";validid "$cid"
