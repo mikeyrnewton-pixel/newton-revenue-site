@@ -123,8 +123,13 @@ export function makeController({
       base();
       const id = random().toString("hex");
       if (!isId(id)) fail("RANDOM_ID_INVALID");
-      const createdAt = new Date(now()).toISOString();
-      const expiresAt = new Date(now() + TTL_MS).toISOString();
+      // Use one time sample: separate now() calls can differ by even 1 ms,
+      // causing verifyRequest's exact 30-minute TTL invariant to reject a
+      // newly-created request before its actual expiration.
+      const createdMs = now();
+      if (!Number.isSafeInteger(createdMs)) fail("CLOCK_INVALID");
+      const createdAt = new Date(createdMs).toISOString();
+      const expiresAt = new Date(createdMs + TTL_MS).toISOString();
       const r = {schema:SCHEMA,id,action:ACTION,createdAt,expiresAt};
       writeOnlyOnce(fileFor(pdir,id),r);
       return {status:"PROPOSED_NOT_APPROVED",id,action:ACTION,expiresAt};
