@@ -52,3 +52,17 @@ test("runs MCP _meta acceptance check on all 3 tools after isolated restart",()=
  assert.match(code,/s\.status!=="FRESH"/);
  assert.match(code,/cap\.writeActions!==false\|\|cap\.macShell!==false/);
 });
+
+test("Docker no-host-ports representations accepted, but exposed ports still denied",()=>{
+ const source = code;
+ assert.match(source,/ports="\$\(fmt '\{\{json \.HostConfig\.PortBindings\}\}' "\$OBS"\)"/);
+ assert.match(source,/case "\$ports" in null\|'\{\}'\) ;; \*\) hold OBSERVER_HOST_PORTS_EXPOSED;; esac/);
+ for(const value of ["null","{}"]){
+  const p=spawnSync("bash",["-c",'p="$1"; case "$p" in null|"{}") exit 0;; *) exit 2;; esac',"--",value],{encoding:"utf8"});
+  assert.equal(p.status,0,"should accept "+value);
+ }
+ for(const value of ['{"18788/tcp":[{"HostPort":"18788"}]}', "INSPECT_FAILED", "[]", '{"x":{}}']){
+  const p=spawnSync("bash",["-c",'p="$1"; case "$p" in null|"{}") exit 0;; *) exit 2;; esac',"--",value],{encoding:"utf8"});
+  assert.equal(p.status,2,"must reject "+value);
+ }
+});
