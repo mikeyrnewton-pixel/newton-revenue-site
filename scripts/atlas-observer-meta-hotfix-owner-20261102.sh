@@ -61,7 +61,11 @@ done
 [ "$(fmt '{{range .Mounts}}{{if eq .Destination "/opt/atlas-observer/scripts"}}{{.Source}}{{end}}{{end}}' "$OBS")" = "$SCRIPTS" ] &&
 [ "$(fmt '{{range .Mounts}}{{if eq .Destination "/run/atlas-observer"}}{{.Source}}{{end}}{{end}}' "$OBS")" = "$SNAP" ] ||
  hold OBSERVER_MOUNTS_CHANGED
-[ "$(fmt '{{json .HostConfig.PortBindings}}' "$OBS")" = null ] &&
+# Docker represents zero host port bindings as either null or {}.
+# Reject ALL nonempty mappings; no host ports may be exposed.
+ports="$(fmt '{{json .HostConfig.PortBindings}}' "$OBS")"
+case "$ports" in null|'{}') ;; *) hold OBSERVER_HOST_PORTS_EXPOSED;; esac
+
 [ "$(fmt '{{index .Config.Labels "com.newton.atlas.observer-review"}}' "$OBS")" = v1 ] &&
 [ "$(fmt '{{json .Config.Entrypoint}}' "$OBS")" = '["node"]' ] &&
 [ "$(fmt '{{json .Config.Cmd}}' "$OBS")" = '["--max-old-space-size=64","/opt/atlas-observer/scripts/atlas-mcp-observer.mjs","--serve"]' ] &&
