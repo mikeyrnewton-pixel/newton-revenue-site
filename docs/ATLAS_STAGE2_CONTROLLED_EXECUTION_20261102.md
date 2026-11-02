@@ -26,11 +26,9 @@ Single allowlisted action: `local_proof_v1`.
 - **Important threat boundary:** owner approval and executor use the same macOS account in this prototype. This is *not* robust against a remote process already holding arbitrary shell access as that user. DO NOT expose `approve` or `execute` through MCP. Production must use independent authorization (separate principal/key or physically separated owner approval) and server-side enforcement.
 
 ## Owner-only LOCAL proof trial, AFTER QA approval
-1. Copy the source from a reviewed, pinned commit to a private Mac location using a verified Git blob. Do not overwrite existing Atlas files; do not install a daemon.
-2. From the owner's trusted iPhone SSH channel, run:
-   `node atlas-stage2-controlled-executor.mjs list`
-3. Create a harmless proposal:
-   `node atlas-stage2-controlled-executor.mjs propose local_proof_v1`
+1. Use the separately pinned `scripts/atlas-stage2-local-proof-bootstrap-20261102.sh` through the trusted iPhone SSH channel, with a checked Git blob. It downloads exactly the reviewed source and runs `list` in a one-off, no-network, no-privilege Docker container reusing the locally cached Node image. It does not start a daemon or restart the Observer.
+2. The private source is installed at `~/.atlas-stage2-proof-source/atlas-stage2-controlled-executor.mjs`. Private state is mounted from `~/.atlas-stage2-proof-private`; no shared folders or Docker socket.
+3. For the subsequent owner-only proof, run the *same* isolated Docker configuration with `propose local_proof_v1` instead of `list`, after its wrapper is independently reviewed. Do not run a host Node command, assume Node is installed on macOS, or enable arbitrary commands.
 4. The tool returns a one-time request ID. Only on an explicit owner decision, issue:
    `node atlas-stage2-controlled-executor.mjs approve <request-id> I_APPROVE_STAGE2_LOCAL_PROOF`
 5. Then the owner can test:
