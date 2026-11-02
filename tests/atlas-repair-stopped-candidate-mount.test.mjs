@@ -34,6 +34,10 @@ test('bind source is the existing owner-private key, never copied, printed or ro
   assert.match(code, /\$HOME\/\.atlas-tunnel\/runtime-key/);
   assert.match(code, /--mount "type=bind,source=\$src,target=\/run\/secrets\/runtime-key,readonly"/);
   assert.match(code, /CANDIDATE_SOURCE_NOT_EXPECTED_MISMATCH/);
+  assert.match(code, /\[ ! -f "\$candidate_src" \]/);
+  assert.match(code, /\[ ! -L "\$candidate_src" \]/);
+  assert.doesNotMatch(code, /\[ ! -e "\$candidate_src" \]/);
+  assert.doesNotMatch(code, /\b(rm|mv|cp) "\$candidate_src"/);
   assert.match(code, /REPAIRED_SOURCE_NOT_IDENTICAL/);
   assert.match(code, /KEY_BIND_UNSAFE/);
   assert.doesNotMatch(code, /\b(cat|cp|mv|rm|shasum|sha256sum) "\$src"/);
