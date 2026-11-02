@@ -28,7 +28,9 @@ const setup=fn=>{
  try{return fn({gate,stateRoot,home,pem,setTime,time,makeApproval,signFor});}
  finally{fs.rmSync(home,{recursive:true,force:true});}
 };
-const mustHold=(cb,code)=>assert.throws(cb,new RegExp("ATLAS_STAGE2B_HOLD_"+code));
+const mustHold=(cb,code)=>assert.throws(cb,code instanceof RegExp ?
+ new RegExp("ATLAS_STAGE2B_HOLD_(?:"+code.source+")") :
+ new RegExp("ATLAS_STAGE2B_HOLD_"+code));
 
 test("single harmless action only; no networking, arbitrary shell or commercial effects",()=>setup(({gate})=>{
  const a=gate.listActions();
