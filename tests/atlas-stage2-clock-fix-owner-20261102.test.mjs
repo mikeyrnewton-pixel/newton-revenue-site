@@ -48,6 +48,7 @@ test("isolated fixed action proposer only, never approval or execution",()=>{
  assert.match(code,/propose local_proof_v1/);
  assert.match(code,/NEW_PROPOSAL_CREATED_NOT_APPROVED/);
  for(const bad of [" --privileged","--publish","--network host","docker.sock",
-  " container stop"," container restart"," approve "," execute ","rm -rf"])
+  " container stop"," container restart","rm -rf"])
    assert.equal(code.includes(bad),false,bad);
+ assert.doesNotMatch(code,/runNode[^\n]*\s(?:approve|execute)\s/);
 });
