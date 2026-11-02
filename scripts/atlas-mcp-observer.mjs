@@ -110,9 +110,14 @@ export function handleObserverMcp(message, {readSnapshot = readSnapshotFile, now
   // Accept only the MCP tool name and optional zero-argument object. Ignoring
   // extra command/path/URL/schema fields would create a fail-open boundary if
   // future code ever started consuming them.
-  if (!exactKeys(message.params, ["name", "arguments"]) ||
+  // MCP Request.params permits a reserved _meta object for transport/client
+  // metadata. Ignore it completely; never treat it as tool arguments or
+  // authority, and continue rejecting every other extraneous field.
+  if (!exactKeys(message.params, ["name", "arguments", "_meta"]) ||
       typeof message.params.name !== "string" ||
-      !TOOLS.some(tool => tool.name === message.params.name)) return error(id, -32602, "Tool not allowed");
+      !TOOLS.some(tool => tool.name === message.params.name) ||
+      (Object.hasOwn(message.params, "_meta") && !inertRecord(message.params._meta)))
+    return error(id, -32602, "Tool not allowed");
   const args = message.params.arguments === undefined ? {} : message.params.arguments;
   if (!exactKeys(args, []))
     return error(id, -32602, "Arguments not allowed");
