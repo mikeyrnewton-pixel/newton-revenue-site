@@ -46,7 +46,9 @@ esac
 # Avoid strange mount source injection before Docker invocation.
 case "$S:$P" in *','*|*$'\n'*|*$'\r'*) hold UNSAFE_MOUNT_PATH;; esac
 runNode() {
- "$D" run --rm --pull=never --network none --read-only \
+ # Keep stdin available for a module-aware syntax check; still no network,
+ # Docker socket, privileges, or remote write permissions.
+ "$D" run -i --rm --pull=never --network none --read-only \
  --cap-drop ALL --security-opt no-new-privileges:true \
  --pids-limit 32 --memory 128m --cpus 0.25 \
  --user "$(id -u):$(id -g)" --env HOME=/run/atlas-stage2 \
@@ -61,8 +63,10 @@ if ! /usr/bin/curl -fsSL --max-time 30 "$URL" -o "$TMP" >/dev/null 2>&1;then
 fi
 [ "$(sha "$TMP")" = "$NEW_SHA" ] || hold DOWNLOAD_HASH_MISMATCH
 chmod 600 "$TMP"
-NAME="$(basename "$TMP")"
-if ! runNode --check "/opt/atlas-stage2/$NAME" >/dev/null 2>&1;then
+# mktemp has a random filename suffix, which Node does not recognize as
+# an ESM extension. Check the verified script as stdin with explicit module
+# mode instead; never relax the syntax gate.
+if ! runNode --check --input-type=module < "$TMP" >/dev/null 2>&1;then
  hold NODE_SYNTAX_CHECK_FAILED
 fi
 # Create a separate backup inode first, then hard-link it exclusively into
