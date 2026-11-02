@@ -239,7 +239,7 @@ test("tool parameter and schema smuggling fails closed without reading status", 
     {name:"atlas_status",arguments:{},path:"/etc/passwd"},
     {name:"atlas_status",arguments:{},url:"http://127.0.0.1:8080"},
     {name:"atlas_status",arguments:{},inputSchema:{additionalProperties:true}},
-    {name:"atlas_status",arguments:{},_meta:{injected:"sk-DO-NOT-REFLECT"}},
+    {name:"atlas_status",arguments:{},unrecognized:{injected:"sk-DO-NOT-REFLECT"}},
   ];
   for(const params of attempts){
     const result=call("tools/call",params,1,deps);
@@ -247,6 +247,26 @@ test("tool parameter and schema smuggling fails closed without reading status", 
     assert.equal(JSON.stringify(result).includes("sk-DO-NOT-REFLECT"),false);
   }
   assert.equal(reads,0);
+});
+
+test("standard MCP _meta is ignored safely, without adding tool authority", () => {
+  let reads=0;
+  const deps={readSnapshot:()=>{reads++;return snap();},now:()=>NOW};
+  const metadata={progressToken:"opaque-client-token", "client/hint":"ignored", extra:{user:"sk-FIXTURE-NOT-REFLECTED"}};
+  for(const name of ["atlas_ping","atlas_capabilities","atlas_status"]){
+    const result=call("tools/call",{name,arguments:{},_meta:metadata},1,deps);
+    assert.equal(result.error,undefined,name);
+    assert.equal(result.isError,undefined);
+    assert.equal(JSON.stringify(result).includes("sk-FIXTURE-NOT-REFLECTED"),false);
+  }
+  assert.equal(reads,1);
+  for(const invalid of [null, [], "hello", 42]){
+    assert.equal(call("tools/call",{name:"atlas_status",arguments:{},_meta:invalid},1,deps).error.code,-32602);
+  }
+  assert.equal(call("tools/call",{name:"run_shell",arguments:{},_meta:metadata},1,deps).error.code,-32602);
+  assert.equal(call("tools/call",{name:"atlas_status",arguments:{command:"whoami"},_meta:metadata},1,deps).error.code,-32602);
+  assert.equal(call("tools/call",{name:"atlas_status",arguments:{},_meta:metadata,command:"whoami"},1,deps).error.code,-32602);
+  assert.equal(reads,1);
 });
 
 test("top-level JSON-RPC envelope smuggling fails before snapshot access", () => {
