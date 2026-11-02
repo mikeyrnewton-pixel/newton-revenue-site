@@ -62,6 +62,24 @@ test("unknown action, extra CLI commands and path smuggling all rejected",()=>fi
  assert.equal(cli.status,2);
  assert.match(cli.stdout,/STAGE2_HOLD_COMMAND_NOT_ALLOWLISTED/);
 }));
+test("proposal TTL is exact even when consecutive clock reads differ by milliseconds",()=>fixture(home=>{
+ const epoch=Date.UTC(2026,10,2,15,21,35);
+ let reads=0;
+ const c=makeController({
+   home,
+   now:()=>epoch+(reads++),
+   random:()=>Buffer.from("bc".repeat(12),"hex")
+ });
+ const p=c.propose("local_proof_v1");
+ const r=JSON.parse(fs.readFileSync(path.join(localRoot(home),"requests",p.id+".json"),"utf8"));
+ assert.equal(Date.parse(r.expiresAt)-Date.parse(r.createdAt),30*60*1000);
+ assert.equal(p.expiresAt,r.expiresAt);
+ const approved=c.approve(p.id,consent);
+ assert.equal(approved.status,"OWNER_APPROVAL_RECORDED");
+ assert.equal(c.execute(p.id).status,"LOCAL_PROOF_EXECUTED");
+ assert.equal(c.receipt(p.id).result,"LOCAL_PROOF_ONLY");
+ assert.ok(reads>=4,"test actually moved time across calls");
+}));
 test("proposal expires and cannot be approved/executed late",()=>fixture(home=>{
  const t={value:Date.UTC(2026,10,2,10,0,0)},c=controller(home,t);
  const p=c.propose("local_proof_v1");
