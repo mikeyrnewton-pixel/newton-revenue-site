@@ -39,8 +39,13 @@ candidate_src="$(fmt '{{range .Mounts}}{{if eq .Destination "/run/secrets/runtim
 [ "$(stat -f %l "$src")" = 1 ] || hold ORIGINAL_KEY_SOURCE_UNSAFE
 case "$(stat -f %Lp "$src")" in 400|600) ;; *) hold ORIGINAL_KEY_PERMISSIONS;; esac
 case "$src" in *','*|*$'\n'*) hold KEY_PATH_FORMAT;; esac
-[ "$candidate_src" != "$src" ] && [ -n "$candidate_src" ] && [ ! -e "$candidate_src" ] ||
+[ "$candidate_src" != "$src" ] && [ -n "$candidate_src" ] &&
+[ "${candidate_src#/}" != "$candidate_src" ] &&
+[ ! -L "$candidate_src" ] && [ ! -f "$candidate_src" ] ||
   hold CANDIDATE_SOURCE_NOT_EXPECTED_MISMATCH
+# An unrelated source may be absent or a directory created by Docker; never
+# read, overwrite, move or remove the old source. Only replace the stopped
+# candidate container after all remaining confinement and identity guards.
 [ "$(fmt '{{range .Mounts}}{{if eq .Destination "/run/secrets/runtime-key"}}{{if and (eq .Type "bind") (not .RW)}}yes{{end}}{{end}}{{end}}' "$OLD")" = yes ] &&
 [ "$(fmt '{{range .Mounts}}{{if eq .Destination "/run/secrets/runtime-key"}}{{if and (eq .Type "bind") (not .RW)}}yes{{end}}{{end}}{{end}}' "$NEW")" = yes ] || hold KEY_BIND_UNSAFE
 canary_id="$(fmt '{{.Id}}' "$CANARY")"
