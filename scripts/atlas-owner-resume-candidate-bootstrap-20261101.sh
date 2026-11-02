@@ -1,6 +1,6 @@
 #!/bin/bash
-# Pinned owner-SSH one-step: stage the verified stopped-candidate resume.
-# Only already-authorised reversible read-only ATLAS tunnel cutover permitted.
+# Owner-SSH preparation ONLY: stage and inspect the stopped Observer candidate.
+# Never cut over, assert credential identity, or modify Docker state here.
 set -euo pipefail
 umask 077
 say(){ printf 'ATLAS_OWNER_RESUME=%s\n' "$1"; }
@@ -18,7 +18,15 @@ stage3="$dir/atlas-observer-stage3-preflight-20261024.sh"
 [ "$(/usr/bin/git hash-object "$stage3" 2>/dev/null)" = 3d06691eaf200e5be3669d8e35da0394c15fb628 ] ||
   hold STAGE3_NOT_VERIFIED
 target="$dir/atlas-observer-resume-stopped-candidate-20261101.sh"
-[ ! -e "$target" ] && [ ! -L "$target" ] || hold RESUME_FILE_ALREADY_PRESENT
+[ ! -L "$target" ] || hold RESUME_FILE_SYMLINK
+if [ -e "$target" ]; then
+  [ -f "$target" ] &&
+  [ "$(/usr/bin/git hash-object "$target" 2>/dev/null)" = 147e2d3d7dcf64cf54023bdc0d75225b7aad9704 ] || hold EXISTING_RESUME_SOURCE_UNVERIFIED
+  say EXISTING_RESUME_SOURCE_VERIFIED
+  /bin/bash "$target" --inspect-only
+  say INSPECTION_ONLY_NO_CUTOVER
+  exit 0
+fi
 temp="$(mktemp "$dir/.resume-reviewed.XXXXXXXX")" || hold TEMP_FILE_FAILED
 url='https://raw.githubusercontent.com/mikeyrnewton-pixel/newton-revenue-site/16301b723f863c134592af32472f9513db631200/scripts/atlas-observer-resume-stopped-candidate-20261101.sh'
 if ! /usr/bin/curl -fsSL --max-time 30 "$url" -o "$temp" >/dev/null 2>&1; then
@@ -33,6 +41,6 @@ fi
 chmod 600 "$temp" || hold STAGED_PERMISSIONS
 mv "$temp" "$target" || hold STAGED_MOVE
 say PATCHED_RESUME_VERIFIED
-ATLAS_REVIEWED_KEY_MATCH=YES ATLAS_WORKSPACE_MATCH=YES \
-  /bin/bash "$target" --apply-existing-candidate
-say APPLY_SCRIPT_EXITED_SUCCESSFULLY
+/bin/bash "$target" --inspect-only
+say INSPECTION_ONLY_NO_CUTOVER
+say KEY_IDENTITY_REQUIRES_SEPARATE_ACCOUNT_SIDE_PROOF
