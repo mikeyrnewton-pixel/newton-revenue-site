@@ -65,15 +65,14 @@ NAME="$(basename "$TMP")"
 if ! runNode --check "/opt/atlas-stage2/$NAME" >/dev/null 2>&1;then
  hold NODE_SYNTAX_CHECK_FAILED
 fi
-# Backup is owner private and only created if absent, never overwritten.
-if ! /bin/ln "$TARGET" "$BACKUP" 2>/dev/null;then hold BACKUP_CREATE_FAILED;fi
-# Hardlink backup would share inode; ensure original backup is independent.
-BP="$S/.atlas-stage2-backup.XXXXXXXX"
-BPTMP="$(mktemp "$BP")" || hold BACKUP_TEMP_FAILED
+# Create a separate backup inode first, then hard-link it exclusively into
+# the destination. Never hard-link the original source file itself.
+BPTMP="$(mktemp "$S/.atlas-stage2-backup.XXXXXXXX")" || hold BACKUP_TEMP_FAILED
+trap 'rm -f "$TMP" "$BPTMP" 2>/dev/null || true' EXIT
 if ! cp "$TARGET" "$BPTMP" || ! chmod 600 "$BPTMP" ||
  [ "$(sha "$BPTMP")" != "$OLD_SHA" ];then hold BACKUP_VERIFY_FAILED;fi
-# Replace hardlink using a separate inode, preserving pre-fix source.
-mv -f "$BPTMP" "$BACKUP" || hold BACKUP_MOVE_FAILED
+/bin/ln "$BPTMP" "$BACKUP" 2>/dev/null || hold BACKUP_ALREADY_EXISTS
+/bin/rm "$BPTMP" || hold BACKUP_CLEANUP_FAILED
 [ "$(sha "$BACKUP")" = "$OLD_SHA" ] &&
 [ "$(stat -f %l "$BACKUP")" = 1 ] || hold BACKUP_NOT_VERIFIED
 [ "$(sha "$TARGET")" = "$OLD_SHA" ] || hold SOURCE_CHANGED_DURING_STAGE
