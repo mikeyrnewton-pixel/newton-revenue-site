@@ -17,6 +17,10 @@ jobs:
           node-version: '22'
       - name: Run website API tests
         run: npm test
+      - name: Verify read-only connection audit without real accounts or API calls
+        run: |
+          python3 -m py_compile scripts/atlas_connections_audit_20261102.py
+          python3 scripts/atlas_connections_audit_20261102.py --self-test
       - name: Record public Mac bootstrap SHA256
         run: |
           shasum -a 256 scripts/bootstrap_mac_builds.sh
