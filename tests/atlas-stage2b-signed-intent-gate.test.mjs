@@ -77,7 +77,7 @@ test("tampering with action, identifier or digest never executes",()=>setup(({ga
  mustHold(()=>gate.executeLocalProof(p.intent,fake,sig),"APPROVAL_INVALID");
  assert.equal(fs.existsSync(stateRoot),false);
 }));
-test("forged signatures, malformed encodings and wrong public key rejected",()=>setup(({gate,makeApproval,signFor})=>{
+test("forged signatures, malformed encodings and wrong public key rejected",()=>setup(({gate,makeApproval,signFor,time})=>{
  const p=gate.propose(),a=makeApproval(p),sig=signFor(a);
  const fake="A".repeat(86);
  mustHold(()=>gate.executeLocalProof(p.intent,a,fake),"SIGNATURE_INVALID");
@@ -85,7 +85,7 @@ test("forged signatures, malformed encodings and wrong public key rejected",()=>
  mustHold(()=>gate.executeLocalProof(p.intent,a,sig.slice(0,85)),"SIGNATURE_INVALID");
  mustHold(()=>gate.executeLocalProof(p.intent,{...a,purpose:"OTHER"},sig),"APPROVAL_INVALID");
  const other=generateKeyPairSync("ed25519");
- const badGate=makeStage2BGate({ownerPublicKeyPem:other.publicKey.export({type:"spki",format:"pem"}),stateRoot:"/tmp/atlas-stage2b-unused"});
+ const badGate=makeStage2BGate({ownerPublicKeyPem:other.publicKey.export({type:"spki",format:"pem"}),stateRoot:"/tmp/atlas-stage2b-unused",now:()=>time});
  mustHold(()=>badGate.verifyOwnerApproval(p.intent,a,sig),"SIGNATURE_INVALID");
 }));
 test("late owner approval can occur after hours; short signed approval expiry enforced",()=>setup(({gate,setTime,time,makeApproval,signFor})=>{
