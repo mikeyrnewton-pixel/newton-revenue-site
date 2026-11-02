@@ -13,8 +13,11 @@ test('bootstrap is valid Bash, fixed immutable source, no Docker container opera
   assert.match(code,/d8f9948b9fb51412b453b170b6c5c9d619f39d8c/);
   assert.match(code,/3d06691eaf200e5be3669d8e35da0394c15fb628/);
   assert.doesNotMatch(code,/container (create|start|stop|rm|run)/);
-  assert.match(code,/--apply-existing-candidate/);
-  assert.match(code,/RESUME_FILE_ALREADY_PRESENT/);
+  assert.match(code,/--inspect-only/);
+  assert.doesNotMatch(code,/--apply-existing-candidate/);
+  assert.doesNotMatch(code,/ATLAS_REVIEWED_KEY_MATCH=YES|ATLAS_WORKSPACE_MATCH=YES/);
+  assert.match(code,/EXISTING_RESUME_SOURCE_UNVERIFIED/);
+  assert.match(code,/INSPECTION_ONLY_NO_CUTOVER/);
 });
 test('bootstrap rejects arguments and non-Mac hosts before staging',()=>{
   const p=spawnSync('bash',[file,'--delete'],{encoding:'utf8'});
