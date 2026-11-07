@@ -33,6 +33,21 @@ FFMPEG="$(node -e 'const p=require(process.argv[1]);process.stdout.write(p)' "$M
 export HYPERFRAMES_FFMPEG_PATH="$FFMPEG"
 echo "FFmpeg: $("$FFMPEG" -version | head -n 1)"
 
+# Persistent launcher for future SSH sessions and unattended video renders.
+# Keeps architecture-specific media paths available without changing system PATH.
+cat > "$ROOT/bin/atlas-hyperframes" <<'ATLAS_LAUNCHER'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT="$HOME/ATLAS-OSS"
+export PATH="$ROOT/vendor/node-v24.13.0-darwin-arm64/bin:$ROOT/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+export HYPERFRAMES_FFMPEG_PATH="$(node -e 'process.stdout.write(require(process.argv[1]))' "$ROOT/vendor/media/node_modules/ffmpeg-static")"
+export HYPERFRAMES_FFPROBE_PATH="$(node -e 'process.stdout.write(require(process.argv[1]).path)' "$ROOT/vendor/media/node_modules/@ffprobe-installer/ffprobe")"
+exec "$ROOT/vendor/hyperframes/node_modules/.bin/hyperframes" "$@"
+ATLAS_LAUNCHER
+chmod 700 "$ROOT/bin/atlas-hyperframes"
+HF="$ROOT/bin/atlas-hyperframes"
+echo "Persistent launcher: $HF"
+
 echo "Disabling nonessential HyperFrames telemetry..."
 "$HF" telemetry disable || true
 
